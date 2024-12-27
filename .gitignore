@@ -127,14 +127,14 @@ dmypy.json
 # Org-mode files
 *.org
 
-# Conda environment folder
+# Various folders
 conda_env/
-
-# Results folder
 results/
-
-# Video folder
 videos/
-
-# Emacs folders
 .auctex-auto/
+
+# Pyright configs
+pyrightconfig.json
+
+# Emacs configs
+.dir-locals.el

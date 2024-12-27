@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clean-aif"
+authors = [
+    {name = "Filippo Torresan", email = "merlin.onirik.d98xe@slmail.me"},
+]
+description = "My package description"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["active inference", "gridworld"]
+license = {text = "Apache License 2.0"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "pandas",
+    "scipy",
+    "opencv-python",
+    "gymnasium >= 0.27"
+]
+dynamic = ["version"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.dynamic]
+version = {attr = "aifgym.__init__.VERSION"}
+
+[project.scripts]
+run-aifgym = "aifgym:main" # main refers to the function inside the top level __init__.py
+vis-aifgym = "aifgym.visuals:main"  # main refers to the function inside the __init__py of visuals
