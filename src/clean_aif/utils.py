@@ -1156,3 +1156,32 @@ def cat_KL(Q, P, axis=0):
         raise ValueError("Inputs dimensions should be equal or greater than 1.")
 
     return kl_div
+
+
+def process_obs(obs: np.ndarray) -> int:
+    """
+    Function to convert a (x, y) representation of a state in the gridworld to an index representation
+    that numbers each state from 0 to 8 starting from the top left corner and moving from left to right,
+    top to bottom
+
+    Input:
+    - obs: np.ndarray, (x, y)
+    Ouput:
+    - index: int
+    """
+
+    index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+
+    state_index = index_repr[obs[0], obs[1]].item()
+
+    return state_index
+
+
+def convert_state(state: int) -> np.ndarray:
+    """"""
+
+    index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+
+    x, y = np.where(index_repr == state)
+
+    return np.array([x[0], y[0]])

@@ -29,8 +29,9 @@ dynamic = ["version"]
 where = ["."]
 
 [tool.setuptools.dynamic]
-version = {attr = "aifgym.__init__.VERSION"}
+version = {attr = "clean_aif.__init__.VERSION"}
 
 [project.scripts]
-run-aifgym = "aifgym:main" # main refers to the function inside the top level __init__.py
+main_aif_paths = "clean_aif.aif_path:main" # main refers to the function inside the script `aif_path.py`
+main_aif_plans = "clean_aif.aif_plans:main" # main refers to the function inside the script `aif_plans.py`
 vis-aifgym = "aifgym.visuals:main"  # main refers to the function inside the __init__py of visuals
