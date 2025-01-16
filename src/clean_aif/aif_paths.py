@@ -18,12 +18,12 @@ import gymnasium
 import gymnasium_env  # Needed otherwise NamespaceNotFound error
 import numpy as np
 import os
-from typing import TypedDict, cast
+from typing import TypedDict, cast, Tuple
 from scipy import special
 from pathlib import Path
 
 # Custom imports
-from .config import PROJECT_ROOT, LOG_DIR, RESULTS_DIR
+from .config import LOG_DIR
 from .utils import *
 
 
@@ -47,11 +47,11 @@ class Args:
     """ the number of observation channels or modalities """
     obs_channels: int = 1
     """ dimensions of observations for each channel """
-    obs_dims: list = [1]
+    obs_dims: Tuple[int] = (1,)
     """ the number of factors in the environment """
     factors: int = 1
     """ dimensions of each factor """
-    factors_dims: list = [1]
+    factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
     start_state: int = 0
     """ index of goal state/location """
@@ -68,7 +68,7 @@ class Args:
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
     ``field(default_factory = custom_func)``)"""
     """ C array: specifies agent's preferred state(s) in the environment """
-    C_array: np.ndarray = field(
+    C_params: np.ndarray = field(
         default_factory=lambda: Args.init_C_array(Args.num_states, Args.num_steps)
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
@@ -89,8 +89,9 @@ class Args:
         implementations: pymdp).
         """
 
-        # Policies to move in Gridworld-v1 TODO: make sure these corresponds to valid action in the enviroment
-        policies = np.array([[2, 2, 1, 0], [1, 1, 2, 2]])
+        # Policies to move in Gridworld-v1
+        # NOTE: 0: "right", 1: "up", 2: "left", 3: "down"
+        policies = np.array([[1, 1, 0, 2], [0, 0, 1, 1]])
 
         return policies
 
@@ -203,34 +204,34 @@ class Args:
             labels_rl = env_matrix_labels[:, r]
 
             if r == 0:
-                # Up action
-                B_params[0, labels_ud, labels_ud] = 1
-                # Down action
-                B_params[2, labels_ud + 3, labels_ud] = 1
-                # Right action
-                B_params[1, labels_rl + 1, labels_rl] = 1
-                # Left action
-                B_params[3, labels_rl, labels_rl] = 1
+                # Up action: 1
+                B_params[1, labels_ud, labels_ud] = 1
+                # Down action: 3
+                B_params[3, labels_ud + 3, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl + 1, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl, labels_rl] = 1
 
             elif r == 1:
-                # Up action
-                B_params[0, labels_ud - 3, labels_ud] = 1
-                # Down action
-                B_params[2, labels_ud + 3, labels_ud] = 1
-                # Right action
-                B_params[1, labels_rl + 1, labels_rl] = 1
-                # Left action
-                B_params[3, labels_rl - 1, labels_rl] = 1
+                # Up action: 1
+                B_params[1, labels_ud - 3, labels_ud] = 1
+                # Down action: 3
+                B_params[3, labels_ud + 3, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl + 1, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl - 1, labels_rl] = 1
 
             elif r == 2:
-                # Up action
-                B_params[0, labels_ud - 3, labels_ud] = 1
-                # Down action
-                B_params[2, labels_ud, labels_ud] = 1
-                # Right action
-                B_params[1, labels_rl, labels_rl] = 1
-                # Left action
-                B_params[3, labels_rl - 1, labels_rl] = 1
+                # Up action: 1
+                B_params[1, labels_ud - 3, labels_ud] = 1
+                # Down action: 3
+                B_params[3, labels_ud, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl - 1, labels_rl] = 1
 
         # Increasing the magnitude of the Dirichlet parameters so that when the B matrices are sampled
         # the correct transitions for every action will have a value close to 1.
@@ -288,9 +289,9 @@ class params(TypedDict):
     exp_name: str
     num_states: int
     obs_channels: int
-    obs_dim: list
+    obs_dim: tuple
     factors: int
-    factors_dims: list
+    factors_dims: tuple
     start_state: int
     goal_state: int
     num_actions: int
@@ -680,12 +681,12 @@ class Agent(object):
                 # one at time by keeping all the others fixed. Here, we are instead using a simultaneous
                 # update of all the factors, possibly repeating this operation a few times. However,
                 # results seem OK even if the for loop iterates just for one step.
-                print(f"BEFORE update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
+                # print(f"BEFORE update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
                 # print(f"Gradient for update: {grad_F_pi}")
                 self.Qs_pi[pi, :, :] = sigma(
                     (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1, axis=0
                 )
-                print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
+                # print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
 
                 # Storing the state beliefs at the first step of the episode
                 if self.current_tstep == 0:
@@ -694,8 +695,8 @@ class Agent(object):
             ######### END ###########
 
             # Printing the free energy value for current policy at current time step
-            print(f"Time Step: {self.current_tstep}")
-            print(f" FE_pi_{pi}: {F_pi}")
+            # print(f"Time Step: {self.current_tstep}")
+            # print(f" FE_pi_{pi}: {F_pi}")
             # Storing the last computed free energy in self.free_energies
             self.free_energies[pi, self.current_tstep] = F_pi
             # Computing the policy-independent state probability at self.current_tstep and storing
@@ -802,20 +803,20 @@ class Agent(object):
                 self.efe_risk[pi, self.current_tstep] = tot_slog_s_over_C
                 self.efe_Anovelty[pi, self.current_tstep] = tot_AsW_As
                 self.efe_Bnovelty[pi, self.current_tstep] = tot_AsW_Bs
-                print(f"--- Summary of planning at time step {self.current_tstep} ---")
-                print(f"FE_{pi}: {F_pi}")
-                print(f"EFE_{pi}: {G_pi}")
-                print(f"Risk_{pi}: {tot_slog_s_over_C}")
-                print(f"Ambiguity {pi}: {tot_Hs}")
-                print(f"A-novelty {pi}: {tot_AsW_As}")
-                print(f"B-novelty {pi}: {tot_AsW_Bs}")
+                # print(f"--- Summary of planning at time step {self.current_tstep} ---")
+                # print(f"FE_{pi}: {F_pi}")
+                # print(f"EFE_{pi}: {G_pi}")
+                # print(f"Risk_{pi}: {tot_slog_s_over_C}")
+                # print(f"Ambiguity {pi}: {tot_Hs}")
+                # print(f"A-novelty {pi}: {tot_AsW_As}")
+                # print(f"B-novelty {pi}: {tot_AsW_Bs}")
 
                 if self.current_tstep == 0:
-                    print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
+                    # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
                     self.efe_Bnovelty_t[pi] += sq_AsW_Bs
-                    print(
-                        f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
-                    )
+                    # print(
+                    #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
+                    # )
                     # if sq_AsW_Bs[2] > 2200:
                     #     raise Exception("B-novelty too high")
 
@@ -904,7 +905,7 @@ class Agent(object):
 
             action_selected = self.rng.choice(argmax_actions)
 
-        return action_selected
+        return int(action_selected)
 
     def action_selection_KL(self):
         """Method for action selection based on the Kullback-Leibler divergence, as described in
@@ -1367,19 +1368,21 @@ def main():
     # Add arguments to the parser
     ### General arguments ###
     parser.add_argument(
-        "--exp-name",
+        "--exp_name",
+        "-expn",
         type=str,
-        default="aif-pi-paths",
+        default="aif-paths",
         help="the name of this experiment based on the active inference implementation",
     )
     parser.add_argument(
-        "--gym-id",
+        "--gym_id",
+        "-gid",
         type=str,
         default="GridWorld-v1",
         help="the name of the registered gym environment (choices: GridWorld-v1)",
     )
     parser.add_argument(
-        "--num-runs",
+        "--num_runs",
         "-nr",
         type=int,
         default=30,
@@ -1396,11 +1399,11 @@ def main():
         "--num_steps",
         "-ns",
         type=int,
-        nargs="?",
+        required=True,
         help="number of steps per episode or total number of steps (depending on type of agent)",
     )
     parser.add_argument(
-        "--learning-rate",
+        "--learning_rate",
         "-lr",
         type=float,
         default=2.5e-4,
@@ -1411,8 +1414,8 @@ def main():
     ### Agent-specific arguments ###
     # Inference
     parser.add_argument(
-        "--inference_steps",
-        "-inf_steps",
+        "--inf_steps",
+        "-infstp",
         type=int,
         default=1,
         help="number of free energy minimization steps",
@@ -1471,7 +1474,7 @@ def main():
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
     data_path = LOG_DIR.joinpath(
         dt_string
-        + f'{cl_params["env_name"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
+        + f'{cl_params["gym_id"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
     )
     data_path.mkdir(parents=True, exist_ok=True)
 
@@ -1486,15 +1489,23 @@ def main():
     agent_params = Args()
     # Convert dataclass to dictionary
     agent_params = asdict(agent_params)
+
     # Update agent_params with corresponding key values in cl_params, and/or add key from cl_params
-    agent_params.update(cl_params)
+    # Custom update function not overwriting default parameter's value if the one from the CL is None
+    def update_params(default_params, new_params):
+        for key, value in new_params.items():
+            if value is not None:
+                default_params[key] = value
+
+    update_params(agent_params, cl_params)
+    # print(agent_params)
 
     ##########################
     ### 4. INIT ENV
     ##########################
 
     # Retrieve name of the environment
-    env_module_name = cl_params["gym-id"]
+    env_module_name = cl_params["gym_id"]
     # Number of runs (or agents interacting with the env)
     NUM_RUNS = agent_params["num_runs"]
     # Number of episodes
@@ -1512,7 +1523,7 @@ def main():
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS, render_mode="human"
+        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS, render_mode=None
     )
 
     ##############################
@@ -1551,6 +1562,9 @@ def main():
             # is_terminal = False
 
             # Reset the environment
+            # NOTE: the Gymnasium environment's observation is a dictionary with the locations of the agent and
+            # the goal/target, i.e. {'agent': array([0, 0]), 'target': array([2, 2])}, but we need only the
+            # location of the agent!
             obs, info = env.reset(
                 options={
                     "deterministic_agent_loc": AGENT_LOC,
@@ -1559,6 +1573,9 @@ def main():
                 },
             )
 
+            # Retrieve observation of the agent's location
+            # print(f"Observation: {obs}; type {type(obs)}")
+            obs = obs["agent"]
             # Convert obs into index representation
             start_state = process_obs(obs)
             # Adding a unit to the state_visits counter for the start_state
@@ -1572,14 +1589,20 @@ def main():
             while steps_count < NUM_STEPS:
                 # Agent returns an action based on current observation/state
                 action = agent.step(current_state)
+                print(f"Agent action {action}, {type(action)}")
                 # Except when at the last episode's step, the agent's action affects the environment;
                 # at the last time step the environment does not change but the agent engages in learning
                 # (parameters update)
                 if steps_count < NUM_STEPS - 1:
                     # Environment outputs based on agent action
                     next_obs, reward, terminated, truncated, info = env.step(action)
+                    # Retrieve observation of the agent's location
+                    next_obs = next_obs["agent"]
+                    print(f"Next obs: {next_obs}")
+
                     # Convert observation into index representation
                     next_state = process_obs(next_obs)
+                    print(f"Next state: {next_state}")
                     # Update total_reward
                     total_reward += reward
 
@@ -1600,6 +1623,8 @@ def main():
 
             # Retrieve all agent's attributes, including episodic metrics we want to save
             all_metrics = agent.__dict__
+            # Adding the key-value pair `total_reward` which is not among the agent's attributes
+            all_metrics["total_reward"] = total_reward
             # Call the logs_writer function to save the episodic info we want
             # NOTE: unpack dictionary with `**` to feed the function with  key-value arguments
             logs_writer.log_episode(run, e, **all_metrics)
@@ -1615,7 +1640,7 @@ def main():
             #         env.make_video(str(e), VIDEO_DIR)
 
     # Save all collected data in a dictionary
-    logs_writer.save_data(LOG_DIR)
+    logs_writer.save_data(data_path)
 
 
 # if __name__ == "__main__":

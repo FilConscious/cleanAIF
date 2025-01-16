@@ -1,6 +1,6 @@
 
 
-# Clean-aif
+# CleanAIF
 
 Train active inference agents in custom Gymnasium environments and visualize their behaviour.
 
@@ -22,15 +22,15 @@ Since its inception, the project has been kept private, and many excellent proje
 
 2.  Clone the Github repository (or download it into the same folder):
     
-    `git clone https://github.com/FilConscious/AiFGym.git`
+    `git clone https://github.com/FilConscious/cleanAIF.git`
 
-3.  Create Python virtual environment or conda environment with a recent version of Python, e.g.:
+3.  Create Python virtual environment or conda environment with a recent version of Python (>=3.10), e.g.:
     
-    `conda create --name aifgym-env python=3.12`
+    `conda create --name myenv python=3.12`
 
 4.  Activate the environment:
     
-    `conda activate aifgym-env`
+    `conda activate myenv`
 
 5.  Install the package:
     
@@ -47,15 +47,15 @@ For detailed instructions, see [Installation](docs/aif-gym-docs.md).
 
 2.  Activate conda environment
     
-    `conda activate name-of-env`
+    `conda activate myenv`
 
-3.  Execute Python script for training
+3.  Execute a Python script for training
     
-    `run-aifgym -task task1 -env GridWorldv0 -nr 1 -ne 2 -pt states -as kd`
+    `main_aif_paths --exp_name "aif-paths" --gym_id "GridWorld-v1" --num_runs 1 --num_episodes 10 --num_steps 5  --pref_type states --action_selection kd`
 
 4.  Execute Python script for data visualization
     
-    `vis-aifgym -i 4 -v 8 -ti 0 -tv 8 -vl 3 -hl 3`
+    `plot_aif_paths -i 4 -v 8 -ti 0 -tv 8 -vl 3 -hl 3`
 
 For more detailed instructions, see [How to Run an Experiment](docs/aif-gym-docs.md).
 

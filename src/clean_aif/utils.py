@@ -685,18 +685,18 @@ def efe(
                         np.matmul(W_B, Qs_pi[pi, :, tau]),
                     )
                     if current_tstep == 0:
-                        print(f"EFE at future time step {tau}: {AsW_Bs}")
+                        # print(f"EFE at future time step {tau}: {AsW_Bs}")
                         sq_AsW_Bs[tau] = AsW_Bs
 
                         if tau == 2:
-                            print(f"Action: {action}")
+                            # print(f"Action: {action}")
                             b = 1 / B_params[action, :, :]
                             b_zero = 1 / np.sum(B_params[action, :, :], axis=0)
-                            print(f"First/last row of b: {b[(0,-1),:]}")
-                            print(
-                                f"First/last row of b_zero: {b_zero[0]}, {b_zero[-1]}"
-                            )
-                            print(f"The Q(s|pi) at {tau+1}: {Qs_pi[pi, :, tau+1]}")
+                            # print(f"First/last row of b: {b[(0,-1),:]}")
+                            # print(
+                            #     f"First/last row of b_zero: {b_zero[0]}, {b_zero[-1]}"
+                            # )
+                            # print(f"The Q(s|pi) at {tau+1}: {Qs_pi[pi, :, tau+1]}")
 
                 # IMPORTANT: here we are replacing zero probabilities with the minimum value in C to
                 # avoid zeroes in logs. Note that this keeps the meaning of the KL divergence
@@ -1172,7 +1172,7 @@ def process_obs(obs: np.ndarray) -> int:
 
     index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
 
-    state_index = index_repr[obs[0], obs[1]].item()
+    state_index = index_repr[obs[1], obs[0]].item()
 
     return state_index
 
@@ -1182,6 +1182,6 @@ def convert_state(state: int) -> np.ndarray:
 
     index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
 
-    x, y = np.where(index_repr == state)
+    y, x = np.where(index_repr == state)
 
     return np.array([x[0], y[0]])
