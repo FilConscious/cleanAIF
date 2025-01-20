@@ -6,186 +6,484 @@ Created at 18:00 on 21st July 2024
 """
 
 # Standard libraries imports
-import importlib
-import copy
-import gymnasium as gym
+
+# Standard libraries imports
+import os
+import argparse
+
+# import copy
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+import gymnasium
+import gymnasium_env  # Needed otherwise NamespaceNotFound error
 import numpy as np
 import os
-import time
-import tyro
-import random
+from typing import TypedDict, cast, Tuple
 from scipy import special
-from dataclasses import dataclass
+from pathlib import Path
 
-# Custom packages/modules imports
-# from ..agents.utils_actinf import *
+# Custom imports
+from .config import LOG_DIR
+from .utils import *
 
 
 @dataclass
 class Args:
-    # General
+    """
+    Dataclass that defines and stores default parameters for the agent class.
+    """
+
+    ### General ###
     """the name of this experiment"""
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    """seed of the experiment"""
-    seed: int = 1
-    # Environment
-    env_id: str = "DarkRoom-v1"
-    # Agent
-    """the number of observation channels or modalities"""
+    ### Environment ###
+    """ Environment ID """
+    gym_id: str = "GridWorld-v1"
+    """ Max number of steps in an episode """
+    num_steps: int = 100
+    """ Number of environmental states (represented by indices 0,1,2,..,8) """
+    num_states: int = 9
+    ### Agent ###
+    """ the number of observation channels or modalities """
     obs_channels: int = 1
-    """dimensions of observations for each channel"""
-    obs_dims: list = [10]
-    """the number of factors in the environment"""
+    """ dimensions of observations for each channel """
+    obs_dims: Tuple[int] = (1,)
+    """ the number of factors in the environment """
     factors: int = 1
-    """dimensions of each factor"""
-    factors_dims: list = [10]
-    """number of free energy minimization steps"""
-    inference_steps: int = 1
-    """number of policies (i.e. sequences of actions) for planning"""
-    num_policies: int = 5
-    """planning horizon (i.e. length of a policy)"""
-    plan_horizon: int = 5
-    """type of agent's preferences ("states" or "obs")"""
-    pref_type: str = "states"
-    """type of action selection mechanism"""
+    """ dimensions of each factor """
+    factors_dims: Tuple[int] = (1,)
+    """ index of starting state (agent knows start location) """
+    start_state: int = 0
+    """ index of goal state/location """
+    goal_state: int = 8
+    """ planning horizon, also the length of a policy """
+    """ NOTE: also MAX number of future steps for which expected free energy is computed """
+    plan_horizon: int = 4
+    """ number of actions (represented by indices 0,1,2,3)"""
+    num_actions: int = 4
+    """ init empty agent's policies arrays """
+    policies: np.ndarray = field(
+        default_factory=lambda: Args.init_policies(Args.num_actions)
+    )
+    ### Agent's knowledge of the environment ###
+    """NOTE: using field() to generate a default value for the attribute when an instance is created,
+    by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
+    ``field(default_factory = custom_func)``) TODO: Clarify this note!!!!"""
+    """ C array: specifies agent's preferred state(s) in the environment """
+    C_params: np.ndarray = field(
+        default_factory=lambda: Args.init_C_array(Args.num_states)
+    )
+    """ B params: specifies Dirichlet parameters to compute transition probabilities """
+    B_params: np.ndarray = field(
+        default_factory=lambda: Args.init_B_params(Args.num_states, Args.num_actions)
+    )
+    """ A params: specifies Dirichlet parameters to compute observation probabilities """
+    A_params: np.ndarray = field(
+        default_factory=lambda: Args.init_A_params(Args.num_states)
+    )
+
+    @staticmethod
+    def init_policies(num_actions: int) -> np.ndarray:
+        """
+        Create initial agent's policies array.
+        """
+
+        # Array to store policies crated at the planning stage
+        policies = np.empty((0, num_actions))
+
+        return policies
+
+    # def __post_init__(self):
+    #     """
+    #     Class method that runs at instance creation AFTER the dataclass is initialized, useful for additional
+    #     initialization logic that depends on the instance attributes.
+    #     """
+
+    #     # Create and set preference array for the agent
+    #     self.pref_array = self.create_pref_array(self.num_states, self.num_steps)
+
+    @staticmethod
+    def init_C_array(num_states: int, pref_type: str = "state") -> np.ndarray:
+        """
+        Initialize preference array, denoted by C in the active inference literature. The vector
+        stores the parameters of a categorical distribution with the probability mass concentrated on
+        the preferred/desired location of the agent in the maze environment.
+
+        NOTE 1: preferences can be either over states (default) or observations.
+
+        Input:
+        - num_states: number of states in the environment
+        - pref_type: preference type ("state" or "obs")
+
+        Ouput:
+
+        - pref_array: np.ndarray (matrix) of shape (num_states, 1)
+        """
+
+        # Initialize preference vector
+        pref_array = np.ones((num_states, 1)) * (1 / num_states)
+
+        if pref_type == "states":
+            # Assign probability to non-goal states...
+            pref_array[:-1, 1] = 0.1 / (num_states - 1)
+            # Assign probability to goal state
+            pref_array[-1, 1] = 0.9
+            # Checking all the probabilities sum to one
+            assert np.all(np.sum(pref_array, axis=0)) == 1, print(
+                "The preferences do not sum to one!"
+            )
+
+        elif pref_type == "obs":
+            # NOTE 1: we are assuming a 1-to-1 correspondence between states and observations, i.e. obs `1`
+            # indicates to the agent that it is in state `1`. Thus, the agent actually deals with an MDP as
+            # opposed to a POMDP, and selecting either type of preferences does not make a difference.
+            # NOTE 2; implement and use this kind of preferences with an actual POMDP (i.e., an observation
+            # `1` of the environment may or may not indicate state `1`).
+
+            # Assign probability to non-goal observation...
+            pref_array[:-1, 1] = 0.1 / (num_states - 1)
+            # Assign probability to goal observation
+            pref_array[-1, 1] = 0.9
+            # Checking all the probabilities sum to one
+            assert np.all(np.sum(pref_array, axis=0)) == 1, print(
+                "The preferences do not sum to one!"
+            )
+
+        return pref_array
+
+    @staticmethod
+    def init_B_params(num_states: int, num_actions: int) -> np.ndarray:
+        """
+        Initialize the Dirichlet parameters that specify the transition probabilities of the environment,
+        stored and denoted by B matrices in the active inference literature, when the agent does not have to
+        learn about them. The parameters are used in the agent's class to sample correct transition probabilities
+        when the 'learn_B' flag passed via the command line is False.
+
+        Input:
+        - num_state (integer): no. of states in environment
+        - num_actions (integer): no. of actions available to the agent
+
+        Output:
+        - B_params (np.ndarray): hard coded parmaters for the B matrices
+
+        """
+
+        B_params = np.zeros((num_actions, num_states, num_states))
+
+        # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
+        env_matrix_labels = np.reshape(np.arange(9), (3, 3))
+
+        # Assigning 1s to correct transitions for every action.
+        # IMPORTANT: The code below works for a maze of size (3, 3) only.
+        # Basically, we are looping over the 3 rows of the maze (indexed from 0 to 2)
+        # and assigning 1s to the correct transitions.
+        for r in range(3):
+
+            labels_ud = env_matrix_labels[r]
+            labels_rl = env_matrix_labels[:, r]
+
+            if r == 0:
+                # Up action: 1
+                B_params[1, labels_ud, labels_ud] = 1
+                # Down action: 3
+                B_params[3, labels_ud + 3, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl + 1, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl, labels_rl] = 1
+
+            elif r == 1:
+                # Up action: 1
+                B_params[1, labels_ud - 3, labels_ud] = 1
+                # Down action: 3
+                B_params[3, labels_ud + 3, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl + 1, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl - 1, labels_rl] = 1
+
+            elif r == 2:
+                # Up action: 1
+                B_params[1, labels_ud - 3, labels_ud] = 1
+                # Down action: 3
+                B_params[3, labels_ud, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl - 1, labels_rl] = 1
+
+        # Increasing the magnitude of the Dirichlet parameters so that when the B matrices are sampled
+        # the correct transitions for every action will have a value close to 1.
+        B_params = B_params * 199 + 1
+
+        return B_params
+
+    @staticmethod
+    def init_A_params(num_states: int) -> np.ndarray:
+        """
+        Initialize the Dirichlet parameters that specify the state-observation mapping probabilities of the
+        environment, stored and denoted by A matrices in the active inference literature, when the agent does
+        not have to learn about them. The parameters are used in the agent's class to sample correct
+        observation probabilities when the 'learn_A' flag passed via the command line is False.
+
+        Input:
+        - num_state (integer): no. of states in environment
+
+        Output:
+        - A_params (np.ndarray): hard coded parmaters for the A matrix
+
+        """
+
+        # Create matrix of 1s with 200s on the diagonal
+        # NOTE: with these parameters there will be 1-to-1 correspondence between states and observations
+        A_params = np.identity(num_states) * 199 + 1
+
+        return A_params
 
 
-class AifAgent(object):
+class params(TypedDict):
+    """
+    This class defines the type of the dictionary of parameters passed to the agent class below. It is used
+    to provide the correct type annotation to the parameters the agent receives.
+    """
+
+    # Parameters from the command line, they overwrite corresponding ones in class Args above if different
+    exp_name: str
+    gym_id: str  # also included in Args
+    num_runs: int
+    num_episodes: int
+    num_steps: int  # also included in Args
+    learning_rate: float
+    seed: float
+    inf_steps: int
+    pref_type: str
+    num_policies: int
+    plan_horizon: int  # also included in Args
+    action_selection: str
+    learn_A: bool
+    learn_B: bool
+    learn_D: bool
+    num_videos: int
+    # Parameters unique to class Args above
+    exp_name: str
+    num_states: int
+    obs_channels: int
+    obs_dim: tuple
+    factors: int
+    factors_dims: tuple
+    start_state: int
+    goal_state: int
+    num_actions: int
+    policies: np.ndarray
+    A_params: np.ndarray
+    B_params: np.ndarray
+    C_params: np.ndarray
+
+
+class Agent(object):
     """AifAgent class to implement active inference algorithm in a discrete POMDP setting."""
 
-    def __init__(self, params: dict):
+    def __init__(self, params: params):
         """
         Inputs:
         - params (dict): the parameters used to initialize the agent (see description below)
         """
 
-        # Make sure the dictionary has the required key-value pairs
-        try:
-            # list of the dimensions of each observation channel
-            self.obs_dims: list = params["obs_dims"]
-            # list of the dimensions of each factors in the environment
-            self.factors_dims: list = params["factors_dims"]
-            # number of free energy minimization steps
-            self.inference_steps: int = params["inference_steps"]
-            # list of dictionaries, representing factor-specific action channels
-            # note: each key-value pair represent the meaning and the integer associated with an action
-            self.actions_dict: list = params["actions"]
-            # number of policies (i.e. sequences of actions) for planning
-            self.num_policies: int = params["num_policies"]
-            # planning horizon (i.e. length of a policy)
-            self.plan_horizon: int = params["plan_horizon"]
-            # whether agent preferred distribution is over obs or states
-            self.pref_type: str = params["pref_type"]
-            # how an action is picked from the distribution over policies
-            self.action_selection: str = params["action_selection"]
-            # list of parameters for obs, transition, and initial state matrices
-            # Note: if the list are empty these parameters are subject to learning
-            self.a_matricesp: list = params["A"]
-            self.b_matricesp: list = params["B"]
-            self.c_vectorsp: list = params["C"]
-            self.d_vectorsp: list = params["D"]
-            # initialise the random number generator for numpy
-            self.rng = np.random.default_rng(seed=params.get("random_seed", 42))
-        except:
-            print("Please pass all the required parameters to initialise the agent.")
+        # Getting some relevant data from params and using default values
+        # if nothing was passed in params for these variables.
+        self.env_name = params.get("gym_id")
+        self.num_states: int = params.get("num_states")
+        self.num_actions: int = params.get("num_actions")
+        self.start_state: int = params.get("start_state")
+        self.steps: int = params.get("num_steps")
+        self.inf_iters: int = params.get("inf_steps")
+        self.efe_tsteps: int = params.get("plan_horizon")
+        self.pref_type: str = params["pref_type"]
+        self.policies: np.ndarray = params["policies"]
+        self.num_policies: int = params["num_policies"]
+        self.as_mechanism: str = params["action_selection"]
+        self.learning_A: bool = params["learn_A"]
+        self.learning_B: bool = params["learn_B"]
+        self.learning_D: bool = params["learn_D"]
+        self.rng = np.random.default_rng(seed=params.get("random_seed", 42))
 
-        ### General info ###
-        # number of observation channels or modalities
-        self.num_obs_channels: int = len(self.obs_dims)
-        # number of factors in the environment
-        self.num_factors: int = len(self.factors_dims)
-        # number of observation matrices, one for each combination of observation channel and factor
-        self.num_a_matrices: int = self.num_obs_channels * self.num_factors
-        # unpack actions (aka controls or control states) for each factor into list of list
-        self.action_channels = [list(d.values()) for d in self.actions_dict]
-        # number of transition matrices, one for each combination of action and factor
-        # self.num_b_matrices = self.num_factors * self.num_actions
+        # 1. Generative Model, initializing the relevant components used in the computation
+        # of free energy and expected free energy:
+        #
+        # - self.A: observation matrix, i.e. P(o|s) (each column is a categorical distribution);
+        # - self.B: transition matrices, i.e. P(s'|s, pi), one for each action (each column
+        # is a categorical distribution);
+        # - self.C: agent's preferences represented by vector of probabilities C.
+        # - self.D: categorical distribution over the initial state, i.e. P(S_1).
 
-        ### Generative model ###
-        # Initialise factor-observatins mappings (self.A), transition matrices (self.B), preference vectors
-        # or preferred stationary distributions (self.C), etc. as ndarray with dtype=object, i.e. each element
-        # of the array is a Python object, specifically another numpy ndarray
+        # Observation matrix, stored in numpy array A, and randomly initialised parameters of
+        # their Dirichlet prior distributions.
+        # Note 1: the Dirichlet parameters must be > 0.
+        # Note 2: the values in matrix A are sampled using the corresponding Dirichlet parameters
+        # in the for loop.
+        # Note 3: if the agent has no uncertainty in the mapping from states to observations,
+        # one can initialise A's parameters so that the entries in A's diagonal are close
+        # to one or just set A equal to the identity matrix (but the latter may cause some
+        # computational errors).
+        if self.learning_A == True:
+            # With learning over A's parameters, initialise matrix A, its Dirichlet parameters,
+            # and sample from them to fill in A
+            self.A = np.zeros((self.num_states, self.num_states))
+            # Parameters initialised uniformly
+            self.A_params = np.ones((self.num_states, self.num_states))
+            # For every state draw one sample from the Dirichlet distribution using the corresponding
+            # column of parameters
+            for s in range(self.num_states):
+                self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
 
-        # Initialise container of A matrices and Dirichlet parameters (state-obser)
-        self.a_matrices = np.zeros((self.num_obs_channels, self.num_factors), dtype=object)
-        self.a_params = np.zeros((self.num_obs_channels, self.num_factors), dtype=object)
-        # Case when the A matrices are learned via an update of the Dirichlet parameters
-        if len(self.a_matricesp) == 0:
-            # Looping over obs channel-factor pairs
-            for c in range(self.num_obs_channels):
-                for f in range(self.num_factors):
-                    # Init matrix of Dirichlet parameters for matrix A of obs channel c and factor f
-                    self.a_params[c, f] = np.ones((self.obs_dims[c], self.factors_dims[f]))
-                    # Init matrix A of obs channel c and factor f
-                    self.a_matrices[c, f] = np.ones((self.obs_dims[c], self.factors_dims[f]))
-                    # Draw one sample from the associated Dirichlet distribution so that each column of
-                    # matrix A encodes a proper categorical distribution P(o^c|s^f)
-                    for s in range(self.factors_dims[f]):
-                        self.a_matrices[c, f][:, s] = self.rng.dirichlet(self.a_params[c, f][:, s], size=1)
-        # Case when the A matrices are NOT learned (need to be provided)
-        else:
-            self.set_a_matrix(self.a_matricesp)
+        elif self.learning_A == False:
+            # Without learning over A's parameters, initialise matrix A and its parameters so
+            # that the entries in A's diagonal will be close to 1
+            self.A = np.zeros((self.num_states, self.num_states))
+            # Retrieve true parameters form dictionary
+            self.A_params = params.get("A_params")
+            # For every state draw one sample from the Dirichlet distribution using the corresponding
+            # column of parameters
+            for s in range(self.num_states):
+                self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
 
-        # Initialise container of B matrices and Dirichlet parameters
-        self.b_matrices = np.zeros((1, self.num_factors), dtype=object)
-        self.b_params = np.zeros((1, self.num_factors), dtype=object)
-        # Case when the B matrices are learned via an update of the Dirichlet parameters
-        if len(self.b_matricesp) == 0:
-            # Looping over action-factor pairs
-            for f, actions in enumerate(self.action_channels):
-                for a in actions:
-                    # Init matrix of Dirichlet parameters for matrix B of action a and factor f
-                    self.b_params[f] = np.ones((a, self.factors_dims[f], self.factors_dims[f]))
-                    # Init matrix B of action a and factor f
-                    self.b_matrices[f] = np.ones((a, self.factors_dims[f], self.factors_dims[f]))
-                    # Draw one sample from the associated Dirichlet distribution so that each column of
-                    # matrix B encodes a proper categorical distribution P(s^f|s^f, a)
-                    for s in range(self.factors_dims[f]):
-                        self.b_matrices[f][a, :, s] = self.rng.dirichlet(self.B_params[f][a, :, s], size=1)
-        # Case when the B matrices are NOT learned (need to be provided)
-        else:
-            self.set_b_matrix(self.b_matricesp)
+        # Transition matrices, stored in tensor B, and randomly initialised parameters of
+        # their Dirichlet prior distributions.
+        # Note 1: the Dirichlet parameters must be > 0.
+        # Note 2: the values in the tensor B are sampled using the corresponding Dirichlet
+        # parameters in the for loop.
+        # Note 3: if the agent has no uncertainty in the transitions, one can initialise
+        # B's parameters so that certain entries in the B matrices are close to one or can
+        # just set them equal to one, e.g. to indicate that action 1 from state 1 brings you
+        # to state 2 for sure.
+        if self.learning_B == True:
+            # With learning over B's parameters, initialise tensor B, its Dirichlet parameters,
+            # and sample from them to fill in B
+            self.B = np.zeros((self.num_actions, self.num_states, self.num_states))
+            # Parameters initialised uniformly
+            self.B_params = np.ones(
+                (self.num_actions, self.num_states, self.num_states)
+            )
 
-        # Initialise container of C vectors and Dirichlet parameters
-        self.c_vectors = np.zeros((1, self.num_factors), dtype=object)
-        self.c_params = np.zeros((1, self.num_factors), dtype=object)
-        # Case when the C vectors are learned via an update of the Dirichlet parameters
-        if len(self.c_vectorsp) == 0:
+            # For every action and state draw one sample from the Dirichlet distribution using
+            # the corresponding column of parameters
+            for a in range(self.num_actions):
+                for s in range(self.num_states):
+                    self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
+
+        elif self.learning_B == False:
+            # Without learning over B's parameters, initialise matrix B and its parameters so
+            # that entries in B reflect true transitions
+            self.B = np.zeros((self.num_actions, self.num_states, self.num_states))
+            self.B_params = params.get("B_params")
+
+            for a in range(self.num_actions):
+                for s in range(self.num_states):
+                    self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
+
+        # Agent's preferences represented by matrix C. Each column stores the agent's preferences for a
+        # certain time step. Specifically, each column is a categorical distribution with the probability
+        # mass concentrated on the state(s) the agent wants to be in at every time step in an episode.
+        # These preference/probabilities could either be over states or observations, and they are defined
+        # in the corresponding phenotype module.
+        self.C = params["C_params"]
+
+        # Initial state distribution, D (if the state is fixed, then D has the probability mass almost
+        # totally concentrated on start_state).
+        if self.learning_D == True:
+
             raise NotImplementedError
-        # Case when the C vectors are provided
-        else:
-            self.set_c_vectors(self.c_vectorsp)
 
-        # Initialise container of D vectors and Dirichlet parameters
-        self.d_vectors = np.zeros((1, self.num_factors), dtype=object)
-        self.d_params = np.zeros((1, self.num_factors), dtype=object)
-        # Case when the D vectors are learned via an update of the Dirichlet parameters
-        if len(self.d_vectorsp) == 0:
-            raise NotImplementedError
-        # Case when the D vectors are provided
-        else:
-            self.set_d_vectors(self.d_vectorsp)
+        elif self.learning_D == False:
 
-        ### Variational Distribution ###
-        # Agent's categorical distributions of factors at initial time step (prior beliefs),
-        # Note: we will stack in here the posteriors at subsequent time steps up to the present
-        self.q_beliefs = copy.deepcopy(self.d_vectors)
+            self.D = np.ones(self.num_states) * 0.0001
+            self.D[self.start_state] = 1 - (0.0001 * (self.num_states - 1))
 
-        ### Logging arrays ###
-        # Free energies (FE) for each factor at each time step (array's shape: time x factors)
-        self.free_energies = np.zeros((1, self.num_factors))
-        # Total expected free energies (EFEs) at each time step (each is a sum of EFEs)
-        self.expected_free_energies =  np.zeros((1, self.num_factors))
-        # Same as above but for the EFEs terms
-        self.efe_ambiguity = np.zeros((1, self.num_factors))
-        self.efe_risk = np.zeros((1, self.num_factors))
-        self.efe_a_novelty = np.zeros((1, self.num_factors))
-        self.efe_b_novelty = np.zeros((1, self.num_factors))
-        # History of observations received from environment for each factor up to the present
-        # Note: each object is a one-hot vector representing the state of a factor
-        self.obs_history = np.zeros((1, self.num_factors), dtype=object)
-        # History of actions for each factor up to the present
-        self.actions_history = np.zeros((self.steps - 1))
+        # 2. Variational Distribution, initializing the relevant components used in the computation
+        # of free energy and expected free energy:
+        # - self.actions: list of actions;
+        # - self.policies: numpy array (policy x actions) with pre-determined policies,
+        # i.e. rows of num_steps actions;
+        # - self.Qpi: categorical distribution over the policies, i.e. Q(pi);
+        # - self.Qs_pi: categorical distributions over the states for each policy, i.e. Q(S_t|pi);
+        # - self.Qt_pi: categorical distributions over the states for one specific S_t for each policy,
+        # i.e. Q(S_t|pi);
+        # - self.Qs: policy-independent states probabilities distributions, i.e. Q(S_t).
+
+        # List of actions, dictionary with all the policies, and array with their corresponding probabilities.
+        self.actions = list(range(self.num_actions))
+        self.policies = params.get("policies")
+
+        # !!!!!!!!!! ATTENTION !!!!!!!!!!
+        # Not needed because at every step the agent computes policies and their prob on the fly
+        # self.Qpi = np.zeros((self.num_policies, self.steps))
+        # self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.policies.shape[0]
+
+        # !!!!!!!!!! ATTENTION !!!!!!!!!!
+        # Not needed because at every step the agent computes policies and their prob on the fly
+
+        # State probabilities given a policy for every time step, the multidimensional array
+        # contains self.steps distributions for each policy (i.e. policies*states*timesteps parameters).
+        # In other words, every policy has a categorical distribution over the states for each time step.
+        # Note 1: a simple way to initialise these probability values is to make every categorical
+        # distribution a uniform distribution.
+        # self.Qs_pi = (
+        #     np.ones((self.policies.shape[0], self.num_states, self.steps))
+        #     * 1
+        #     / self.num_states
+        # )
+        # This multi-dimensional array is exactly like the previous one but is used for storing/logging
+        # the state probabilities given a policy for the first step of the episode (while the previous array
+        # is overwritten at every step and ends up logging the last step state beliefs for the episode)
+        # self.Qsf_pi = (
+        #     np.ones((self.policies.shape[0], self.num_states, self.steps))
+        #     * 1
+        #     / self.num_states
+        # )
+        # Policy conditioned state-beliefs throughout an episode, i.e. these matrices show how
+        # all the Q(S_i|pi) change step after step by doing perceptual inference.
+        # self.Qt_pi = (
+        #     np.ones((self.steps, self.policies.shape[0], self.num_states, self.steps))
+        #     * 1
+        #     / self.num_states
+        # )
+        # Policy-independent states probabilities distributions, numpy array of size (num_states, timesteps).
+        # See perception() method below.
+        self.Qs = np.zeros((self.num_states, self.steps))
+
+        # 3. Initialising arrays where to store agent's data during the experiment.
+        # Numpy arrays where at every time step the computed free energies and expected free energies
+        # for each policy and the total free energy are stored. For how these are calculated see the
+        # methods below. We also stored separately the various EFE components.
+        self.free_energies = np.zeros((self.policies.shape[0], self.steps))
+        self.expected_free_energies = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_ambiguity = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_risk = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_Anovelty = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_Bnovelty = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_Bnovelty_t = np.zeros((self.policies.shape[0], self.steps))
+        self.total_free_energies = np.zeros((self.steps))
+
+        # Where the agent believes it is at each time step
+        self.states_beliefs = np.zeros((self.steps))
+
+        # Matrix of one-hot columns indicating the observation at each time step and matrix
+        # of one-hot columns indicating the agent observation at each time step.
+        # Note 1 (IMPORTANT): if the agent does not learn A and the environment is not stochastic,
+        # then current_obs is the same as agent_obs.
+        # Note 2: If the agent learns A, then at every time step what the agent actually observes is sampled
+        # from A given the environment state.
+        self.current_obs = np.zeros((self.num_states, self.steps))
+        self.agent_obs = np.zeros((self.num_states, self.steps))
+
+        # Numpy array that stores the sequence of actions performed by the agent during the episode
+        self.actual_action_sequence = np.zeros((self.steps - 1))
+        # Numpy array that stores the index of the policy picked at each action selection step
+        # NOTE: the index is with respect to the list of policies computed on the fly at that time step
+        self.actual_pi_indices = np.zeros((self.steps - 1))
+        # Numpy array that stores the full policy picked at each action selection step, minimizing EFE,
+        # from which only the first action was executed
+        self.actual_pi = np.empty((0, self.num_actions))
 
         # Learning rate for the gradient descent on free energy (i.e. it multiplies grad_F_pi in the
         # perception method below)
@@ -206,113 +504,24 @@ class AifAgent(object):
         self.current_tstep = -1
 
         # 4. Setting the action selection mechanism
-        if self.action_selection == "kd":
+        if self.as_mechanism == "kd":
             # Action selection mechanism with Kronecker delta (KD) as described in Da Costa et. al. 2020,
             # (DOI: 10.1016/j.jmp.2020.102447).
             self.select_action = "self.action_selection_KD()"
 
-        elif self.action_selection == "kl":
+        elif self.as_mechanism == "kl":
             # Action selection mechanism with Kullback-Leibler divergence (KL) as described
             # in Sales et. al. 2019, 'Locus Coeruleus tracking of prediction errors optimises
             # cognitive flexibility: An Active Inference model'.
             self.select_action = "self.action_selection_KL()"
 
-        elif self.action_selection == "probs":
+        elif self.as_mechanism == "probs":
             # Action selection mechanism naively based on updated policy probabilities
             self.select_action = "self.action_selection_probs()"
 
         else:
 
             raise Exception("Invalid action selection mechanism.")
-
-    def set_a_matrix(self, obs_params: list):
-        """
-        Set the agent's observation matrices with arrays provided externally.
-        Input:
-
-        - obs_params: list of lists
-
-        Note: each list in obs_params should store the parameters of the factor-conditioned
-        observation matrices relative to one observation channel.
-        """
-
-        # Looping over obs channel-factor pairs
-        for c in range(self.num_obs_channels):
-            for f in range(self.num_factors):
-                # Init matrix of Dirichlet parameters for matrix A of obs channel c and factor f
-                self.a_params[c, f] = obs_params[c][f]
-                # Init matrix A of obs channel c and factor f
-                self.a_matrices[c, f] = np.zeros((self.obs_dims[c], self.factors_dims[f]))
-                # Draw one sample from the associated Dirichlet distribution so that each column of
-                # matrix A encodes a proper categorical distribution P(o^c|s^f)
-                for s in range(self.factors_dims[f]):
-                    self.a_matrices[c, f][:, s] = self.rng.dirichlet(self.a_params[c, f][:, s], size=1)
-
-    def set_b_matrix(self, trs_params: list):
-        """
-        Set the agent's transitions (or control) matrices with arrays provided externally.
-        Input:
-
-        - trs_params: list of lists
-
-        Note: each list in trs_params should store the parameters of the factor-conditioned
-        transition matrices relative to one action.
-        """
-
-        # Looping over action-factor pairs
-        for a in range(self.num_actions):
-            for f in range(self.num_factors):
-                # Init matrix of Dirichlet parameters for matrix B of action a and factor f
-                self.b_params[a, f] = trs_params[a][f]
-                # Init matrix B of action a and factor f
-                self.b_matrices[a, f] = np.zeros((self.factors_dims[f], self.factors_dims[f]))
-                # Draw one sample from the associated Dirichlet distribution so that each column of
-                # matrix B encodes a proper categorical distribution P(s^f|s^f, a)
-                for s in range(self.factors_dims[f]):
-                    self.b_matrices[a, f][:, s] = self.rng.dirichlet(self.b_params[a, f][:, s], size=1)
-
-    def set_c_vectors(self, pref_params: list):
-        """
-        Set the agent's preferences vectors with arrays provided externally.
-        Input:
-
-        - pref_params: list of arrays
-
-        Note: each array in pref_params should store the parameters of the factor-conditioned
-        preferences matrices.
-        """
-
-        # Looping over factors
-        for f in range(self.num_factors):
-            # Init vector of Dirichlet parameters for vector C of factor f
-            self.c_params[1, f] = pref_params[f]
-            # Init vector C of preferences for factor f
-            self.c_vectors[1, f] = np.zeros((1, self.factors_dims[f]))
-            # Draw one sample from the associated Dirichlet distribution so that vector C encodes
-            # a proper categorical distribution P(s^f)
-            self.c_vectors[1, f][:] = self.rng.dirichlet(self.c_params[1, f][:], size=1)
-
-
-    def set_d_vectors(self, start_params: list):
-        """
-        Set the agent's beliefs over initial factor states with arrays provided externally.
-        Input:
-
-        - start_params: list of arrays
-
-        Note: each array in start_params should store the parameters of the factor-conditioned initial beliefs.
-        """
-
-        # Looping over factors
-        for f in range(self.num_factors):
-            # Init vector of Dirichlet parameters for vector D of factor f
-            self.d_params[1, f] = start_params[f]
-            # Init vector D of initial factor beliefs for factor f
-            self.d_vectors[1, f] = np.zeros((1, self.factors_dims[f]))
-            # Draw one sample from the associated Dirichlet distribution so that vector D encodes
-            # a proper categorical distribution P(s^f)
-            self.d_vectors[1, f][:] = self.rng.dirichlet(self.d_params[1, f][:], size=1)
-
 
     def perception(self):
         """Method that performs a gradient descent on free energy for every policy to update
@@ -455,12 +664,12 @@ class AifAgent(object):
                 # one at time by keeping all the others fixed. Here, we are instead using a simultaneous
                 # update of all the factors, possibly repeating this operation a few times. However,
                 # results seem OK even if the for loop iterates just for one step.
-                print(f"BEFORE update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
+                # print(f"BEFORE update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
                 # print(f"Gradient for update: {grad_F_pi}")
                 self.Qs_pi[pi, :, :] = sigma(
                     (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1, axis=0
                 )
-                print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
+                # print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
 
                 # Storing the state beliefs at the first step of the episode
                 if self.current_tstep == 0:
@@ -469,8 +678,8 @@ class AifAgent(object):
             ######### END ###########
 
             # Printing the free energy value for current policy at current time step
-            print(f"Time Step: {self.current_tstep}")
-            print(f" FE_pi_{pi}: {F_pi}")
+            # print(f"Time Step: {self.current_tstep}")
+            # print(f" FE_pi_{pi}: {F_pi}")
             # Storing the last computed free energy in self.free_energies
             self.free_energies[pi, self.current_tstep] = F_pi
             # Computing the policy-independent state probability at self.current_tstep and storing
@@ -577,20 +786,20 @@ class AifAgent(object):
                 self.efe_risk[pi, self.current_tstep] = tot_slog_s_over_C
                 self.efe_Anovelty[pi, self.current_tstep] = tot_AsW_As
                 self.efe_Bnovelty[pi, self.current_tstep] = tot_AsW_Bs
-                print(f"--- Summary of planning at time step {self.current_tstep} ---")
-                print(f"FE_{pi}: {F_pi}")
-                print(f"EFE_{pi}: {G_pi}")
-                print(f"Risk_{pi}: {tot_slog_s_over_C}")
-                print(f"Ambiguity {pi}: {tot_Hs}")
-                print(f"A-novelty {pi}: {tot_AsW_As}")
-                print(f"B-novelty {pi}: {tot_AsW_Bs}")
+                # print(f"--- Summary of planning at time step {self.current_tstep} ---")
+                # print(f"FE_{pi}: {F_pi}")
+                # print(f"EFE_{pi}: {G_pi}")
+                # print(f"Risk_{pi}: {tot_slog_s_over_C}")
+                # print(f"Ambiguity {pi}: {tot_Hs}")
+                # print(f"A-novelty {pi}: {tot_AsW_As}")
+                # print(f"B-novelty {pi}: {tot_AsW_Bs}")
 
                 if self.current_tstep == 0:
-                    print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
+                    # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
                     self.efe_Bnovelty_t[pi] += sq_AsW_Bs
-                    print(
-                        f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
-                    )
+                    # print(
+                    #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
+                    # )
                     # if sq_AsW_Bs[2] > 2200:
                     #     raise Exception("B-novelty too high")
 
@@ -679,7 +888,7 @@ class AifAgent(object):
 
             action_selected = self.rng.choice(argmax_actions)
 
-        return action_selected
+        return int(action_selected)
 
     def action_selection_KL(self):
         """Method for action selection based on the Kullback-Leibler divergence, as described in
@@ -942,3 +1151,480 @@ class AifAgent(object):
             ppd_policies = self.Qpi[:, -1]
             self.Qpi = np.zeros((self.num_policies, self.steps))
             self.Qpi[:, 0] = ppd_policies
+
+
+class LogData(object):
+    """
+    Class that defines and stores data collected from an experiment with the above agent class.
+    """
+
+    def __init__(self, params: params) -> None:
+        ### Retrieve relevant experiment/agent parameters ###
+        self.num_runs: int = params.get("num_runs")
+        self.num_episodes: int = params.get("num_episodes")
+        self.num_states: int = params.get("num_states")
+        self.num_max_steps: int = params.get("num_steps")
+        self.num_actions: int = params.get("num_actions")
+        self.num_policies: int = params.get("num_policies")
+        self.num_videos: int = params.get("num_videos")
+        self.learnA: bool = params.get("learn_A")
+        self.learnB: bool = params.get("learn_B")
+
+        ### Define attributes to store various metrics ###
+        """Counts of how many times maze tiles have been visited"""
+        self.state_visits: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_states)
+        )
+        """Counts of how many times the goal state is reached"""
+        self.reward_counts: np.ndarray = np.zeros((self.num_runs, self.num_episodes))
+        """Policy dependent free energies at each step during every episode"""
+        self.pi_free_energies: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """Total free energies at each step during every episode"""
+        self.total_free_energies: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_max_steps)
+        )
+        """Policy dependent expected free energies at each step during every episode"""
+        self.expected_free_energies: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """Ambiguity term of policy dependent expected free energies at each step during every episode"""
+        self.efe_ambiguity: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """Risk term of policy dependent expected free energies at each step during every episode"""
+        self.efe_risk: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """A-novelty term of policy dependent expected free energies at each step during every episode"""
+        self.efe_Anovelty: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """B-novelty term of policy dependent expected free energies at each step during every episode"""
+        self.efe_Bnovelty: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        self.efe_Bnovelty_t: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """Observations collected by the agent at each step during an episode"""
+        self.observations: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_states, self.num_max_steps)
+        )
+        """Policy independent probabilistic beliefs about environmental states"""
+        self.states_beliefs: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_max_steps)
+        )
+        """Sequence of action performed by the agent during each episode"""
+        self.actual_action_sequence: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_max_steps - 1)
+        )
+        """Policy dependent probabilistic beliefs about environmental states (last episode step)"""
+        self.policy_state_prob: np.ndarray = np.zeros(
+            (
+                self.num_runs,
+                self.num_episodes,
+                self.num_policies,
+                self.num_states,
+                self.num_max_steps,
+            )
+        )
+        """Policy dependent probabilistic beliefs about environmental states (first episode step)"""
+        self.policy_state_prob_first: np.ndarray = np.zeros(
+            (
+                self.num_runs,
+                self.num_episodes,
+                self.num_policies,
+                self.num_states,
+                self.num_max_steps,
+            )
+        )
+        """Q(S_i|pi) recorded at every time step for every belief state"""
+        self.every_tstep_prob: np.ndarray = np.zeros(
+            (
+                self.num_runs,
+                self.num_episodes,
+                self.num_max_steps,
+                self.num_policies,
+                self.num_states,
+                self.num_max_steps,
+            )
+        )
+        """Probabilities of the policies at each time step during every episode"""
+        self.pi_probabilities: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        """State-observation mappings (matrix A) at the end of each episode"""
+        self.so_mappings: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_states, self.num_states)
+        )
+        """State-trainsition probabilities (matrix B) at the end of each episode"""
+        self.transitions_prob: np.ndarray = np.zeros(
+            (
+                self.num_runs,
+                self.num_episodes,
+                self.num_actions,
+                self.num_states,
+                self.num_states,
+            )
+        )
+
+    def log_step(self, run, episode, next_state):
+        """Method to log data at every step"""
+
+        # Adding a unit to the state counter visits for the new state reached
+        self.state_visits[run][episode][next_state] += 1
+
+    def log_episode(self, run: int, episode: int, **kwargs):
+        """Method to log data at end of every episode"""
+
+        # At the end of the episode, storing the total reward in reward_counts and other info
+        # accumulated by the agent, e.g the total free energies, expected free energies etc.
+        # (this is done for every episode and for every run).
+        self.reward_counts[run][episode] = kwargs["total_reward"]
+        self.pi_free_energies[run, episode, :, :] = kwargs["free_energies"]
+        self.total_free_energies[run, episode, :] = kwargs["total_free_energies"]
+        self.expected_free_energies[run, episode, :, :] = kwargs[
+            "expected_free_energies"
+        ]
+        self.efe_ambiguity[run, episode, :, :] = kwargs["efe_ambiguity"]
+        self.efe_risk[run, episode, :, :] = kwargs["efe_risk"]
+        self.efe_Anovelty[run, episode, :, :] = kwargs["efe_Anovelty"]
+        self.efe_Bnovelty[run, episode, :, :] = kwargs["efe_Bnovelty"]
+        self.efe_Bnovelty_t[run, episode, :, :] = kwargs["efe_Bnovelty_t"]
+        self.observations[run, episode, :, :] = kwargs["current_obs"]
+        self.states_beliefs[run, episode, :] = kwargs["states_beliefs"]
+        self.actual_action_sequence[run, episode, :] = kwargs["actual_action_sequence"]
+        self.policy_state_prob[run, episode, :, :, :] = kwargs["Qs_pi"]
+        self.policy_state_prob_first[run, episode, :, :, :] = kwargs["Qsf_pi"]
+        self.every_tstep_prob[run, episode, :, :, :, :] = kwargs["Qt_pi"]
+        self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
+        self.so_mappings[run, episode, :, :] = kwargs["A"]
+        self.transitions_prob[run, episode, :, :, :] = kwargs["B"]
+
+    def save_data(self, log_dir, file_name="data"):
+        """Method to save to file the collected data"""
+
+        # Dictionary to store the data
+        data = {}
+        # Populate dictionary with corresponding key
+        data["num_runs"] = self.num_runs
+        data["num_episodes"] = self.num_episodes
+        data["num_states"] = self.num_states
+        data["num_steps"] = self.num_max_steps
+        data["num_policies"] = self.num_policies
+        data["learn_A"] = self.learnA
+        data["learn_B"] = self.learnB
+        data["state_visits"] = self.state_visits
+        data["reward_counts"] = self.reward_counts
+        data["pi_free_energies"] = self.pi_free_energies
+        data["total_free_energies"] = self.total_free_energies
+        data["expected_free_energies"] = self.expected_free_energies
+        data["efe_ambiguity"] = self.efe_ambiguity
+        data["efe_risk"] = self.efe_risk
+        data["efe_Anovelty"] = self.efe_Anovelty
+        data["efe_Bnovelty"] = self.efe_Bnovelty
+        data["efe_Bnovelty_t"] = self.efe_Bnovelty_t
+        data["observations"] = self.observations
+        data["states_beliefs"] = self.states_beliefs
+        data["actual_action_sequence"] = self.actual_action_sequence
+        data["policy_state_prob"] = self.policy_state_prob
+        data["policy_state_prob_first"] = self.policy_state_prob_first
+        data["every_tstep_prob"] = self.every_tstep_prob
+        data["pi_probabilities"] = self.pi_probabilities
+        data["so_mappings"] = self.so_mappings
+        data["transition_prob"] = self.transitions_prob
+        # Save data to local file
+        file_data_path = log_dir.joinpath(file_name)
+        np.save(file_data_path, data)
+
+
+def main():
+
+    ##################################
+    ### 1. PARSING COMMAND LINE
+    ##################################
+
+    # Create command line parser object
+    parser = argparse.ArgumentParser()
+    # Add arguments to the parser
+    ### General arguments ###
+    parser.add_argument(
+        "--exp_name",
+        "-expn",
+        type=str,
+        default="aif-paths",
+        help="the name of this experiment based on the active inference implementation",
+    )
+    parser.add_argument(
+        "--gym_id",
+        "-gid",
+        type=str,
+        default="GridWorld-v1",
+        help="the name of the registered gym environment (choices: GridWorld-v1)",
+    )
+    parser.add_argument(
+        "--num_runs",
+        "-nr",
+        type=int,
+        default=30,
+        help="the number of times the experiment is run",
+    )
+    parser.add_argument(
+        "--num_episodes",
+        "-ne",
+        type=int,
+        default=100,
+        help="number of episodes per run/experiment",
+    )
+    parser.add_argument(
+        "--num_steps",
+        "-ns",
+        type=int,
+        required=True,
+        help="number of steps per episode or total number of steps (depending on type of agent)",
+    )
+    parser.add_argument(
+        "--learning_rate",
+        "-lr",
+        type=float,
+        default=2.5e-4,
+        help="the learning rate for the free energy gradients",
+    )
+    parser.add_argument("--seed", type=int, default=1, help="seed of the experiment")
+
+    ### Agent-specific arguments ###
+    # Inference
+    parser.add_argument(
+        "--inf_steps",
+        "-infstp",
+        type=int,
+        default=1,
+        help="number of free energy minimization steps",
+    )
+    # Agent's preferences type
+    parser.add_argument(
+        "--pref_type",
+        "-pt",
+        type=str,
+        default="states",
+        help="choices: states, observations",
+    )
+    # Policy
+    parser.add_argument(
+        "--num_policies",
+        "-np",
+        type=int,
+        default=2,
+        help="number of policies (i.e. sequences of actions) in planning",
+    )
+    parser.add_argument(
+        "--plan_horizon",
+        "-ph",
+        type=int,
+        nargs="?",
+        help="planning horizon (i.e. length of a policy)",
+    )
+    # Action selection mechanism
+    parser.add_argument(
+        "--action_selection",
+        "-as",
+        type=str,
+        default="kd",
+        help="choices: probs, kl, kd",
+    )
+    # Enable learning of different aspects of the environment
+    parser.add_argument("--learn_A", "-lA", action="store_true")
+    parser.add_argument("--learn_B", "-lB", action="store_true")
+    parser.add_argument("--learn_D", "-lD", action="store_true")
+    # Number of videos to record
+    parser.add_argument("--num_videos", "-nvs", type=int, default=0)
+
+    # Creating object holding the attributes from the command line
+    args = parser.parse_args()
+    # Convert args to dictionary
+    cl_params = vars(args)
+
+    ########################################################
+    ### 2. CREATE DIRECTORY FOR LOGGING DATA FROM CURRENT EXP
+    ########################################################
+
+    # Datetime object containing current date and time
+    now = datetime.now()
+    # Converting data-time in an appropriate string: '_dd.mm.YYYY_H.M.S'
+    dt_string = now.strftime("%d.%m.%Y_%H.%M.%S_")
+    # Create folder (with dt_string as unique identifier) where to store data from current experiment.
+    data_path = LOG_DIR.joinpath(
+        dt_string
+        + f'{cl_params["gym_id"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
+    )
+    data_path.mkdir(parents=True, exist_ok=True)
+
+    # if not (os.path.exists(data_path)):
+    #     os.makedirs(data_path)
+
+    ###############################
+    ### 3. INIT AGENT PARAMETERS
+    ##############################
+
+    # Create dataclass with default parameters configuration for the agent
+    agent_params = Args()
+    # Convert dataclass to dictionary
+    agent_params = asdict(agent_params)
+
+    # Update agent_params with corresponding key values in cl_params, and/or add key from cl_params
+    # Custom update function not overwriting default parameter's value if the one from the CL is None
+    def update_params(default_params, new_params):
+        for key, value in new_params.items():
+            if value is not None:
+                default_params[key] = value
+
+    update_params(agent_params, cl_params)
+    # print(agent_params)
+
+    ##########################
+    ### 4. INIT ENV
+    ##########################
+
+    # Retrieve name of the environment
+    env_module_name = cl_params["gym_id"]
+    # Number of runs (or agents interacting with the env)
+    NUM_RUNS = agent_params["num_runs"]
+    # Number of episodes
+    NUM_EPISODES = agent_params["num_episodes"]
+    # Number of steps in one episode
+    NUM_STEPS = agent_params["num_steps"]
+    # Fix agent's location at the beginning of every episode (i.e. agent starts always from the same location)
+    # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
+    # what the Gymnasium environment requires.
+    AGENT_LOC = convert_state(agent_params["start_state"])  # output: np.array([0, 0])
+    # Fix walls location in the environment (the same in every episode)
+    WALLS_LOC = [convert_state(4)]  # output: np.array([1, 1])
+    # Fix target location in the environment (the same in every episode)
+    TARGET_LOC = convert_state(agent_params["goal_state"])
+
+    # Create the environment
+    env = gymnasium.make(
+        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS, render_mode=None
+    )
+
+    ##############################
+    ### 5. INIT LOGGING
+    ##############################
+
+    # Create instance of LogData for logging and saving experiments metrics
+    logs_writer = LogData(cast(params, agent_params))
+    # Define random number generator for picking random actions
+    # rng = np.random.default_rng()
+
+    ###############################
+    ### 5. TRAINING
+    ###############################
+
+    ### TRAINING LOOP ###
+    # Loop over number of runs and episodes
+    for run in range(NUM_RUNS):
+        # Print iteration (run) number
+        print("************************************")
+        print(f"Starting Run {run}...")
+        # Set a random seed for current run, used by RNG attribute in the agent
+        agent_params["seed"] += run
+        # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
+        agent = Agent(cast(params, agent_params))
+        # Loop over episodes
+        for e in range(NUM_EPISODES):
+            # Printing episode number
+            print("--------------------")
+            print(f"Episode {e}")
+            print("--------------------")
+
+            # Initialize steps and reward counters
+            steps_count = 0
+            total_reward = 0
+            # is_terminal = False
+
+            # Reset the environment
+            # NOTE: the Gymnasium environment's observation is a dictionary with the locations of the agent and
+            # the goal/target, i.e. {'agent': array([0, 0]), 'target': array([2, 2])}, but we need only the
+            # location of the agent!
+            obs, info = env.reset(
+                options={
+                    "deterministic_agent_loc": AGENT_LOC,
+                    "deterministic_target_loc": TARGET_LOC,
+                    "deterministic_wall_loc": WALLS_LOC,
+                },
+            )
+
+            # Retrieve observation of the agent's location
+            # print(f"Observation: {obs}; type {type(obs)}")
+            obs = obs["agent"]
+            # Convert obs into index representation
+            start_state = process_obs(obs)
+            # Adding a unit to the state_visits counter for the start_state
+            logs_writer.log_step(run, e, start_state)
+            # Current state (updated at every step and passed to the agent)
+            current_state = start_state
+
+            # Agent and environment interact for NUM_STEPS steps.
+            # NOTE: we start counting episode steps from 0 (steps_count = 0) and we have NUM_STEPS steps
+            # (say, 5) so `steps_count < NUM_STEPS ensures the loop lasts for NUM_STEPS.
+            while steps_count < NUM_STEPS:
+                # Agent returns an action based on current observation/state
+                action = agent.step(current_state)
+                print(f"Agent action {action}, {type(action)}")
+                # Except when at the last episode's step, the agent's action affects the environment;
+                # at the last time step the environment does not change but the agent engages in learning
+                # (parameters update)
+                if steps_count < NUM_STEPS - 1:
+                    # Environment outputs based on agent action
+                    next_obs, reward, terminated, truncated, info = env.step(action)
+                    # Retrieve observation of the agent's location
+                    next_obs = next_obs["agent"]
+                    print(f"Next obs: {next_obs}")
+
+                    # Convert observation into index representation
+                    next_state = process_obs(next_obs)
+                    print(f"Next state: {next_state}")
+                    # Update total_reward
+                    total_reward += reward
+
+                    print("-------- STEP SUMMARY --------")
+                    print(f"Time step: {steps_count}")
+                    print(f"Observation: {current_state}")
+                    print(f"Agent action: {action}")
+                    print(f"Next state: {next_state}")
+                    print(f"Terminal/Goal state: {terminated}")
+
+                    # Adding a unit to the state_visits counter for the start_state
+                    logs_writer.log_step(run, e, next_state)
+                    # Update current state with next_state
+                    current_state = next_state
+
+                # Update step count
+                steps_count += 1
+
+            # Retrieve all agent's attributes, including episodic metrics we want to save
+            all_metrics = agent.__dict__
+            # Adding the key-value pair `total_reward` which is not among the agent's attributes
+            all_metrics["total_reward"] = total_reward
+            # Call the logs_writer function to save the episodic info we want
+            # NOTE: unpack dictionary with `**` to feed the function with  key-value arguments
+            logs_writer.log_episode(run, e, **all_metrics)
+            # Reset the agent before starting a new episode
+            agent.reset()
+
+            # Record num_videos uniformly distanced throughout the experiment
+            # if num_videos != 0 and num_videos <= num_episodes:
+
+            #     rec_step = num_episodes // num_videos
+            #     if ((e + 1) % rec_step) == 0:
+
+            #         env.make_video(str(e), VIDEO_DIR)
+
+    # Save all collected data in a dictionary
+    logs_writer.save_data(data_path)
+
+
+# if __name__ == "__main__":
+# main()

@@ -106,7 +106,7 @@ class Args:
 
     @staticmethod
     def init_C_array(
-        num_states: int, steps: int, pref_type: str = "state"
+        num_states: int, steps: int, pref_type: str = "states"
     ) -> np.ndarray:
         """
         Initialize preference array/matrix, denoted by C in the active inference literature, where each column
@@ -204,30 +204,32 @@ class Args:
             labels_rl = env_matrix_labels[:, r]
 
             if r == 0:
-                # Up action: 1
-                B_params[1, labels_ud, labels_ud] = 1
+                # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
+                # Gymnasium grid coordinate system the negative and positive y axes are swapped
                 # Down action: 3
-                B_params[3, labels_ud + 3, labels_ud] = 1
+                B_params[3, labels_ud, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud + 3, labels_ud] = 1
                 # Right action: 0
                 B_params[0, labels_rl + 1, labels_rl] = 1
                 # Left action: 2
                 B_params[2, labels_rl, labels_rl] = 1
 
             elif r == 1:
-                # Up action: 1
-                B_params[1, labels_ud - 3, labels_ud] = 1
                 # Down action: 3
-                B_params[3, labels_ud + 3, labels_ud] = 1
+                B_params[3, labels_ud - 3, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud + 3, labels_ud] = 1
                 # Right action: 0
                 B_params[0, labels_rl + 1, labels_rl] = 1
                 # Left action: 2
                 B_params[2, labels_rl - 1, labels_rl] = 1
 
             elif r == 2:
-                # Up action: 1
-                B_params[1, labels_ud - 3, labels_ud] = 1
                 # Down action: 3
-                B_params[3, labels_ud, labels_ud] = 1
+                B_params[3, labels_ud - 3, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud, labels_ud] = 1
                 # Right action: 0
                 B_params[0, labels_rl, labels_rl] = 1
                 # Left action: 2
@@ -326,7 +328,8 @@ class Agent(object):
         self.learning_A: bool = params["learn_A"]
         self.learning_B: bool = params["learn_B"]
         self.learning_D: bool = params["learn_D"]
-        self.rng = np.random.default_rng(seed=params.get("random_seed", 42))
+        self.seed: int = params["seed"]
+        self.rng = np.random.default_rng(seed=self.seed)
 
         # 1. Generative Model, initializing the relevant components used in the computation
         # of free energy and expected free energy:
@@ -567,77 +570,21 @@ class Agent(object):
         for pi, pi_actions in enumerate(self.policies):
 
             ### DEBUGGING ###
-            # print(f'Policy {pi}')
+            # print(f"FE Minimization for Policy {pi}")
             # print(f'Policy actions {pi_actions}')
-            # print(f'Time Step {self.current_tstep}')
+            # print(f"Time Step {self.current_tstep}")
+            # print(f"Pi actions {pi_actions}")
+            # print(f"First action {pi_actions[0]}")
             ### END ###
 
-            # IMPORTANT: the parameters of the categorical Q(S_t|pi) can be updated by
-            # gradient descent on (variational) free energy or using analytical updates
-            # resulting from setting the gradient to zero. Both methods are spelled out
-            # below but just one is commented out.
-            # TODO: the selection of the method should occur via the command line.
-
-            ######### 1. Update the Q(S_t|pi) with gradient descent #########
-            # next_F = 1000000
-            # last_F = 0
-            # epsilon = 1
-            # delta_w = 0
-            # gamma = 0.3
-            # counter = 0
-
-            # # Gradient descent on Free Energy: while loop until the difference between the next
-            # # and last free energy values becomes less than or equal to epsilon.
-            # while next_F - last_F > epsilon:
-
-            #     counter += 1
-
-            #     # Computing the free energy for the current policy and gradient descent iteration
-            #     # Note 1: if B parameters are learned then you need to pass in self.B_params and
-            #     # self.learning_B (the same applies for A)
-            #     logA_pi, logB_pi, logD_pi, F_pi = vfe(self.num_states, self.steps, self.current_tstep, self.current_obs, pi, pi_actions,
-            #                                             self.A, self.B, self.D, self.Qs_pi, A_params=self.A_params, learning_A=self.learning_A,
-            #                                             B_params=self.B_params, learning_B=self.learning_B)
-
-            #     # Computing the free energy gradient for the current policy and gradient descent iteration
-            #     grad_F_pi = grad_vfe(self.num_states, self.steps, self.current_tstep, self.current_obs, pi, self.Qs_pi, logA_pi, logB_pi, logD_pi)
-
-            #     # Note 1: the updates are stored in the corresponding agent's attributes
-            #     # so they are immediately available at the next iteration.
-
-            #     # Simultaneous gradient update using momentum
-            #     # Note 1 (IMPORTANT!): with momentum the gradient descent works better and leads to better results, however it still does not
-            #     # prevent overshooting in certain episodes with the free energy diverging (it oscillates between two values). So, below we stop
-            #     # the gradient update after a certain number of iterations.
-            #     self.Qs_pi[pi, :, :] = (self.Qs_pi[pi, :, :] - self.learning_rate_F * grad_F_pi + gamma * delta_w)
-            #     self.Qs_pi[pi, :, :] = sigma( self.Qs_pi[pi, :, :] - np.amax(self.Qs_pi[pi, :, :], axis=0) , axis=0)
-
-            #     delta_w = gamma * delta_w - self.learning_rate_F * grad_F_pi
-
-            #     # Updating temporary variables to compute the difference between previous and next free energies to decide when to stop
-            #     # the gradient update (i.e. when the absolute value of the different is below epsilon).
-            #     if counter == 1:
-
-            #         next_F = F_pi
-
-            #     elif counter > 1:
-
-            #         last_F = next_F
-            #         next_F = F_pi
-
-            #     # IMPORTANT: stopping the gradient updates after 20 iterations to avoid free energy divergence.
-            #     if counter > 20:
-            #         break
-
-            ########## END ###########
-
-            ########### 2. Update the Q(S_t|pi) by setting gradient to zero ##############
+            ########### Update the Q(S_t|pi) by setting gradient to zero ##############
 
             for _ in range(self.inf_iters):
 
                 # IMPORTANT: here we are replacing zero probabilities with the value 0.0001
                 # to avoid zeroes in logs.
                 self.Qs_pi = np.where(self.Qs_pi == 0, 0.0001, self.Qs_pi)
+
                 # Computing the variational free energy for the current policy
                 # Note 1: if B parameters are learned then you need to pass in self.B_params and
                 # self.learning_B (the same applies for A)
@@ -681,12 +628,16 @@ class Agent(object):
                 # one at time by keeping all the others fixed. Here, we are instead using a simultaneous
                 # update of all the factors, possibly repeating this operation a few times. However,
                 # results seem OK even if the for loop iterates just for one step.
-                # print(f"BEFORE update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
-                # print(f"Gradient for update: {grad_F_pi}")
+
+                # print("Gradient for update:")
+                # print(f"{grad_F_pi}")
                 self.Qs_pi[pi, :, :] = sigma(
-                    (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1, axis=0
+                    (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1,
+                    axis=0,
                 )
-                # print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
+
+                # print("Qs_pi after update:")
+                # print(f"{self.Qs_pi}")
 
                 # Storing the state beliefs at the first step of the episode
                 if self.current_tstep == 0:
@@ -713,11 +664,6 @@ class Agent(object):
             for t in range(self.steps):
                 self.Qt_pi[t, pi, :, self.current_tstep] = self.Qs_pi[pi, :, t]
 
-            print(self.Qt_pi.shape)
-
-            # if self.current_tstep == 0 and pi==1:
-            #    print(f'This is Q(S_1|pi_1): {self.Qs_pi[pi, :, 1]}')
-
         ### DEBUGGING ###
         # assert np.sum(self.Qs[:, self.current_tstep], axis=0) == 1, "The values of the policy-independent state probability distribution at time " + str(self.current_tstep) + " don't sum to one!"
         ### END ###
@@ -727,8 +673,8 @@ class Agent(object):
         # computed above, i.e., one is getting the most probable state the agent believes to be in
         # based on Q(S_t|pi) and the old Q(pi) updated *at the previous time step*.
         # TODO: check that commenting this out does not cause any error
-        state_belief = np.argmax(self.Qs[:, self.current_tstep], axis=0)
-        self.states_beliefs[self.current_tstep] = state_belief
+        # state_belief = np.argmax(self.Qs[:, self.current_tstep], axis=0)
+        # self.states_beliefs[self.current_tstep] = state_belief
 
     def planning(self):
         """Method for planning, which involves computing the expected free energy for all the policies
@@ -803,28 +749,28 @@ class Agent(object):
                 self.efe_risk[pi, self.current_tstep] = tot_slog_s_over_C
                 self.efe_Anovelty[pi, self.current_tstep] = tot_AsW_As
                 self.efe_Bnovelty[pi, self.current_tstep] = tot_AsW_Bs
-                # print(f"--- Summary of planning at time step {self.current_tstep} ---")
-                # print(f"FE_{pi}: {F_pi}")
-                # print(f"EFE_{pi}: {G_pi}")
-                # print(f"Risk_{pi}: {tot_slog_s_over_C}")
-                # print(f"Ambiguity {pi}: {tot_Hs}")
-                # print(f"A-novelty {pi}: {tot_AsW_As}")
-                # print(f"B-novelty {pi}: {tot_AsW_Bs}")
-
+                #### DEBUGGING ####
+                print(f"--- Policy {pi} ---")
+                print(f"--- Summary of planning at time step {self.current_tstep} ---")
+                print(f"FE_{pi}: {F_pi}")
+                print(f"EFE_{pi}: {G_pi}")
+                print(f"Risk_{pi}: {tot_slog_s_over_C}")
+                print(f"Ambiguity {pi}: {tot_Hs}")
+                print(f"A-novelty {pi}: {tot_AsW_As}")
+                print(f"B-novelty {pi}: {tot_AsW_Bs}")
+                #### END ####
                 if self.current_tstep == 0:
-                    # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
+                    print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
                     self.efe_Bnovelty_t[pi] += sq_AsW_Bs
-                    # print(
-                    #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
-                    # )
-                    # if sq_AsW_Bs[2] > 2200:
-                    #     raise Exception("B-novelty too high")
+                    print(
+                        f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
+                    )
 
         # Normalising the negative expected free energies stored as column in self.Qpi to get
         # the posterior over policies Q(pi) to be used for action selection
         print(f"Computing posterior over policy Q(pi)...")
         self.Qpi[:, self.current_tstep] = sigma(-self.Qpi[:, self.current_tstep])
-        print(f"Before adding noise - Q(pi): {self.Qpi}")
+        # print(f"Before adding noise - Q(pi): {self.Qpi}")
         # Replacing zeroes with 0.0001, to avoid the creation of nan values and multiplying by 5 to make sure
         # the concentration of probabilities is preserved when reapplying the softmax
         self.Qpi[:, self.current_tstep] = np.where(
@@ -836,17 +782,19 @@ class Agent(object):
             self.Qpi[:, self.current_tstep],
         )
         self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
-        print(f"After adding noise - Q(pi): {self.Qpi}")
         # Computing the policy-independent state probability at self.current_tstep and storing it in self.Qs
-        self.Qs[:, self.current_tstep] += (
-            self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
-        )
-
-        ### DEBUGGING ###
-        # if self.current_tstep == 5:
-        #      print(f'Prob for policy {0}: {self.Qpi[0, self.current_tstep+1]}')
-        #      print(f'Prob for policy {1} {self.Qpi[1, self.current_tstep+1]}')
-        ### END ###
+        for pi, _ in enumerate(self.policies):
+            #### DEBUGGING ####
+            # print(f"For policy {pi}")
+            # print("Before update:")
+            # print(f"{self.Qs}")
+            # print("Using:")
+            # print(f"{self.Qs_pi[pi, :, :]}")
+            # print(f"{self.Qpi[pi, self.current_tstep]}")
+            #### END ####
+            self.Qs[:, self.current_tstep] += (
+                self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
+            )
 
     def action_selection_KD(self):
         """Method for action selection based on the Kronecker delta, as described in Da Costa et. al. 2020,
@@ -992,6 +940,14 @@ class Agent(object):
         # Getting the updated parameters for matrices A and B using dirichlet_update().
         # Note 1: if A or B parameters are *not* learned the update method simply return self.A_params or
         # self.B_params
+
+        #### DEBUGGING ####
+        # print("Params for dirichlet update")
+        # print(f"Observation list: {self.current_obs}")
+        # print(f"Action sequence: {self.actual_action_sequence}")
+        # print("Policy independent state probabilities:")
+        # print(f"{self.Qs}")
+        #### END ####
         print("Updating Dirichlet parameters...")
         self.A_params, self.B_params = dirichlet_update(
             self.num_states,
@@ -1036,6 +992,9 @@ class Agent(object):
             # distribution using the corresponding column of parameters.
             for s in range(self.num_states):
                 self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
+
+            print("New matrix A:")
+            print(f" {self.A}")
 
         elif self.learning_A == False and self.learning_B == True:
 
@@ -1314,6 +1273,8 @@ class LogData(object):
         self.states_beliefs[run, episode, :] = kwargs["states_beliefs"]
         self.actual_action_sequence[run, episode, :] = kwargs["actual_action_sequence"]
         self.policy_state_prob[run, episode, :, :, :] = kwargs["Qs_pi"]
+        # np.set_printoptions(precision=3, suppress=True)
+        # print(f'Qs_pi: {kwargs["Qs_pi"]}')
         self.policy_state_prob_first[run, episode, :, :, :] = kwargs["Qsf_pi"]
         self.every_tstep_prob[run, episode, :, :, :, :] = kwargs["Qt_pi"]
         self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
@@ -1539,6 +1500,8 @@ def main():
     ### 5. TRAINING
     ###############################
 
+    np.set_printoptions(precision=3, suppress=True)
+
     ### TRAINING LOOP ###
     # Loop over number of runs and episodes
     for run in range(NUM_RUNS):
@@ -1546,7 +1509,7 @@ def main():
         print("************************************")
         print(f"Starting Run {run}...")
         # Set a random seed for current run, used by RNG attribute in the agent
-        agent_params["seed"] += run
+        agent_params["seed"] = run
         # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
         agent = Agent(cast(params, agent_params))
         # Loop over episodes
@@ -1555,7 +1518,6 @@ def main():
             print("--------------------")
             print(f"Episode {e}")
             print("--------------------")
-
             # Initialize steps and reward counters
             steps_count = 0
             total_reward = 0
@@ -1589,7 +1551,6 @@ def main():
             while steps_count < NUM_STEPS:
                 # Agent returns an action based on current observation/state
                 action = agent.step(current_state)
-                print(f"Agent action {action}, {type(action)}")
                 # Except when at the last episode's step, the agent's action affects the environment;
                 # at the last time step the environment does not change but the agent engages in learning
                 # (parameters update)
@@ -1598,17 +1559,21 @@ def main():
                     next_obs, reward, terminated, truncated, info = env.step(action)
                     # Retrieve observation of the agent's location
                     next_obs = next_obs["agent"]
-                    print(f"Next obs: {next_obs}")
+                    # print(f"Next obs: {next_obs}")
 
                     # Convert observation into index representation
                     next_state = process_obs(next_obs)
-                    print(f"Next state: {next_state}")
+                    assert (
+                        next_state != 4
+                    ), f"Next state is {next_state}, which should not be accessible."
+
+                    # print(f"Next state: {next_state}")
                     # Update total_reward
                     total_reward += reward
 
                     print("-------- STEP SUMMARY --------")
                     print(f"Time step: {steps_count}")
-                    print(f"Observation: {current_state}")
+                    print(f"Current state: {current_state}")
                     print(f"Agent action: {action}")
                     print(f"Next state: {next_state}")
                     print(f"Terminal/Goal state: {terminated}")

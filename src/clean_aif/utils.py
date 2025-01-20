@@ -163,7 +163,11 @@ def vfe(
             if t < (steps - 1):
                 # Simply retrieving the corresponding transition matrix B because its
                 # parameters are not learned.
+
                 action = pi_actions[t]
+                # print(f"First action is: {action}")
+                # print("Corresponding B matrix is")
+                # print(f"{B[action, :, :]}")
                 logB_pi[t, :, :] = np.log(B[action, :, :])
 
             # if t < (steps-1):
@@ -218,6 +222,22 @@ def grad_vfe(
     - grad_F_pi (numpy array, size: num_state*num_steps), it stores the free energy gradient vectors
     as columns, one for each Q(s_t|pi).
     """
+
+    # print("Data for computing gradients")
+    # print(f"- Num states: {num_states}")
+    # print(f"- Steps: {steps}")
+    # print(f"- Current tstep: {current_tstep}")
+    # print("- Current obs: ")
+    # print(f"{current_obs}")
+    # print(f"- Policies: {pi}")
+    # print("- Qs_pi: ")
+    # print(f"{Qs_pi}")
+    # print("- logA_pi: ")
+    # print(f"{logA_pi}")
+    # print("- logB_pi: ")
+    # print(f"{logB_pi}")
+    # print("- logD_pi: ")
+    # print(f"{logD_pi}")
 
     print("Computing FE gradients...")
     # Initialising the gradient vectors for each Q(s_t|pi)
@@ -716,11 +736,12 @@ def efe(
                         Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, tau])
                     )
                     ### DEBUGGING ###
-                    # print(f"Q(s|pi), corrected: {Qs_pi_risk}")  # ; Preferences: {C}")
-                    # print(
-                    #     f"logQ(S|pi) - log C: {np.log(Qs_pi_risk) - np.log(C[:, tau])}"
-                    # )
-                    # print(f"Risk: {slog_s_over_C}")
+                    print(f"Q(s|pi), corrected: {Qs_pi_risk} ; Preferences: {C}")
+                    print(f"logQ(S|pi): {np.log(Qs_pi_risk)}")
+                    print(
+                        f"logQ(S|pi) - log C: {np.log(Qs_pi_risk) - np.log(C[:, tau])}"
+                    )
+                    print(f"Risk: {slog_s_over_C}")
                     ### END ###
 
                 else:
