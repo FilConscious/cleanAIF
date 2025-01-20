@@ -16,6 +16,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import gymnasium
 import gymnasium_env  # Needed otherwise NamespaceNotFound error
+from itertools import product
+import math
 import numpy as np
 import os
 from typing import TypedDict, cast, Tuple
@@ -24,7 +26,7 @@ from pathlib import Path
 
 # Custom imports
 from .config import LOG_DIR
-from .utils import *
+from .utils_plans import *
 
 
 @dataclass
@@ -183,30 +185,32 @@ class Args:
             labels_rl = env_matrix_labels[:, r]
 
             if r == 0:
-                # Up action: 1
-                B_params[1, labels_ud, labels_ud] = 1
+                # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
+                # Gymnasium grid coordinate system the negative and positive y axes are swapped
                 # Down action: 3
-                B_params[3, labels_ud + 3, labels_ud] = 1
+                B_params[3, labels_ud, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud + 3, labels_ud] = 1
                 # Right action: 0
                 B_params[0, labels_rl + 1, labels_rl] = 1
                 # Left action: 2
                 B_params[2, labels_rl, labels_rl] = 1
 
             elif r == 1:
-                # Up action: 1
-                B_params[1, labels_ud - 3, labels_ud] = 1
                 # Down action: 3
-                B_params[3, labels_ud + 3, labels_ud] = 1
+                B_params[3, labels_ud - 3, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud + 3, labels_ud] = 1
                 # Right action: 0
                 B_params[0, labels_rl + 1, labels_rl] = 1
                 # Left action: 2
                 B_params[2, labels_rl - 1, labels_rl] = 1
 
             elif r == 2:
-                # Up action: 1
-                B_params[1, labels_ud - 3, labels_ud] = 1
                 # Down action: 3
-                B_params[3, labels_ud, labels_ud] = 1
+                B_params[3, labels_ud - 3, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud, labels_ud] = 1
                 # Right action: 0
                 B_params[0, labels_rl, labels_rl] = 1
                 # Left action: 2
@@ -254,7 +258,7 @@ class params(TypedDict):
     num_episodes: int
     num_steps: int  # also included in Args
     learning_rate: float
-    seed: float
+    seed: int
     inf_steps: int
     pref_type: str
     num_policies: int
@@ -305,7 +309,8 @@ class Agent(object):
         self.learning_A: bool = params["learn_A"]
         self.learning_B: bool = params["learn_B"]
         self.learning_D: bool = params["learn_D"]
-        self.rng = np.random.default_rng(seed=params.get("random_seed", 42))
+        self.seed: int = params["seed"]
+        self.rng = np.random.default_rng(seed=self.seed)
 
         # 1. Generative Model, initializing the relevant components used in the computation
         # of free energy and expected free energy:
@@ -522,6 +527,49 @@ class Agent(object):
         else:
 
             raise Exception("Invalid action selection mechanism.")
+
+    from math import factorial
+
+    def set_policies(
+        self, num_policies: int, policy_len: int, num_actions: int
+    ) -> np.ndarray:
+        """Function to create and select the policies the agent will use to plan and pick an action at
+        one step in the interaction with the environment.
+
+        The policies are sequences of actions that correspond to all the k-tuples over the set S of actions,
+        S = [0,.., (num_actions - 1)] and k = policy_len, with repetitions allowed. They amount to the elements
+        of the k-fold Cartesian product [0,.., (num_actions - 1)] x .. x [0,.., (num_actions - 1)] for a total
+        of (num_actions**policy_len) sequences.
+
+        Inputs:
+        - num_policies: number of policies to use (if one does not want to consider all the permutations)
+        - policy_len: number of actions in a policy (length of a policy)
+        - num_actions: number of available actions, represented by the integers in [0, .. , (num_actions - 1)]
+
+        Output:
+        - policy_array: array of shape (num_policies, policy_len), all the policies stored as rows
+        """
+
+        # Set of actions
+        actions = np.arange(num_actions)
+        # Create all the policies
+        policies_list = [p for p in product(actions, repeat=policy_len)]
+        # Convert list into array
+        policies_array = np.array(policies_list)
+        # Number of all the sequences
+        num_all_pol = num_actions**policy_len
+        # All the row indices of policies_array
+        indices = np.arange(num_all_pol)
+        # Shuffle the indices
+        self.rng.shuffle(indices)
+        # Randomly select num_policies from the array with all the policies
+        # NOTE 1: if num_policies equals the number of all sequences, the end result is just
+        # policies_array with its rows shuffled
+        # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+        # the selected policies may not include the optimal policy in this implementation
+        sel_policies = policies_array[indices[:num_policies], :]
+
+        return sel_policies
 
     def perception(self):
         """Method that performs a gradient descent on free energy for every policy to update
@@ -1050,6 +1098,10 @@ class Agent(object):
         self.current_tstep += 1
         # Updating the matrix of observations and agent obs with the observations at the first time step
         self.current_obs[new_obs, self.current_tstep] = 1
+        # Create new set of policies for this time step
+        self.policies = self.set_policies(
+            self.num_policies, self.efe_tsteps, self.num_actions
+        )
 
         # Sampling from the categorical distribution, i.e. corresponding column of A.
         # Note 1: the agent_observation is a one-hot vector.
@@ -1529,7 +1581,7 @@ def main():
         print("************************************")
         print(f"Starting Run {run}...")
         # Set a random seed for current run, used by RNG attribute in the agent
-        agent_params["seed"] += run
+        agent_params["seed"] = run
         # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
         agent = Agent(cast(params, agent_params))
         # Loop over episodes
