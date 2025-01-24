@@ -874,14 +874,14 @@ def dirichlet_update(
 
         # Computing the Dirichlet updates for A
         for t in range(steps):
-            Dirichlet_update_A += np.outer(current_obs[:, t], Qs)
+            Dirichlet_update_A += np.outer(current_obs[:, t], Qs[:, t])
 
         # Getting the approximate posterior
         Q_A_params = A_params + Dirichlet_update_A
 
         # Computing the Dirichlet updates for B
         for action in range(num_actions):
-            for t in range(1, steps - 1):
+            for t in range(1, steps):
                 for policy in range(policies.shape[0]):
                     Dirichlet_update_B[action, :, :] += (
                         (action == policies[policy, t - 1])
@@ -924,9 +924,11 @@ def dirichlet_update(
         # Computing the Dirichlet updates for B
         for action in range(num_actions):
             # Note (important): we want to consider all the time steps in which an action was taken,
-            # i.e. from 0 to the second last. However, the range is set to go from 1 to steps because
-            # then in the loop we consider t-1 (taking care of action at step 0) and because Python
-            # range loops for steps-1 (thereby excluding the last step where no action is taken).
+            # i.e. from index 0 to index steps - 2 because at the last time step, indexed by steps - 1,
+            # no action is selected. In Python the for-loop below goes from index 1 to index steps - 1
+            # which allows us to pick the action at the first time step with episode_actions[t - 1]
+            # when t = 1, and exclude the non-existent action at the last time step because the last value
+            # of t is t = steps - 1 which gives us episode_actions[steps - 2].
             for t in range(1, steps):
                 for policy in range(policies.shape[0]):
                     Dirichlet_update_B[action, :, :] += (

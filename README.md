@@ -51,11 +51,11 @@ For detailed instructions, see [Installation](docs/aif-gym-docs.md).
 
 3.  Execute a Python script for training
     
-    `main_aif_paths --exp_name "aif-paths" --gym_id "GridWorld-v1" --num_runs 1 --num_episodes 10 --num_steps 5  --pref_type states --action_selection kd`
+    `main_aif_paths --exp_name "aif-paths" --gym_id "GridWorld-v1" --num_runs 100 --num_episodes 100 --num_steps 5 --inf_steps 5 --pref_type states --action_selection kd`
 
 4.  Execute Python script for data visualization
     
-    `plot_aif_paths -i 4 -v 8 -ti 0 -tv 8 -vl 3 -hl 3`
+    `plot_aif_paths -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3`
 
 For more detailed instructions, see [How to Run an Experiment](docs/aif-gym-docs.md).
 

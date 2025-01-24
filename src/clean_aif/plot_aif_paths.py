@@ -131,7 +131,7 @@ def main():
     # 2.b Plotting the expected free energy for each policy
     plot_efe(file_dp, params["select_policy"], result_dir)
     # 2.c Plotting the expected free energy components for each policy
-    plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=1)
+    plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=0)
     plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)
     # 3.a Plotting the policies probabilities, i.e. Q(pi)
     plot_pi_prob(file_dp, params["x_ticks_tstep"], params["select_policy"], result_dir)

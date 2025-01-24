@@ -277,7 +277,7 @@ class params(TypedDict):
     num_episodes: int
     num_steps: int  # also included in Args
     learning_rate: float
-    seed: float
+    seed: int
     inf_steps: int
     pref_type: str
     num_policies: int
@@ -439,9 +439,11 @@ class Agent(object):
         # Note 2: self.policies.shape[1] = (self.steps-1), i.e. the length of a policy is such that
         # it brings the agent to visit self.steps states (including the initial state) but at the last
         # time step (or state visited) there is no action.
-        # Note 3: the probabilities over policies change at every step except the last one;
-        # in the self.Qpi's column corresponding to the last step we store the Q(pi) computed at
-        # the previous time step.
+        # Note 3 (!!! IMPORTANT !!!): the probabilities over policies are updated at every time step and the
+        # updated values are saved at the corresponding time step in self.Qpi; this means that the first
+        # updated values computed at `self.current_tstep = 0` overwrite the initialized value below.
+        # In other words: at each time step we save the updated policies probabilities that become the prior
+        # for the NEXT time step.
         self.actions = list(range(self.num_actions))
         self.policies = params.get("policies")
         self.Qpi = np.zeros((self.num_policies, self.steps))
@@ -792,6 +794,8 @@ class Agent(object):
             # print(f"{self.Qs_pi[pi, :, :]}")
             # print(f"{self.Qpi[pi, self.current_tstep]}")
             #### END ####
+            # NOTE: here we are updating the values of Qs using += because the array is initialized with zeroes
+            # without any prior values whereas Qpi above was initialized with uniform probabilities at index 0
             self.Qs[:, self.current_tstep] += (
                 self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
             )
@@ -904,6 +908,10 @@ class Agent(object):
         """Method for action selection based on update policies probabilities. That is, action selection
         simply involves picking the action dictated by the most probable policy.
 
+        NOTE: below we are retrieving the pi probability values at the index 'current_tstep' because in the
+        planning method the *updated* policy probabilities are saved in Qpi at the current time step, i.e.
+        using self.current_tstep as index.
+
         Inputs:
             - None.
         Outputs:
@@ -911,8 +919,7 @@ class Agent(object):
         """
 
         argmax_policies = np.argwhere(
-            self.Qpi[:, self.current_tstep + 1]
-            == np.amax(self.Qpi[:, self.current_tstep + 1])
+            self.Qpi[:, self.current_tstep] == np.amax(self.Qpi[:, self.current_tstep])
         ).squeeze()
 
         if argmax_policies.shape == ():
@@ -949,6 +956,9 @@ class Agent(object):
         # print(f"{self.Qs}")
         #### END ####
         print("Updating Dirichlet parameters...")
+        # NOTE: below we retrieve the second last Qpi because that corresponds to the last time step an
+        # action was selected by the agent (no action is selected at the truncation or termination point)
+        # and that is all that is needed by the dirichlet_update() method
         self.A_params, self.B_params = dirichlet_update(
             self.num_states,
             self.num_actions,
@@ -1014,6 +1024,10 @@ class Agent(object):
         """This method brings together all computational processes defined above, forming the
         perception-action loop of an active inference agent at every time step during an episode.
 
+        NOTE: the computation of total free energy is done AFTER perception and planning because it involves
+        both the old policy probabilities, saved in Qpi at `current_tstep - 1`, and the updated policy
+        probabilities saved in Qpi at `current_tstep`.
+
         Inputs:
         - new_obs: the state from the environment's env_step method (based on where the agent ended up
         after the last step, e.g., an integer indicating the tile index for the agent in the maze).
@@ -1046,15 +1060,16 @@ class Agent(object):
 
             self.perception()
             self.planning()
-            print("---------------------")
-            print("--- 3. ACTING ---")
-            self.current_action = eval(self.select_action)
             # Computing the total free energy and store it in self.total_free_energies
             # (as a reference for the agent performance)
             total_F = total_free_energy(
                 self.current_tstep, self.steps, self.free_energies, self.Qpi
             )
 
+            print("---------------------")
+            print("--- 3. ACTING ---")
+
+            self.current_action = eval(self.select_action)
             # Storing the selected action in self.actual_action_sequence
             self.actual_action_sequence[self.current_tstep] = self.current_action
 
@@ -1435,7 +1450,7 @@ def main():
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
     data_path = LOG_DIR.joinpath(
         dt_string
-        + f'{cl_params["gym_id"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
+        + f'{cl_params["gym_id"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}infsteps{cl_params["inf_steps"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
     )
     data_path.mkdir(parents=True, exist_ok=True)
 
