@@ -264,7 +264,7 @@ def vfe(
                 # Simply retrieving the corresponding transition matrix B because its
                 # parameters are not learned.
                 action = pi_actions[t]
-                # print(f"First action is: {action}")
+                # print(f"The action is: {action}, {type(action)}")
                 # print("Corresponding B matrix is")
                 # print(f"{B[action, :, :]}")
                 logB_pi[t, :, :] = np.log(B[action, :, :])

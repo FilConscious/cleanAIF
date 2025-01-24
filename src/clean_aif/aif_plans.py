@@ -499,7 +499,7 @@ class Agent(object):
         self.agent_obs = np.zeros((self.num_states, self.steps))
 
         # Numpy array that stores the sequence of actions performed by the agent during the episode
-        self.actual_action_sequence = np.zeros((self.steps - 1))
+        self.actual_action_sequence = np.zeros((self.steps - 1), dtype=np.int64)
         # Numpy array that stores the index of the policy picked at each action selection step
         # NOTE: the index is with respect to the list of policies computed on the fly at that time step
         self.actual_pi_indices = np.zeros((self.steps - 1))
@@ -568,11 +568,11 @@ class Agent(object):
         """
 
         # Set of actions
-        actions = np.arange(num_actions)
+        actions = np.arange(num_actions, dtype=np.int64)
         # Create all the policies
         policies_list = [p for p in product(actions, repeat=policy_len)]
         # Convert list into array
-        policies_array = np.array(policies_list)
+        policies_array = np.array(policies_list, dtype=np.int64)
         # Number of all the sequences
         num_all_pol = num_actions**policy_len
         # All the row indices of policies_array
@@ -671,7 +671,6 @@ class Agent(object):
             pi_actions = pi_actions + list(
                 self.actual_action_sequence[: self.current_tstep + 1]
             )
-
             ########### Update the Q(S_t|pi) by setting gradient to zero ##############
 
             for _ in range(self.inf_iters):
