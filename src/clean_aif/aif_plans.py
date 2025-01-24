@@ -410,7 +410,7 @@ class Agent(object):
         # - self.policies: numpy array (policy x actions) with pre-determined policies,
         # i.e. rows of num_steps actions;
         # - self.Qpi: categorical distribution over the policies, i.e. Q(pi);
-        # - self.Qs_pi: categorical distributions over the states for each policy, i.e. Q(S_t|pi);
+        # - self.Qs_ps: categorical distributions over the states for each policy, i.e. Q(S_t|pi);
         # - self.Qt_pi: categorical distributions over the states for one specific S_t for each policy,
         # i.e. Q(S_t|pi);
         # - self.Qs: policy-independent states probabilities distributions, i.e. Q(S_t).
@@ -419,20 +419,23 @@ class Agent(object):
         self.actions = list(range(self.num_actions))
         self.policies = params.get("policies")
 
-        # !!!!!!!!!! ATTENTION !!!!!!!!!!
-        # Not needed because at every step the agent computes policies and their prob on the fly
-        # self.Qpi = np.zeros((self.num_policies, self.steps))
-        # self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.policies.shape[0]
+        # Array to store policies probability
+        # NOTE: these are reassigned at every time step when new policies are computed/selected
+        # (!!! IMPORTANT !!!): the probabilities over policies are updated at every time step and the
+        # updated values are saved at the corresponding time step in self.Qpi; this means that the first
+        # updated values computed at `self.current_tstep = 0` overwrite the initialized value below.
+        # In other words: at each time step we save the updated policies probabilities that become the prior
+        # for the NEXT time step.
+        self.Qpi = np.zeros((self.num_policies, self.steps))
+        self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.policies.shape[0]
 
-        # !!!!!!!!!! ATTENTION !!!!!!!!!!
-        # Not needed because at every step the agent computes policies and their prob on the fly
-
+        ### ATTENTTION: NOT USED/NOT NEEDED ###
         # State probabilities given a policy for every time step, the multidimensional array
         # contains self.steps distributions for each policy (i.e. policies*states*timesteps parameters).
         # In other words, every policy has a categorical distribution over the states for each time step.
         # Note 1: a simple way to initialise these probability values is to make every categorical
         # distribution a uniform distribution.
-        # self.Qs_pi = (
+        # self.Qs_ps = (
         #     np.ones((self.policies.shape[0], self.num_states, self.steps))
         #     * 1
         #     / self.num_states
@@ -452,9 +455,21 @@ class Agent(object):
         #     * 1
         #     / self.num_states
         # )
+        ### END ###
+
         # Policy-independent states probabilities distributions, numpy array of size (num_states, timesteps).
-        # See perception() method below.
+        # NOTE: these are used in free energy minimization, they are state beliefs of the common past each
+        # policy/plan shares; see perception() method below.
         self.Qs = np.zeros((self.num_states, self.steps))
+        # Initialize prior beliefs for the initial step
+        self.Qs[:, 0] = 1 / self.num_states
+        # Policy-dependent state probabilities distributions, or future state beliefs for EACH policy,
+        # numpy array of size (num_policies, num_states, plan_horizon).
+        # NOTE: they are computed anew at every free energy minimization step (because the policy also change
+        # every time); see perception() method below.
+        self.Qs_ps = np.zeros(
+            (self.policies.shape[0], self.num_states, self.efe_tsteps)
+        )
 
         # 3. Initialising arrays where to store agent's data during the experiment.
         # Numpy arrays where at every time step the computed free energies and expected free energies
@@ -466,11 +481,13 @@ class Agent(object):
         self.efe_risk = np.zeros((self.policies.shape[0], self.steps))
         self.efe_Anovelty = np.zeros((self.policies.shape[0], self.steps))
         self.efe_Bnovelty = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Bnovelty_t = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_Bnovelty_t = np.zeros(
+            (self.steps, self.policies.shape[0], self.efe_tsteps)
+        )
         self.total_free_energies = np.zeros((self.steps))
 
         # Where the agent believes it is at each time step
-        self.states_beliefs = np.zeros((self.steps))
+        # self.states_beliefs = np.zeros((self.steps))
 
         # Matrix of one-hot columns indicating the observation at each time step and matrix
         # of one-hot columns indicating the agent observation at each time step.
@@ -593,6 +610,18 @@ class Agent(object):
         # after performing gradient descent.
         sigma = special.softmax
 
+        # Length of a trajectory, from past to future time steps considered by each policy
+        # NOTE: current_tstep is the index for the current time step; since we start counting from 0, an index
+        # of 2 implies that *three* times teps have passed. Therefore we add 1 below for computing the total
+        # number of time steps in a trajectory.
+        trajectory_len = self.current_tstep + 1 + self.efe_tsteps
+
+        # Initialize empty arrays to store policy-dependent state probabilities over full trajectories
+        # NOTE: these values are saved for the planning step involving expected free energy minimization,
+        # also note that this attribute is re-assigned at every time step following the computation of a
+        # new set of policies
+        self.Qs_ps_traj = np.empty((self.num_policies, trajectory_len))
+
         # Looping over the policies to calculate the respective free energies and their gradients
         # to perform gradient descent on the Q(S_t|pi).
         for pi, pi_actions in enumerate(self.policies):
@@ -603,78 +632,49 @@ class Agent(object):
             # print(f'Time Step {self.current_tstep}')
             ### END ###
 
-            # IMPORTANT: the parameters of the categorical Q(S_t|pi) can be updated by
-            # gradient descent on (variational) free energy or using analytical updates
-            # resulting from setting the gradient to zero. Both methods are spelled out
-            # below but just one is commented out.
-            # TODO: the selection of the method should occur via the command line.
+            # Initialize free energy variable for current policy
+            F_pi = 0
 
-            ######### 1. Update the Q(S_t|pi) with gradient descent #########
-            # next_F = 1000000
-            # last_F = 0
-            # epsilon = 1
-            # delta_w = 0
-            # gamma = 0.3
-            # counter = 0
+            # Compute future state beliefs for current policy
+            # NOTE: this attribute is re-assigned at every step following the computation of a new set of
+            # policies, therefore note that across steps the beliefs stored in row i do not refer to the
+            # same policy
+            if self.current_tstep == 0:
+                # At the first time step we are using the agent's prior probabilities on its location
+                current_state_probs = self.D
+            else:
+                # At other time step we are using the prior state probabilities which were computed/saved
+                # at the previous time step, see the planning() method.
+                current_state_probs = self.Qs[self.current_tstep - 1]
 
-            # # Gradient descent on Free Energy: while loop until the difference between the next
-            # # and last free energy values becomes less than or equal to epsilon.
-            # while next_F - last_F > epsilon:
+            # Compute future state beliefs using prior state probabilities at current time step
+            self.Qs_ps[pi] = compute_future_beliefs(
+                self.num_states, current_state_probs, pi_actions, self.B
+            )
 
-            #     counter += 1
+            # Concatenate past, present and future state beliefs for CURRENT policy
+            # NOTE: each policy will have a shared past and present
+            Qs_p_traj = np.concatenate(
+                (self.Qs[:, 0 : self.current_tstep + 1], self.Qs_ps[pi, :, :]), axis=1
+            )
+            # Check that Qs_p has correct shape
+            assert (
+                Qs_p_traj.shape[1] == trajectory_len
+            ), f"Axis 1 of Qs_p should be of size {trajectory_len}, but it is of size {Qs_p_traj.shape[1]} instead."
 
-            #     # Computing the free energy for the current policy and gradient descent iteration
-            #     # Note 1: if B parameters are learned then you need to pass in self.B_params and
-            #     # self.learning_B (the same applies for A)
-            #     logA_pi, logB_pi, logD_pi, F_pi = vfe(self.num_states, self.steps, self.current_tstep, self.current_obs, pi, pi_actions,
-            #                                             self.A, self.B, self.D, self.Qs_pi, A_params=self.A_params, learning_A=self.learning_A,
-            #                                             B_params=self.B_params, learning_B=self.learning_B)
-
-            #     # Computing the free energy gradient for the current policy and gradient descent iteration
-            #     grad_F_pi = grad_vfe(self.num_states, self.steps, self.current_tstep, self.current_obs, pi, self.Qs_pi, logA_pi, logB_pi, logD_pi)
-
-            #     # Note 1: the updates are stored in the corresponding agent's attributes
-            #     # so they are immediately available at the next iteration.
-
-            #     # Simultaneous gradient update using momentum
-            #     # Note 1 (IMPORTANT!): with momentum the gradient descent works better and leads to better results, however it still does not
-            #     # prevent overshooting in certain episodes with the free energy diverging (it oscillates between two values). So, below we stop
-            #     # the gradient update after a certain number of iterations.
-            #     self.Qs_pi[pi, :, :] = (self.Qs_pi[pi, :, :] - self.learning_rate_F * grad_F_pi + gamma * delta_w)
-            #     self.Qs_pi[pi, :, :] = sigma( self.Qs_pi[pi, :, :] - np.amax(self.Qs_pi[pi, :, :], axis=0) , axis=0)
-
-            #     delta_w = gamma * delta_w - self.learning_rate_F * grad_F_pi
-
-            #     # Updating temporary variables to compute the difference between previous and next free energies to decide when to stop
-            #     # the gradient update (i.e. when the absolute value of the different is below epsilon).
-            #     if counter == 1:
-
-            #         next_F = F_pi
-
-            #     elif counter > 1:
-
-            #         last_F = next_F
-            #         next_F = F_pi
-
-            #     # IMPORTANT: stopping the gradient updates after 20 iterations to avoid free energy divergence.
-            #     if counter > 20:
-            #         break
-
-            ########## END ###########
-
-            ########### 2. Update the Q(S_t|pi) by setting gradient to zero ##############
+            ########### Update the Q(S_t|pi) by setting gradient to zero ##############
 
             for _ in range(self.inf_iters):
 
                 # IMPORTANT: here we are replacing zero probabilities with the value 0.0001
                 # to avoid zeroes in logs.
-                self.Qs_pi = np.where(self.Qs_pi == 0, 0.0001, self.Qs_pi)
+                Qs_p_traj = np.where(Qs_p_traj == 0, 0.0001, Qs_p_traj)
                 # Computing the variational free energy for the current policy
                 # Note 1: if B parameters are learned then you need to pass in self.B_params and
                 # self.learning_B (the same applies for A)
                 logA_pi, logB_pi, logD_pi, F_pi = vfe(
+                    trajectory_len,
                     self.num_states,
-                    self.steps,
                     self.current_tstep,
                     self.current_obs,
                     pi,
@@ -682,7 +682,7 @@ class Agent(object):
                     self.A,
                     self.B,
                     self.D,
-                    self.Qs_pi,
+                    Qs_p_traj,
                     A_params=self.A_params,
                     learning_A=self.learning_A,
                     B_params=self.B_params,
@@ -691,12 +691,13 @@ class Agent(object):
 
                 # Computing the free energy gradient for the current policy
                 grad_F_pi = grad_vfe(
+                    trajectory_len,
                     self.num_states,
-                    self.steps,
                     self.current_tstep,
                     self.current_obs,
                     pi,
-                    self.Qs_pi,
+                    pi_actions,
+                    Qs_p_traj,
                     logA_pi,
                     logB_pi,
                     logD_pi,
@@ -714,16 +715,19 @@ class Agent(object):
                 # results seem OK even if the for loop iterates just for one step.
                 # print(f"BEFORE update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
                 # print(f"Gradient for update: {grad_F_pi}")
-                self.Qs_pi[pi, :, :] = sigma(
-                    (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1, axis=0
+                Qs_p_traj = sigma(
+                    (-1) * (grad_F_pi - np.log(Qs_p_traj) - 1) - 1, axis=0
                 )
                 # print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
 
                 # Storing the state beliefs at the first step of the episode
-                if self.current_tstep == 0:
-                    self.Qsf_pi[pi, :, :] = self.Qs_pi[pi, :, :]
+                # if self.current_tstep == 0:
+                #     self.Qsf_pi[pi, :, :] = Qs_p_traj[pi, :, :]
                 # self.Qs_pi[pi, :, :] = sigma(-self.Qpi[pi, -1] * grad_F_pi, axis=0)
             ######### END ###########
+
+            # Store the last update of Qs_p_traj for the current policy
+            self.Qs_ps_traj[pi] = Qs_p_traj
 
             # Printing the free energy value for current policy at current time step
             # print(f"Time Step: {self.current_tstep}")
@@ -738,16 +742,18 @@ class Agent(object):
             #     self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
             # )
 
+            #### ATTENTION: no longer needed ####
             # Storing S_i probabilities for a certain index i, e.g., the index that corresponds to the
             # final step to see whether the agent ends up believing that it will reach the goal state
             # at the end of the episode by following the corresponding policy.
-            for t in range(self.steps):
-                self.Qt_pi[t, pi, :, self.current_tstep] = self.Qs_pi[pi, :, t]
+            # for t in range(self.steps):
+            #     self.Qt_pi[t, pi, :, self.current_tstep] = self.Qs_pi[pi, :, t]
 
-            print(self.Qt_pi.shape)
+            # print(self.Qt_pi.shape)
 
             # if self.current_tstep == 0 and pi==1:
             #    print(f'This is Q(S_1|pi_1): {self.Qs_pi[pi, :, 1]}')
+            #### END ####
 
         ### DEBUGGING ###
         # assert np.sum(self.Qs[:, self.current_tstep], axis=0) == 1, "The values of the policy-independent state probability distribution at time " + str(self.current_tstep) + " don't sum to one!"
@@ -758,10 +764,10 @@ class Agent(object):
         # computed above, i.e., one is getting the most probable state the agent believes to be in
         # based on Q(S_t|pi) and the old Q(pi) updated *at the previous time step*.
         # TODO: check that commenting this out does not cause any error
-        state_belief = np.argmax(self.Qs[:, self.current_tstep], axis=0)
-        self.states_beliefs[self.current_tstep] = state_belief
+        # state_belief = np.argmax(self.Qs[:, self.current_tstep], axis=0)
+        # self.states_beliefs[self.current_tstep] = state_belief
 
-    def planning(self):
+    def planning(self, truncated, terminated):
         """Method for planning, which involves computing the expected free energy for all the policies
         to update their probabilities, i.e. Q(pi), which are then used for action selection.
 
@@ -783,7 +789,7 @@ class Agent(object):
             # At the last time step only update Q(pi) with the computed free energy
             # (because there is no expected free energy then). for all the other steps
             # compute the total expected free energy over the remaining time steps.
-            if self.current_tstep == (self.steps - 1):
+            if self.current_tstep == (self.steps - 1) or truncated or terminated:
                 # Storing the free energy for the corresponding policy as the corresponding entry
                 # in self.Qpi, that will be normalised below using a softmax to get update probability
                 # over the policies (e.g. sigma(-F_pi))
@@ -805,15 +811,12 @@ class Agent(object):
                 ### END ###
                 G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs = (
                     efe(
-                        self.num_states,
-                        self.steps,
-                        self.current_tstep,
                         self.efe_tsteps,
                         pi,
                         pi_actions,
                         self.A,
                         self.C,
-                        self.Qs_pi,
+                        self.Qs_ps,
                         self.pref_type,
                         self.A_params,
                         self.B_params,
@@ -842,22 +845,22 @@ class Agent(object):
                 # print(f"A-novelty {pi}: {tot_AsW_As}")
                 # print(f"B-novelty {pi}: {tot_AsW_Bs}")
 
-                if self.current_tstep == 0:
-                    # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
-                    self.efe_Bnovelty_t[pi] += sq_AsW_Bs
-                    # print(
-                    #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
-                    # )
-                    # if sq_AsW_Bs[2] > 2200:
-                    #     raise Exception("B-novelty too high")
+                # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
+                # Save the sequence of B-novelties for policy pi at time step current_tstep
+                self.efe_Bnovelty_t[self.current_tstep, pi] += sq_AsW_Bs
+                # print(
+                #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
+                # )
+                # if sq_AsW_Bs[2] > 2200:
+                #     raise Exception("B-novelty too high")
 
         # Normalising the negative expected free energies stored as column in self.Qpi to get
         # the posterior over policies Q(pi) to be used for action selection
         print(f"Computing posterior over policy Q(pi)...")
         self.Qpi[:, self.current_tstep] = sigma(-self.Qpi[:, self.current_tstep])
         print(f"Before adding noise - Q(pi): {self.Qpi}")
-        # Replacing zeroes with 0.0001, to avoid the creation of nan values and multiplying by 5 to make sure
-        # the concentration of probabilities is preserved when reapplying the softmax
+        # Replacing zeroes with 0.0001, to avoid the creation of nan values, and replacing 1 with 5 to make
+        # sure a similar concentration of probabilities is preserved when reapplying the softmax
         self.Qpi[:, self.current_tstep] = np.where(
             self.Qpi[:, self.current_tstep] == 1, 5, self.Qpi[:, self.current_tstep]
         )
@@ -868,9 +871,13 @@ class Agent(object):
         )
         self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
         print(f"After adding noise - Q(pi): {self.Qpi}")
-        # Computing the policy-independent state probability at self.current_tstep and storing it in self.Qs
-        self.Qs[:, self.current_tstep] += (
-            self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
+
+        # Computing updated policy-independent state probability marginalizing w.r.t to the policies,
+        # e.g. $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$
+        # NOTE: these will be the prior probabilities over states for the next time step but we are saving
+        # them in self.Qs at the index corresponding to the CURRENT time step
+        self.Qs[:, self.current_tstep] = (
+            self.Qs_ps[:, :, 0].T @ self.Qpi[:, self.current_tstep]
         )
 
         ### DEBUGGING ###
@@ -958,15 +965,20 @@ class Agent(object):
             # print(f'Qs is {self.Qs[:, self.current_tstep+1]}')
 
             # Computing policy independent states for t+1
-            Stp1 = np.dot(
-                self.Qs_pi[:, :, self.current_tstep + 1].T,
-                self.Qpi[:, self.current_tstep],
-            )
+            # Stp1 = np.dot(
+            #     self.Qs_pi[:, :, self.current_tstep + 1].T,
+            #     self.Qpi[:, self.current_tstep],
+            # )
+            if self.current_tstep == 0:
+                Stp1 = self.Qs[:, self.current_tstep]
+                St = self.D
+            else:
+                Stp1 = self.Qs[:, self.current_tstep]
+                St = self.Qs[:, self.current_tstep - 1]
+
             # Computing distributions over observations
             AS_tp1 = np.dot(self.A, Stp1)
-            ABS_t = np.dot(
-                self.A, np.dot(self.B[a, :, :], self.Qs[:, self.current_tstep])
-            )
+            ABS_t = np.dot(self.A, np.dot(self.B[a, :, :], St))
             # Computing KL divergence for action a and storing it in kl_div
             div = cat_KL(AS_tp1, ABS_t, axis=0)
             kl_div[a] = div
@@ -994,8 +1006,7 @@ class Agent(object):
         """
 
         argmax_policies = np.argwhere(
-            self.Qpi[:, self.current_tstep + 1]
-            == np.amax(self.Qpi[:, self.current_tstep + 1])
+            self.Qpi[:, self.current_tstep] == np.amax(self.Qpi[:, self.current_tstep])
         ).squeeze()
 
         if argmax_policies.shape == ():
@@ -1011,7 +1022,8 @@ class Agent(object):
         return action_selected
 
     def learning(self):
-        """Method for parameters learning. This occurs at the end of the episode.
+        """Method for parameters learning. This occurs when the agent reaches the goal state or the truncation
+        point, i.e. the max number of time steps in the environment..
         Inputs:
             - None.
         Outputs:
@@ -1023,16 +1035,16 @@ class Agent(object):
         # Getting the updated parameters for matrices A and B using dirichlet_update().
         # Note 1: if A or B parameters are *not* learned the update method simply return self.A_params or
         # self.B_params
+        # NOTE: below we retrieve the second last Qpi because that corresponds to the last time step an
+        # action was selected by the agent (no action is selected at the truncation or termination point)
+        # and that is all that is needed by the dirichlet_update() method
         print("Updating Dirichlet parameters...")
         self.A_params, self.B_params = dirichlet_update(
             self.num_states,
             self.num_actions,
-            self.steps,
+            self.current_tstep,
             self.current_obs,
             self.actual_action_sequence,
-            self.policies,
-            self.Qpi[:, -2],
-            self.Qs_pi,
             self.Qs,
             self.A_params,
             self.B_params,
@@ -1082,7 +1094,7 @@ class Agent(object):
 
             print("No update (matrices A and Bs not subject to learning).")
 
-    def step(self, new_obs):
+    def step(self, new_obs, done):
         """This method brings together all computational processes defined above, forming the
         perception-action loop of an active inference agent at every time step during an episode.
 
@@ -1094,6 +1106,8 @@ class Agent(object):
         - self.current_action: the action chosen by the agent.
         """
 
+        # Retrieve done information
+        truncated, terminated = done
         # During an episode the counter self.current_tstep goes up by one unit at every time step
         self.current_tstep += 1
         # Updating the matrix of observations and agent obs with the observations at the first time step
@@ -1102,7 +1116,10 @@ class Agent(object):
         self.policies = self.set_policies(
             self.num_policies, self.efe_tsteps, self.num_actions
         )
+        # Initialize total free energy variable
+        total_F = 0
 
+        ### ATTENTION: NOT NEEDED/CONSIDER REMOVING ###
         # Sampling from the categorical distribution, i.e. corresponding column of A.
         # Note 1: the agent_observation is a one-hot vector.
         # Note 2 (IMPORTANT!): The computation below presupposes an interpretation of matrix A as a
@@ -1114,52 +1131,60 @@ class Agent(object):
         # To make them relevant, we should pass self.agent_obs to the various methods that require it,
         # e.g. the methods used to minimise free energy in self.perception().
         # TODO: consider commenting out these two lines
-        agent_observation = np.random.multinomial(1, self.A[:, new_obs], size=None)
-        self.agent_obs[:, self.current_tstep] = agent_observation
+        # agent_observation = np.random.multinomial(1, self.A[:, new_obs], size=None)
+        # self.agent_obs[:, self.current_tstep] = agent_observation
+        ### END ###
 
         # During an episode perform perception, planning, and action selection based on current observation
-        if self.current_tstep < (self.steps - 1):
+        if self.current_tstep < (self.steps - 1) and not truncated and not terminated:
 
+            # Free-energy minimization, i.e. inference or state estimation
             self.perception()
-            self.planning()
-            print("---------------------")
-            print("--- 3. ACTING ---")
-            self.current_action = eval(self.select_action)
-            # Computing the total free energy and store it in self.total_free_energies
-            # (as a reference for the agent performance)
+            # Expected free energy minimization, i.e. planning and update of policies probabilities
+            self.planning(truncated, terminated)
+            # Compute total free energy, i.e. sum of free energies scaled by policies' probabilities Q(pi)
+            # NOTE: this should be computed after the planning stage because it requires old policy
+            # probabilities as well as the updated ones
             total_F = total_free_energy(
-                self.current_tstep, self.steps, self.free_energies, self.Qpi
+                self.current_tstep, truncated, terminated, self.free_energies, self.Qpi
             )
 
+            print("---------------------")
+            print("--- 3. ACTING ---")
+            # Select an action
+            self.current_action = eval(self.select_action)
             # Storing the selected action in self.actual_action_sequence
             self.actual_action_sequence[self.current_tstep] = self.current_action
 
         # At the end of the episode (terminal state), do perception and update the A and/or B's parameters
         # (an instance of learning)
-        elif self.current_tstep == (self.steps - 1):
+        elif self.current_tstep == (self.steps - 1) or truncated or terminated:
             # Saving the P(A) and/or P(B) used during the episode before parameter learning,
             # in this way we conserve the priors for computing the KL divergence(s) for the
             # total free energy at the end of the episode (see below).
             prior_A = self.A_params
             prior_B = self.B_params
-            # Perception (state-estimation)
+            # Free-energy minimization, i.e. inference or state estimation
             self.perception()
-            # Planning (expected free energy computation)
+            # Expected free energy minimization, i.e. planning and update of policies probabilities
             # Note 1 (IMPORTANT): at the last time step self.planning() only serves to update Q(pi) based on
             # the past as there is no expected free energy to compute.
-            self.planning()
+            self.planning(truncated, terminated)
             # Learning (parameter's updates)
             self.learning()
             self.current_action = None
-            # Computing the total free energy and store it in self.total_free_energies (as a reference
-            # for the agent performance)
+            # Compute total free energy, i.e. sum of free energies scaled by policies' probabilities Q(pi)
+            # NOTE: this should be computed after the planning and learning stage because it requires old
+            # policy probabilities as well as the updated ones and the old Dirichlet parameters as well as
+            # the updated ones
             total_F = total_free_energy(
                 self.current_tstep,
-                self.steps,
+                truncated,
+                terminated,
                 self.free_energies,
                 self.Qpi,
-                prior_A,
-                prior_B,
+                prior_A=prior_A,
+                prior_B=prior_B,
                 A_params=self.A_params,
                 learning_A=self.learning_A,
                 B_params=self.B_params,
@@ -1608,6 +1633,8 @@ def main():
                 },
             )
 
+            terminated, truncated = False, False
+
             # Retrieve observation of the agent's location
             # print(f"Observation: {obs}; type {type(obs)}")
             obs = obs["agent"]
@@ -1623,7 +1650,7 @@ def main():
             # (say, 5) so `steps_count < NUM_STEPS ensures the loop lasts for NUM_STEPS.
             while steps_count < NUM_STEPS:
                 # Agent returns an action based on current observation/state
-                action = agent.step(current_state)
+                action = agent.step(current_state, (truncated, terminated))
                 print(f"Agent action {action}, {type(action)}")
                 # Except when at the last episode's step, the agent's action affects the environment;
                 # at the last time step the environment does not change but the agent engages in learning
