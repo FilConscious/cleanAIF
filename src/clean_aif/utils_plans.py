@@ -87,6 +87,8 @@ def compute_future_beliefs(
         # Select action the policy dictates at time step t in the future
         action = pi_actions[t]
         # Compute the future state beliefs
+        # print(f"B_matrices.shape: {B_matrices[action].shape}")
+        # print(f"previous_state_probs.shape: {previous_state_probs.shape}")
         state_beliefs = B_matrices[action] @ previous_state_probs
         # Store the state beliefs in the array
         future_beliefs[:, t] = state_beliefs
@@ -240,6 +242,9 @@ def vfe(
 
     # For every step in the trajectory retrieve the action that the policy pi dictates at
     # time step t-1. NOTE: t ranges over the indices representing each time step
+    # print(f"Traj len: {trajectory_len}")
+    # print(f"Action seq len: {len(pi_actions)}")
+
     for t in range(trajectory_len):
 
         if learning_B == True:
@@ -812,13 +817,17 @@ def efe(
 
             if pref_type == "states":
                 # Computing risk based on preferred states
-                slog_s_over_C = np.dot(
-                    Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, tau])
-                )
+                # print(f"Shape of C: {C.shape}")
+                # print(f"Tau: {tau}")
+                # NOTE (!!! IMPORTANT !!!): we have replaced `np.log(C[:, tau])` with `np.log(C[:, 0])`
+                # because in this active inference implementation we don't currently have the possibility
+                # to specify preferences over a trajectory, which was possible in the original one, we can
+                # only give the agent a single vector of preferences, i.e. a stationary distribution
+                slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, 0]))
                 ### DEBUGGING ###
                 print(f"Q(s|pi), corrected: {Qs_pi_risk} ; Preferences: {C}")
                 print(f"logQ(S|pi): {np.log(Qs_pi_risk)}")
-                print(f"logQ(S|pi) - log C: {np.log(Qs_pi_risk) - np.log(C[:, tau])}")
+                print(f"logQ(S|pi) - log C: {np.log(Qs_pi_risk) - np.log(C[:, 0])}")
                 print(f"Risk: {slog_s_over_C}")
                 ### END ###
 

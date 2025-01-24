@@ -645,10 +645,12 @@ class Agent(object):
             else:
                 # At other time step we are using the prior state probabilities which were computed/saved
                 # at the previous time step, see the planning() method.
-                current_state_probs = self.Qs[self.current_tstep - 1]
+                current_state_probs = self.Qs[:, self.current_tstep - 1]
 
             # Compute future state beliefs using prior state probabilities at current time step
             # print(f"The number of policies is {self.Qs_ps.shape[0]}")
+            # print(f"Shape of self.Qs: {self.Qs.shape}")
+            # print(f"current_state_probs.shape {current_state_probs.shape}")
 
             self.Qs_ps[pi] = compute_future_beliefs(
                 self.num_states, current_state_probs, pi_actions, self.B
@@ -663,6 +665,12 @@ class Agent(object):
             assert (
                 Qs_p_traj.shape[1] == trajectory_len
             ), f"Axis 1 of Qs_p should be of size {trajectory_len}, but it is of size {Qs_p_traj.shape[1]} instead."
+
+            # Compute action sequence from past to future given current policy
+            # NOTE: this is a combination of already taken actions and the policy's actions
+            pi_actions = pi_actions + list(
+                self.actual_action_sequence[: self.current_tstep + 1]
+            )
 
             ########### Update the Q(S_t|pi) by setting gradient to zero ##############
 
@@ -880,6 +888,13 @@ class Agent(object):
         # e.g. $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$
         # NOTE: these will be the prior probabilities over states for the next time step but we are saving
         # them in self.Qs at the index corresponding to the CURRENT time step
+        # print(
+        #     f"self.Qs[:, self.current_tstep].shape: {self.Qs[:, self.current_tstep].shape}"
+        # )
+        # print(f"self.Qs_ps[:,:,0].shape: {self.Qs_ps[:,:,0].shape}")
+        # print(
+        #     f"self.Qpi[:, self.current_tstep].shape: {self.Qpi[:, self.current_tstep].shape}"
+        # )
         self.Qs[:, self.current_tstep] = (
             self.Qs_ps[:, :, 0].T @ self.Qpi[:, self.current_tstep]
         )
