@@ -1450,7 +1450,7 @@ def main():
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
     data_path = LOG_DIR.joinpath(
         dt_string
-        + f'{cl_params["gym_id"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}infsteps{cl_params["inf_steps"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
+        + f'{cl_params["gym_id"]}_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_infsteps{cl_params["inf_steps"]}_preftype{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
     )
     data_path.mkdir(parents=True, exist_ok=True)
 

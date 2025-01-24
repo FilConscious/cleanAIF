@@ -58,6 +58,8 @@ class Args:
     start_state: int = 0
     """ index of goal state/location """
     goal_state: int = 8
+    """ number of policies the agent consider at each planning step """
+    num_policies: int = 100
     """ planning horizon, also the length of a policy """
     """ NOTE: also MAX number of future steps for which expected free energy is computed """
     plan_horizon: int = 4
@@ -84,10 +86,12 @@ class Args:
         default_factory=lambda: Args.init_A_params(Args.num_states)
     )
 
+    # !!! ATTENTION !!!: probably not needed, check if it is OK removing
     @staticmethod
     def init_policies(num_actions: int) -> np.ndarray:
         """
         Create initial agent's policies array.
+
         """
 
         # Array to store policies crated at the planning stage
@@ -261,7 +265,7 @@ class params(TypedDict):
     seed: int
     inf_steps: int
     pref_type: str
-    num_policies: int
+    num_policies: int  # also included in Args
     plan_horizon: int  # also included in Args
     action_selection: str
     learn_A: bool
@@ -467,9 +471,7 @@ class Agent(object):
         # numpy array of size (num_policies, num_states, plan_horizon).
         # NOTE: they are computed anew at every free energy minimization step (because the policy also change
         # every time); see perception() method below.
-        self.Qs_ps = np.zeros(
-            (self.policies.shape[0], self.num_states, self.efe_tsteps)
-        )
+        self.Qs_ps = np.zeros((self.num_policies, self.num_states, self.efe_tsteps))
 
         # 3. Initialising arrays where to store agent's data during the experiment.
         # Numpy arrays where at every time step the computed free energies and expected free energies
@@ -648,6 +650,7 @@ class Agent(object):
                 current_state_probs = self.Qs[self.current_tstep - 1]
 
             # Compute future state beliefs using prior state probabilities at current time step
+            # print(f"The number of policies is {self.Qs_ps.shape[0]}")
             self.Qs_ps[pi] = compute_future_beliefs(
                 self.num_states, current_state_probs, pi_actions, self.B
             )
@@ -1493,7 +1496,7 @@ def main():
         "--num_policies",
         "-np",
         type=int,
-        default=2,
+        nargs="?",
         help="number of policies (i.e. sequences of actions) in planning",
     )
     parser.add_argument(
