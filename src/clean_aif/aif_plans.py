@@ -477,15 +477,13 @@ class Agent(object):
         # Numpy arrays where at every time step the computed free energies and expected free energies
         # for each policy and the total free energy are stored. For how these are calculated see the
         # methods below. We also stored separately the various EFE components.
-        self.free_energies = np.zeros((self.policies.shape[0], self.steps))
-        self.expected_free_energies = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_ambiguity = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_risk = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Anovelty = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Bnovelty = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Bnovelty_t = np.zeros(
-            (self.steps, self.policies.shape[0], self.efe_tsteps)
-        )
+        self.free_energies = np.zeros((self.num_policies, self.steps))
+        self.expected_free_energies = np.zeros((self.num_policies, self.steps))
+        self.efe_ambiguity = np.zeros((self.num_policies, self.steps))
+        self.efe_risk = np.zeros((self.num_policies, self.steps))
+        self.efe_Anovelty = np.zeros((self.num_policies, self.steps))
+        self.efe_Bnovelty = np.zeros((self.num_policies, self.steps))
+        self.efe_Bnovelty_t = np.zeros((self.steps, self.num_policies, self.efe_tsteps))
         self.total_free_energies = np.zeros((self.steps))
 
         # Where the agent believes it is at each time step
@@ -622,7 +620,7 @@ class Agent(object):
         # NOTE: these values are saved for the planning step involving expected free energy minimization,
         # also note that this attribute is re-assigned at every time step following the computation of a
         # new set of policies
-        self.Qs_ps_traj = np.empty((self.num_policies, trajectory_len))
+        self.Qs_ps_traj = np.empty((self.num_policies, self.num_states, trajectory_len))
 
         # Looping over the policies to calculate the respective free energies and their gradients
         # to perform gradient descent on the Q(S_t|pi).
@@ -651,6 +649,7 @@ class Agent(object):
 
             # Compute future state beliefs using prior state probabilities at current time step
             # print(f"The number of policies is {self.Qs_ps.shape[0]}")
+
             self.Qs_ps[pi] = compute_future_beliefs(
                 self.num_states, current_state_probs, pi_actions, self.B
             )
@@ -730,6 +729,8 @@ class Agent(object):
             ######### END ###########
 
             # Store the last update of Qs_p_traj for the current policy
+            # print(self.Qs_ps_traj.shape)
+            # print(Qs_p_traj.shape)
             self.Qs_ps_traj[pi] = Qs_p_traj
 
             # Printing the free energy value for current policy at current time step
