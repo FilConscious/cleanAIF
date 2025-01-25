@@ -431,7 +431,7 @@ class Agent(object):
         # In other words: at each time step we save the updated policies probabilities that become the prior
         # for the NEXT time step.
         self.Qpi = np.zeros((self.num_policies, self.steps))
-        self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.policies.shape[0]
+        self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
 
         ### ATTENTTION: NOT USED/NOT NEEDED ###
         # State probabilities given a policy for every time step, the multidimensional array
@@ -440,14 +440,6 @@ class Agent(object):
         # Note 1: a simple way to initialise these probability values is to make every categorical
         # distribution a uniform distribution.
         # self.Qs_ps = (
-        #     np.ones((self.policies.shape[0], self.num_states, self.steps))
-        #     * 1
-        #     / self.num_states
-        # )
-        # This multi-dimensional array is exactly like the previous one but is used for storing/logging
-        # the state probabilities given a policy for the first step of the episode (while the previous array
-        # is overwritten at every step and ends up logging the last step state beliefs for the episode)
-        # self.Qsf_pi = (
         #     np.ones((self.policies.shape[0], self.num_states, self.steps))
         #     * 1
         #     / self.num_states
@@ -472,6 +464,11 @@ class Agent(object):
         # NOTE: they are computed anew at every free energy minimization step (because the policy also change
         # every time); see perception() method below.
         self.Qs_ps = np.zeros((self.num_policies, self.num_states, self.efe_tsteps))
+        # We save in the following array the policy-dependent future state probabilities distributions
+        # computed at EVERY time step of each episode; see perception() method below.
+        self.Qs_all_ps = np.zeros(
+            (self.steps, self.num_policies, self.num_states, self.efe_tsteps)
+        )
 
         # 3. Initialising arrays where to store agent's data during the experiment.
         # Numpy arrays where at every time step the computed free energies and expected free energies
@@ -485,9 +482,6 @@ class Agent(object):
         self.efe_Bnovelty = np.zeros((self.num_policies, self.steps))
         self.efe_Bnovelty_t = np.zeros((self.steps, self.num_policies, self.efe_tsteps))
         self.total_free_energies = np.zeros((self.steps))
-
-        # Where the agent believes it is at each time step
-        # self.states_beliefs = np.zeros((self.steps))
 
         # Matrix of one-hot columns indicating the observation at each time step and matrix
         # of one-hot columns indicating the agent observation at each time step.
@@ -647,14 +641,18 @@ class Agent(object):
                 # at the previous time step, see the planning() method.
                 current_state_probs = self.Qs[:, self.current_tstep - 1]
 
-            # Compute future state beliefs using prior state probabilities at current time step
+            # Compute policy-dependent future state beliefs using prior state probabilities at current time step
             # print(f"The number of policies is {self.Qs_ps.shape[0]}")
             # print(f"Shape of self.Qs: {self.Qs.shape}")
             # print(f"current_state_probs.shape {current_state_probs.shape}")
-
+            # NOTE: this is overwritten at every time step and the array of values computed at the LAST step
+            # of the episode is logged
             self.Qs_ps[pi] = compute_future_beliefs(
                 self.num_states, current_state_probs, pi_actions, self.B
             )
+            # Also, we save in a separate array the policy-dependent future state beliefs the agent computes
+            # at EACH time step in every episode
+            self.Qs_all_ps[self.current_tstep, pi, :, :] = np.copy(self.Qs_ps[pi])
 
             # Concatenate past, present and future state beliefs for CURRENT policy
             # NOTE: each policy will have a shared past and present
@@ -668,8 +666,9 @@ class Agent(object):
 
             # Compute action sequence from past to future given current policy
             # NOTE: this is a combination of already taken actions and the policy's actions
-            pi_actions = pi_actions + list(
-                self.actual_action_sequence[: self.current_tstep + 1]
+            pi_actions = np.concatenate(
+                (pi_actions, self.actual_action_sequence[: self.current_tstep + 1]),
+                axis=0,
             )
             ########### Update the Q(S_t|pi) by setting gradient to zero ##############
 
@@ -729,9 +728,6 @@ class Agent(object):
                 )
                 # print(f"AFTER update, Qs_{pi}: {self.Qs_pi[pi,:,3]}")
 
-                # Storing the state beliefs at the first step of the episode
-                # if self.current_tstep == 0:
-                #     self.Qsf_pi[pi, :, :] = Qs_p_traj[pi, :, :]
                 # self.Qs_pi[pi, :, :] = sigma(-self.Qpi[pi, -1] * grad_F_pi, axis=0)
             ######### END ###########
 
@@ -858,7 +854,9 @@ class Agent(object):
 
                 # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
                 # Save the sequence of B-novelties for policy pi at time step current_tstep
-                self.efe_Bnovelty_t[self.current_tstep, pi] += sq_AsW_Bs
+                print(f"sq_AsW_Bs shape: {sq_AsW_Bs.shape}")
+                print(f"efe_Bnovelty_t shape {self.efe_Bnovelty_t.shape}")
+                self.efe_Bnovelty_t[self.current_tstep, pi, :] += sq_AsW_Bs
                 # print(
                 #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
                 # )
@@ -948,8 +946,8 @@ class Agent(object):
         # which is simply the wanted index (an integer).
 
         actions_probs = np.matmul(
-            (self.policies[:, self.current_tstep] == actions_matrix),
-            self.Qpi[:, self.current_tstep],
+            (self.policies[:, 0] == actions_matrix),
+            self.Qpi[:, 0],
         )
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
@@ -1215,37 +1213,39 @@ class Agent(object):
         return self.current_action
 
     def reset(self):
-        """This method is used to reset certain variables before starting a new episode.
-
-        Specifically, the observation matrix, self.current_obs, and self.Qs should be reset at the beginning
-        of each episode to store the new sequence of observations etc.; also, the matrix with the probabilities
-        over policies stored in the previous episode, self.Qpi, should be rinitialized so that at time step 0
-        (zero) the prior over policies is the last computed value from the previous episode.
+        """
+        Method to reset agent's attributes used to store different metrics before starting a new episode.
         """
 
         # Initializing current action and step variables
         self.current_action = None
         self.current_tstep = -1
-        # Setting self.current_obs and self.agent_obs to a zero array before starting a new episode
+        # Setting self.current_obs and self.agent_obs to a zero array
         self.current_obs = np.zeros((self.num_states, self.steps))
         self.agent_obs = np.zeros((self.num_states, self.steps))
-        # Setting self.Qs to a zero array before starting a new episode
+        # Setting self.Qs to a zero array
         self.Qs = np.zeros((self.num_states, self.steps))
-        # Resetting sequence of B-novelty values at t = 0
-        self.efe_Bnovelty_t = np.zeros((self.policies.shape[0], self.steps))
-        # Initializing self.Qpi so that the prior over policies is equal to the last probability distribution
-        # computed.
-        # Note 1: this is done at all episodes except for the very first. To single out the first episode
-        # case we check whether it is populated by zeros (because it is initialized as such when the agent
-        # object is instantiated).
-        if np.sum(self.Qpi[:, 1], axis=0) == 0:
-            # Do nothing because self.Qpi is already initialized correctly
-            pass
-        else:
-            # New prior probability distribution over policies
-            ppd_policies = self.Qpi[:, -1]
-            self.Qpi = np.zeros((self.num_policies, self.steps))
-            self.Qpi[:, 0] = ppd_policies
+        # Reset prior probabilities over states to be uniform
+        self.Qs[:, 0] = 1 / self.num_states
+        # Setting self.Qpi to a zero array
+        self.Qpi = np.zeros((self.num_policies, self.steps))
+        # Reset prior probabilities over policies to be uniform
+        self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
+        # Reset other attributes used to store episodic data related to free energy
+        self.free_energies = np.zeros((self.num_policies, self.steps))
+        self.expected_free_energies = np.zeros((self.num_policies, self.steps))
+        self.efe_ambiguity = np.zeros((self.num_policies, self.steps))
+        self.efe_risk = np.zeros((self.num_policies, self.steps))
+        self.efe_Anovelty = np.zeros((self.num_policies, self.steps))
+        self.efe_Bnovelty = np.zeros((self.num_policies, self.steps))
+        self.efe_Bnovelty_t = np.zeros((self.steps, self.num_policies, self.efe_tsteps))
+        self.total_free_energies = np.zeros((self.steps))
+        # Reset array for sequence of actions performed by the agent during an episode
+        self.actual_action_sequence = np.zeros((self.steps - 1), dtype=np.int64)
+        # Reset array for the index of the policy picked at each action selection step
+        self.actual_pi_indices = np.zeros((self.steps - 1))
+        # Reset array for storing the full policy picked at each action selection step, minimizing EFE
+        self.actual_pi = np.empty((0, self.num_actions))
 
 
 class LogData(object):
@@ -1261,6 +1261,7 @@ class LogData(object):
         self.num_max_steps: int = params.get("num_steps")
         self.num_actions: int = params.get("num_actions")
         self.num_policies: int = params.get("num_policies")
+        self.efe_tsteps: int = params.get("plan_horizon")
         self.num_videos: int = params.get("num_videos")
         self.learnA: bool = params.get("learn_A")
         self.learnB: bool = params.get("learn_B")
@@ -1301,7 +1302,13 @@ class LogData(object):
             (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
         )
         self.efe_Bnovelty_t: np.ndarray = np.zeros(
-            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+            (
+                self.num_runs,
+                self.num_episodes,
+                self.num_max_steps,
+                self.num_policies,
+                self.efe_tsteps,
+            )
         )
         """Observations collected by the agent at each step during an episode"""
         self.observations: np.ndarray = np.zeros(
@@ -1309,7 +1316,7 @@ class LogData(object):
         )
         """Policy independent probabilistic beliefs about environmental states"""
         self.states_beliefs: np.ndarray = np.zeros(
-            (self.num_runs, self.num_episodes, self.num_max_steps)
+            (self.num_runs, self.num_episodes, self.num_states, self.num_max_steps)
         )
         """Sequence of action performed by the agent during each episode"""
         self.actual_action_sequence: np.ndarray = np.zeros(
@@ -1322,7 +1329,7 @@ class LogData(object):
                 self.num_episodes,
                 self.num_policies,
                 self.num_states,
-                self.num_max_steps,
+                self.efe_tsteps,
             )
         )
         """Policy dependent probabilistic beliefs about environmental states (first episode step)"""
@@ -1332,7 +1339,7 @@ class LogData(object):
                 self.num_episodes,
                 self.num_policies,
                 self.num_states,
-                self.num_max_steps,
+                self.efe_tsteps,
             )
         )
         """Q(S_i|pi) recorded at every time step for every belief state"""
@@ -1343,7 +1350,7 @@ class LogData(object):
                 self.num_max_steps,
                 self.num_policies,
                 self.num_states,
-                self.num_max_steps,
+                self.efe_tsteps,
             )
         )
         """Probabilities of the policies at each time step during every episode"""
@@ -1387,13 +1394,19 @@ class LogData(object):
         self.efe_risk[run, episode, :, :] = kwargs["efe_risk"]
         self.efe_Anovelty[run, episode, :, :] = kwargs["efe_Anovelty"]
         self.efe_Bnovelty[run, episode, :, :] = kwargs["efe_Bnovelty"]
-        self.efe_Bnovelty_t[run, episode, :, :] = kwargs["efe_Bnovelty_t"]
+        self.efe_Bnovelty_t[run, episode, :, :, :] = kwargs["efe_Bnovelty_t"]
         self.observations[run, episode, :, :] = kwargs["current_obs"]
-        self.states_beliefs[run, episode, :] = kwargs["states_beliefs"]
+        self.states_beliefs[run, episode, :, :] = kwargs["Qs"]
         self.actual_action_sequence[run, episode, :] = kwargs["actual_action_sequence"]
-        self.policy_state_prob[run, episode, :, :, :] = kwargs["Qs_pi"]
-        self.policy_state_prob_first[run, episode, :, :, :] = kwargs["Qsf_pi"]
-        self.every_tstep_prob[run, episode, :, :, :, :] = kwargs["Qt_pi"]
+        self.policy_state_prob[run, episode, :, :, :] = kwargs[
+            "Qs_ps"
+        ]  # at the last time step
+        self.policy_state_prob_first[run, episode, :, :, :] = kwargs["Qs_all_ps"][
+            0
+        ]  # at the first time step
+        self.every_tstep_prob[run, episode, :, :, :, :] = kwargs[
+            "Qs_all_ps"
+        ]  # at every time step
         self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
         self.so_mappings[run, episode, :, :] = kwargs["A"]
         self.transitions_prob[run, episode, :, :, :] = kwargs["B"]
@@ -1663,43 +1676,49 @@ def main():
             # Current state (updated at every step and passed to the agent)
             current_state = start_state
 
-            # Agent and environment interact for NUM_STEPS steps.
-            # NOTE: we start counting episode steps from 0 (steps_count = 0) and we have NUM_STEPS steps
-            # (say, 5) so `steps_count < NUM_STEPS ensures the loop lasts for NUM_STEPS.
-            while steps_count < NUM_STEPS:
+            # Agent and environment interact until the environment is truncated or terminated.
+            # NOTE: the maximum number of steps is NUM_STEPS, i.e. the time step at which the environment
+            # is truncated regardless of whether the agent has reached the goal state or not..
+            while not truncated and not terminated:
                 # Agent returns an action based on current observation/state
                 action = agent.step(current_state, (truncated, terminated))
+                print(f"Terminated: {terminated}")
                 print(f"Agent action {action}, {type(action)}")
-                # Except when at the last episode's step, the agent's action affects the environment;
-                # at the last time step the environment does not change but the agent engages in learning
-                # (parameters update)
-                if steps_count < NUM_STEPS - 1:
-                    # Environment outputs based on agent action
-                    next_obs, reward, terminated, truncated, info = env.step(action)
-                    # Retrieve observation of the agent's location
-                    next_obs = next_obs["agent"]
-                    print(f"Next obs: {next_obs}")
+                print(f"Step_count: {steps_count}")
+                # Environment outputs based on agent action
+                next_obs, reward, terminated, truncated, info = env.step(action)
+                # Retrieve observation of the agent's location
+                next_obs = next_obs["agent"]
+                print(f"Next obs: {next_obs}")
 
-                    # Convert observation into index representation
-                    next_state = process_obs(next_obs)
-                    print(f"Next state: {next_state}")
-                    # Update total_reward
-                    total_reward += reward
+                # Convert observation into index representation
+                next_state = process_obs(next_obs)
+                print(f"Next state: {next_state}")
+                # Update total_reward
+                total_reward += reward
 
-                    print("-------- STEP SUMMARY --------")
-                    print(f"Time step: {steps_count}")
-                    print(f"Observation: {current_state}")
-                    print(f"Agent action: {action}")
-                    print(f"Next state: {next_state}")
-                    print(f"Terminal/Goal state: {terminated}")
+                print("-------- STEP SUMMARY --------")
+                print(f"Time step: {steps_count}")
+                print(f"Observation: {current_state}")
+                print(f"Agent action: {action}")
+                print(f"Next state: {next_state}")
+                print(f"Terminal/Goal state: {terminated}")
 
-                    # Adding a unit to the state_visits counter for the start_state
-                    logs_writer.log_step(run, e, next_state)
-                    # Update current state with next_state
-                    current_state = next_state
-
+                # Adding a unit to the state_visits counter for the start_state
+                logs_writer.log_step(run, e, next_state)
+                # Update current state with next_state
+                current_state = next_state
                 # Update step count
                 steps_count += 1
+
+            # After the environment is truncated/terminated we use agent.step outside the loop one more time
+            # to update specific agent's parameters, those of A or B matrices, based on the trajectory the
+            # agent has realized; in the active inference literature this is an instance of learning.
+            action = agent.step(current_state, (truncated, terminated))
+
+            print("-------- EPISODE SUMMARY --------")
+            print(f"Step Count: {steps_count}")
+            print(f"Goal reached: {terminated}")
 
             # Retrieve all agent's attributes, including episodic metrics we want to save
             all_metrics = agent.__dict__
