@@ -24,7 +24,7 @@ from pathlib import Path
 
 # Custom imports
 from .config import LOG_DIR
-from .utils import *
+from .utils_paths import *
 
 
 @dataclass
