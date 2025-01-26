@@ -30,6 +30,9 @@ import time
 from .config import LOG_DIR
 from .utils_plans import *
 
+# Set the print options for NumPy
+np.set_printoptions(precision=3, suppress=True)
+
 
 @dataclass
 class Args:
@@ -584,6 +587,8 @@ class Agent(object):
         # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
         # the selected policies may not include the optimal policy in this implementation
         sel_policies = policies_array[indices[:num_policies], :]
+        # print("Policies")
+        # print(sel_policies)
 
         return sel_policies
 
@@ -658,6 +663,9 @@ class Agent(object):
             # Also, we save in a separate array the policy-dependent future state beliefs the agent computes
             # at EACH time step in every episode
             self.Qs_all_ps[self.current_tstep, pi, :, :] = np.copy(self.Qs_ps[pi])
+
+            # print(self.Qs_ps[pi][0])
+            # print(self.Qs_all_ps[self.current_tstep, pi, 0, :])
 
             # Concatenate past, present and future state beliefs for CURRENT policy
             # NOTE: each policy will have a shared past and present
@@ -859,8 +867,8 @@ class Agent(object):
 
                 # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
                 # Save the sequence of B-novelties for policy pi at time step current_tstep
-                print(f"sq_AsW_Bs shape: {sq_AsW_Bs.shape}")
-                print(f"efe_Bnovelty_t shape {self.efe_Bnovelty_t.shape}")
+                # print(f"sq_AsW_Bs shape: {sq_AsW_Bs.shape}")
+                # print(f"efe_Bnovelty_t shape {self.efe_Bnovelty_t.shape}")
                 self.efe_Bnovelty_t[self.current_tstep, pi, :] += sq_AsW_Bs
                 # print(
                 #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
@@ -872,19 +880,33 @@ class Agent(object):
         # the posterior over policies Q(pi) to be used for action selection
         print(f"Computing posterior over policy Q(pi)...")
         self.Qpi[:, self.current_tstep] = sigma(-self.Qpi[:, self.current_tstep])
-        print(f"Before adding noise - Q(pi): {self.Qpi}")
+
+        # print(f"Before adding noise - Q(pi): {self.Qpi}")
         # Replacing zeroes with 0.0001, to avoid the creation of nan values, and replacing 1 with 5 to make
         # sure a similar concentration of probabilities is preserved when reapplying the softmax
-        self.Qpi[:, self.current_tstep] = np.where(
-            self.Qpi[:, self.current_tstep] == 1, 5, self.Qpi[:, self.current_tstep]
-        )
-        self.Qpi[:, self.current_tstep] = np.where(
-            self.Qpi[:, self.current_tstep] == 0,
-            0.0001,
-            self.Qpi[:, self.current_tstep],
-        )
-        self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
-        print(f"After adding noise - Q(pi): {self.Qpi}")
+        # self.Qpi[:, self.current_tstep] = np.where(
+        #     self.Qpi[:, self.current_tstep] == 1, 5, self.Qpi[:, self.current_tstep]
+        # )
+        # self.Qpi[:, self.current_tstep] = np.where(
+        #     self.Qpi[:, self.current_tstep] == 0,
+        #     0.0001,
+        #     self.Qpi[:, self.current_tstep],
+        # )
+        # self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
+        # print(f"After adding noise - Q(pi): {self.Qpi}")
+
+        ### DEBUG ###
+        max_pindex = np.argmax(self.Qpi[:, self.current_tstep], axis=0)
+        print(f"Index of most probable policy: {max_pindex}")
+        print(f"Most probable policy: {self.policies[max_pindex]}")
+        print(f"Probability of the policy: {self.Qpi[max_pindex, self.current_tstep]}")
+        print(f"{np.max(self.Qpi[:, self.current_tstep])}")
+
+        optimal_index = np.where((self.policies == [0, 0, 1, 1]).all(axis=1))[0]
+        print(f"Optimal index: {optimal_index}")
+        print(f"Optimal policy: {self.policies[optimal_index]}")
+        print(f"Prob of optimal policy: {self.Qpi[optimal_index, self.current_tstep]}")
+        ### END ###
 
         # Computing updated policy-independent state probability marginalizing w.r.t to the policies,
         # e.g. $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$
@@ -917,11 +939,6 @@ class Agent(object):
         Outputs:
             - action_selected (integer): the action the agent is going to perform.
 
-        Note 1: the matrix self.Qpi is indexed with self.current_tstep + 1 (the next time step) because
-        we store the approximate posterior in the next available column, with the first one being occupied
-        by the initial Q(pi). This makes sense because the new Q(pi) becomes the prior for the next time step.
-        But because it is also the approximate posterior at the current time step it is used for selecting
-        the action.
         """
 
         # Matrix of shape (num_actions, num_policies) with each row being populated by the same integer,
@@ -952,8 +969,9 @@ class Agent(object):
 
         actions_probs = np.matmul(
             (self.policies[:, 0] == actions_matrix),
-            self.Qpi[:, 0],
+            self.Qpi[:, self.current_tstep],
         )
+        print(f"Action probabilities: {actions_probs}")
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
         if argmax_actions.shape == ():
@@ -963,6 +981,11 @@ class Agent(object):
         else:
 
             action_selected = self.rng.choice(argmax_actions)
+
+        print(f"Step {self.current_tstep}")
+        print(f"Action selected: {int(action_selected)}")
+        if self.current_tstep == 3:
+            print(a)
 
         return int(action_selected)
 
@@ -1032,14 +1055,14 @@ class Agent(object):
 
         if argmax_policies.shape == ():
 
-            action_selected = self.policies[argmax_policies, self.current_tstep]
+            action_selected = self.policies[argmax_policies, 0]
 
         else:
 
-            action_selected = self.rng.choice(
-                self.policies[argmax_policies, self.current_tstep]
-            )
+            action_selected = self.rng.choice(self.policies[argmax_policies, 0])
 
+        # if self.current_tstep == 10:
+        #     print(a)
         return action_selected
 
     def learning(self):
@@ -1654,9 +1677,9 @@ def main():
         # Loop over episodes
         for e in range(NUM_EPISODES):
             # Printing episode number
-            print("--------------------")
-            print(f"Episode {e}")
-            print("--------------------")
+            print("**********************************************************")
+            print(f"****************** EPISODE {e} **************************")
+            print("**********************************************************")
 
             # Initialize steps and reward counters
             steps_count = 0

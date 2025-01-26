@@ -9,6 +9,9 @@ import numpy as np
 import math
 from scipy import special
 
+# Set the print options for NumPy
+np.set_printoptions(precision=3, suppress=True)
+
 
 # def faster_permutations(n: int) -> np.ndarray:
 #     """Function to create all the permutations of n integers. i.e. those in the sequence [0,.., n-1].
@@ -74,9 +77,14 @@ def compute_future_beliefs(
     Output:
     - future_beliefs: array of shape (num_states, plan_horizon)
     """
+    # print(f"Computing future beliefs for policy: {pi_actions}")
 
     # State probabilities at the current time step
     previous_state_probs = current_state_probs
+
+    # print(f"Prior or previous_state_probs:")
+    # print(f"{previous_state_probs}")
+
     # Length of a policy, i.e. the future time steps for which the state beliefs need to be computed
     num_future_steps = len(pi_actions)
     # Initialize array with future state beliefs
@@ -87,13 +95,18 @@ def compute_future_beliefs(
         # Select action the policy dictates at time step t in the future
         action = pi_actions[t]
         # Compute the future state beliefs
+
         # print(f"B_matrices.shape: {B_matrices[action].shape}")
         # print(f"previous_state_probs.shape: {previous_state_probs.shape}")
+
         state_beliefs = B_matrices[action] @ previous_state_probs
         # Store the state beliefs in the array
         future_beliefs[:, t] = state_beliefs
         # Make the state beliefs the new "current" state beliefs for the next iteration
         previous_state_probs = state_beliefs
+
+    # print(f"Policy future beliefs shape: {future_beliefs.shape}")
+    # print(f"{future_beliefs}")
 
     return future_beliefs
 
@@ -161,7 +174,7 @@ def vfe(
     #  # Fourth term: sum of dot products from t=2 to T.
     #  - S_2T(Q(s_t|pi) @ log(B_t-1) @ Q(s_t-1|pi)).
 
-    print("Computing FE...")
+    # print("Computing FE...")
 
     # # Length of a policy, i.e. the number of time steps to plan/predict the future
     # plan_steps = len(pi_actions)
@@ -350,7 +363,7 @@ def grad_vfe(
     # print("- logD_pi: ")
     # print(f"{logD_pi}")
 
-    print("Computing FE gradients...")
+    # print("Computing FE gradients...")
 
     # Initialising the gradient vectors for each Q(s_t|pi)
     grad_F_pi = np.zeros((num_states, trajectory_len))
@@ -623,7 +636,7 @@ def efe(
     - G_pi (float): the sum of pi's expected free energies, one for each of future time step considered.
     """
 
-    print("Computing EFE...")
+    # print("Computing EFE...")
     # Initialising the expected free energy variable and its components
     G_pi = 0
     # Ambiguity
@@ -882,6 +895,7 @@ def efe(
                 # slog_s_over_C = np.dot(
                 #     Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau])
                 # )
+
                 slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, 0]))
 
             else:
