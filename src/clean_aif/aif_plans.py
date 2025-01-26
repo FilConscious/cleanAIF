@@ -17,12 +17,14 @@ from datetime import datetime
 import gymnasium
 import gymnasium_env  # Needed otherwise NamespaceNotFound error
 from itertools import product
-import math
+
+# import math
 import numpy as np
 import os
 from typing import TypedDict, cast, Tuple
 from scipy import special
 from pathlib import Path
+import time
 
 # Custom imports
 from .config import LOG_DIR
@@ -69,13 +71,15 @@ class Args:
     policies: np.ndarray = field(
         default_factory=lambda: Args.init_policies(Args.num_actions)
     )
+    """ preferences type """
+    pref_type: str = "states"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
     ``field(default_factory = custom_func)``) TODO: Clarify this note!!!!"""
     """ C array: specifies agent's preferred state(s) in the environment """
     C_params: np.ndarray = field(
-        default_factory=lambda: Args.init_C_array(Args.num_states)
+        default_factory=lambda: Args.init_C_array(Args.num_states, Args.pref_type)
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
     B_params: np.ndarray = field(
@@ -109,7 +113,7 @@ class Args:
     #     self.pref_array = self.create_pref_array(self.num_states, self.num_steps)
 
     @staticmethod
-    def init_C_array(num_states: int, pref_type: str = "state") -> np.ndarray:
+    def init_C_array(num_states: int, pref_type: str) -> np.ndarray:
         """
         Initialize preference array, denoted by C in the active inference literature. The vector
         stores the parameters of a categorical distribution with the probability mass concentrated on
@@ -130,10 +134,11 @@ class Args:
         pref_array = np.ones((num_states, 1)) * (1 / num_states)
 
         if pref_type == "states":
+            print("Setting agent's preferences...")
             # Assign probability to non-goal states...
-            pref_array[:-1, 1] = 0.1 / (num_states - 1)
+            pref_array[:-1, 0] = 0.1 / (num_states - 1)
             # Assign probability to goal state
-            pref_array[-1, 1] = 0.9
+            pref_array[-1, 0] = 0.9
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
                 "The preferences do not sum to one!"
@@ -264,7 +269,6 @@ class params(TypedDict):
     learning_rate: float
     seed: int
     inf_steps: int
-    pref_type: str
     num_policies: int  # also included in Args
     plan_horizon: int  # also included in Args
     action_selection: str
@@ -283,6 +287,7 @@ class params(TypedDict):
     goal_state: int
     num_actions: int
     policies: np.ndarray
+    pref_type: str
     A_params: np.ndarray
     B_params: np.ndarray
     C_params: np.ndarray
@@ -1152,7 +1157,7 @@ class Agent(object):
         ### END ###
 
         # During an episode perform perception, planning, and action selection based on current observation
-        if self.current_tstep < (self.steps - 1) and not truncated and not terminated:
+        if self.current_tstep < self.steps - 1 and not truncated and not terminated:
 
             # Free-energy minimization, i.e. inference or state estimation
             self.perception()
@@ -1174,7 +1179,7 @@ class Agent(object):
 
         # At the end of the episode (terminal state), do perception and update the A and/or B's parameters
         # (an instance of learning)
-        elif self.current_tstep == (self.steps - 1) or truncated or terminated:
+        elif self.current_tstep == self.steps - 1 or truncated or terminated:
             # Saving the P(A) and/or P(B) used during the episode before parameter learning,
             # in this way we conserve the priors for computing the KL divergence(s) for the
             # total free energy at the end of the episode (see below).
@@ -1273,6 +1278,8 @@ class LogData(object):
         )
         """Counts of how many times the goal state is reached"""
         self.reward_counts: np.ndarray = np.zeros((self.num_runs, self.num_episodes))
+        """Counts of how many steps the episode last (i.e. steps to termination or truncation)"""
+        self.steps_count: np.ndarray = np.zeros((self.num_runs, self.num_episodes))
         """Policy dependent free energies at each step during every episode"""
         self.pi_free_energies: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
@@ -1384,6 +1391,7 @@ class LogData(object):
         # At the end of the episode, storing the total reward in reward_counts and other info
         # accumulated by the agent, e.g the total free energies, expected free energies etc.
         # (this is done for every episode and for every run).
+        self.steps_count[run][episode] = kwargs["steps_count"]
         self.reward_counts[run][episode] = kwargs["total_reward"]
         self.pi_free_energies[run, episode, :, :] = kwargs["free_energies"]
         self.total_free_energies[run, episode, :] = kwargs["total_free_energies"]
@@ -1426,6 +1434,7 @@ class LogData(object):
         data["learn_B"] = self.learnB
         data["state_visits"] = self.state_visits
         data["reward_counts"] = self.reward_counts
+        data["steps_count"] = self.steps_count
         data["pi_free_energies"] = self.pi_free_energies
         data["total_free_energies"] = self.total_free_energies
         data["expected_free_energies"] = self.expected_free_energies
@@ -1511,14 +1520,14 @@ def main():
         default=1,
         help="number of free energy minimization steps",
     )
-    # Agent's preferences type
-    parser.add_argument(
-        "--pref_type",
-        "-pt",
-        type=str,
-        default="states",
-        help="choices: states, observations",
-    )
+    # Agent's preferences type (moved to the Args class specific for the agent)
+    # parser.add_argument(
+    #     "--pref_type",
+    #     "-pt",
+    #     type=str,
+    #     default="states",
+    #     help="choices: states, observations",
+    # )
     # Policy
     parser.add_argument(
         "--num_policies",
@@ -1565,7 +1574,7 @@ def main():
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
     data_path = LOG_DIR.joinpath(
         dt_string
-        + f'{cl_params["gym_id"]}r{cl_params["num_runs"]}e{cl_params["num_episodes"]}prF{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
+        + f'{cl_params["gym_id"]}_r{cl_params["num_runs"]}_e{cl_params["num_episodes"]}_as{cl_params["action_selection"]}_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
     data_path.mkdir(parents=True, exist_ok=True)
 
@@ -1614,7 +1623,7 @@ def main():
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS, render_mode=None
+        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS - 1, render_mode=None
     )
 
     ##############################
@@ -1629,6 +1638,8 @@ def main():
     ###############################
     ### 5. TRAINING
     ###############################
+
+    start_time = time.time()
 
     ### TRAINING LOOP ###
     # Loop over number of runs and episodes
@@ -1683,6 +1694,7 @@ def main():
                 # Agent returns an action based on current observation/state
                 action = agent.step(current_state, (truncated, terminated))
                 print(f"Terminated: {terminated}")
+                print(f"Truncated: {truncated}")
                 print(f"Agent action {action}, {type(action)}")
                 print(f"Step_count: {steps_count}")
                 # Environment outputs based on agent action
@@ -1722,8 +1734,10 @@ def main():
 
             # Retrieve all agent's attributes, including episodic metrics we want to save
             all_metrics = agent.__dict__
-            # Adding the key-value pair `total_reward` which is not among the agent's attributes
+            # Add key-value pair `total_reward` which is not among the agent's attributes
             all_metrics["total_reward"] = total_reward
+            # Add key-value pair step count (i.e. time steps to termination or truncation)
+            all_metrics["steps_count"] = steps_count + 1
             # Call the logs_writer function to save the episodic info we want
             # NOTE: unpack dictionary with `**` to feed the function with  key-value arguments
             logs_writer.log_episode(run, e, **all_metrics)
@@ -1740,6 +1754,10 @@ def main():
 
     # Save all collected data in a dictionary
     logs_writer.save_data(data_path)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Total execution time for {NUM_RUNS} runs: {elapsed_time:.2f} seconds")
 
 
 # if __name__ == "__main__":

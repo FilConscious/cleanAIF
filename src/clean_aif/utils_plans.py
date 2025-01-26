@@ -866,14 +866,23 @@ def efe(
         for tau in range(0, future_steps):
             # Computing the terms of the expected free energy: ambiguity and risk
             # (no novelty terms because neither A nor B are learned)
+
+            # IMPORTANT: here we are replacing zero probabilities with the minimum value in C to
+            # avoid zeroes in logs. Note that this keeps the meaning of the KL divergence
+            # (the risk term) intact because if the Qs_pi predicts the state has zero probability
+            # and the preference is low, then the KL divergence turns out to be zero (with
+            # the above replacement); conversely, if the preference was high then the Qs_pi got
+            # things very wrong and the KL divergence will be high.
+            Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
             # Computing ambiguity term
             Hs = np.dot(H, Qs_pi[pi, :, tau])
 
             if pref_type == "states":
                 # Computing risk term based on preferred states
-                slog_s_over_C = np.dot(
-                    Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau])
-                )
+                # slog_s_over_C = np.dot(
+                #     Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau])
+                # )
+                slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, 0]))
 
             else:
                 # Computing risk term based on preferred observations
