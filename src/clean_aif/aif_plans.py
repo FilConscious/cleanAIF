@@ -645,11 +645,13 @@ class Agent(object):
             # same policy
             if self.current_tstep == 0:
                 # At the first time step we are using the agent's prior probabilities on its location
+                # NOTE: also we are saving them in self.Qs
+                self.Qs[:, 0] = self.D
                 current_state_probs = self.D
             else:
-                # At other time step we are using the prior state probabilities which were computed/saved
-                # at the previous time step, see the planning() method.
-                current_state_probs = self.Qs[:, self.current_tstep - 1]
+                # At other time step we are using the prior state probabilities which were computed
+                # at the previous time step but saved at the current one, see the planning() method.
+                current_state_probs = self.Qs[:, self.current_tstep]
 
             # Compute policy-dependent future state beliefs using prior state probabilities at current time step
             # print(f"The number of policies is {self.Qs_ps.shape[0]}")
@@ -660,6 +662,15 @@ class Agent(object):
             self.Qs_ps[pi] = compute_future_beliefs(
                 self.num_states, current_state_probs, pi_actions, self.B
             )
+
+            ### DEBUG ###
+            # if pi == 242:
+            #     print(f"Policy: {pi_actions}")
+            #     print("Policy future beliefs:")
+            #     print(self.Qs_ps[pi])
+            #     print(np.argmax(self.Qs_ps[pi], axis=0))
+            ### END ###
+
             # Also, we save in a separate array the policy-dependent future state beliefs the agent computes
             # at EACH time step in every episode
             self.Qs_all_ps[self.current_tstep, pi, :, :] = np.copy(self.Qs_ps[pi])
@@ -680,9 +691,20 @@ class Agent(object):
             # Compute action sequence from past to future given current policy
             # NOTE: this is a combination of already taken actions and the policy's actions
             pi_actions = np.concatenate(
-                (pi_actions, self.actual_action_sequence[: self.current_tstep + 1]),
+                (self.actual_action_sequence[: self.current_tstep], pi_actions),
                 axis=0,
             )
+
+            ### DEBUG ###
+            # if pi == 150:
+            #     print(self.current_tstep)
+            #     print(self.actual_action_sequence[: self.current_tstep])
+            #     print("Qs_p_traj")
+            #     print(np.argmax(Qs_p_traj, axis=0))
+            #     print(f"Full Sequence of Actions for policy {pi}")
+            #     print(pi_actions)
+            ### END ###
+
             ########### Update the Q(S_t|pi) by setting gradient to zero ##############
 
             for _ in range(self.inf_iters):
@@ -880,6 +902,9 @@ class Agent(object):
         # the posterior over policies Q(pi) to be used for action selection
         print(f"Computing posterior over policy Q(pi)...")
         self.Qpi[:, self.current_tstep] = sigma(-self.Qpi[:, self.current_tstep])
+        print("Policies Probs > 0.005")
+        pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
+        print(f"Policies indices: {pi_indices}")
 
         # print(f"Before adding noise - Q(pi): {self.Qpi}")
         # Replacing zeroes with 0.0001, to avoid the creation of nan values, and replacing 1 with 5 to make
@@ -896,16 +921,16 @@ class Agent(object):
         # print(f"After adding noise - Q(pi): {self.Qpi}")
 
         ### DEBUG ###
-        max_pindex = np.argmax(self.Qpi[:, self.current_tstep], axis=0)
-        print(f"Index of most probable policy: {max_pindex}")
-        print(f"Most probable policy: {self.policies[max_pindex]}")
-        print(f"Probability of the policy: {self.Qpi[max_pindex, self.current_tstep]}")
-        print(f"{np.max(self.Qpi[:, self.current_tstep])}")
+        # max_pindex = np.argmax(self.Qpi[:, self.current_tstep], axis=0)
+        # print(f"Index of most probable policy: {max_pindex}")
+        # print(f"Most probable policy: {self.policies[max_pindex]}")
+        # print(f"Probability of the policy: {self.Qpi[max_pindex, self.current_tstep]}")
+        # print(f"{np.max(self.Qpi[:, self.current_tstep])}")
 
-        optimal_index = np.where((self.policies == [0, 0, 1, 1]).all(axis=1))[0]
-        print(f"Optimal index: {optimal_index}")
-        print(f"Optimal policy: {self.policies[optimal_index]}")
-        print(f"Prob of optimal policy: {self.Qpi[optimal_index, self.current_tstep]}")
+        # optimal_index = np.where((self.policies == [0, 0, 1, 1]).all(axis=1))[0]
+        # print(f"Optimal index: {optimal_index}")
+        # print(f"Optimal policy: {self.policies[optimal_index]}")
+        # print(f"Prob of optimal policy: {self.Qpi[optimal_index, self.current_tstep]}")
         ### END ###
 
         # Computing updated policy-independent state probability marginalizing w.r.t to the policies,
@@ -919,9 +944,58 @@ class Agent(object):
         # print(
         #     f"self.Qpi[:, self.current_tstep].shape: {self.Qpi[:, self.current_tstep].shape}"
         # )
-        self.Qs[:, self.current_tstep] = (
+        self.Qs[:, self.current_tstep + 1] = (
             self.Qs_ps[:, :, 0].T @ self.Qpi[:, self.current_tstep]
         )
+        print(f"Time step {self.current_tstep}")
+        index_most_pp = np.argmax(self.Qpi[:, self.current_tstep])
+        print(f"Index of most probable policy: {index_most_pp}")
+        print(f"Most probable policy: {self.policies[index_most_pp]}")
+        print(
+            f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
+        )
+        print("Next state beliefs:")
+        print(self.Qs[:, self.current_tstep + 1])
+
+        # print("Number of policies that lead to state 2")
+        # print(f"{np.where(self.Qs_ps[:, 2, 0].T > 0.1)[0].shape}")
+        # print(f"Indices of policies to state 2:")
+        indices_prob_2 = np.where(self.Qs_ps[:, 2, 0].T > 0.2)[0]
+        print(indices_prob_2)
+        print(self.Qs_ps[:, 2, 0].T)
+
+        indices_prob_5 = np.where(self.Qs_ps[:, 5, 0].T > 0.2)[0]
+        print(indices_prob_5)
+        print(self.Qs_ps[:, 5, 0].T)
+
+        print("Policies Probs > 0.005")
+        pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
+        print(f"Policies indices: {pi_indices}")
+        print(f"Policies")
+        print(self.policies[pi_indices])
+        print(f"Probs: {self.Qpi[pi_indices, self.current_tstep]}")
+        # if len(indices_prob_2) > 0:
+        #     print(f"Policies/probabilities of policies that lead to state 2")
+        #     for i, n in enumerate(indices_prob_2):
+        #         print("Policy     | Probability     ")
+        #         print(f"{self.policies[n]}, {self.Qpi[n, self.current_tstep]}")
+
+        # print(f"Indices of policies to state 5:")
+        # indices_prob_5 = np.where(self.Qs_ps[:, 5, 0].T > 0.2)[0]
+        # print(indices_prob_5)
+
+        # if len(indices_prob_5) > 0:
+        #     print(f"Policies/probabilities of policies that lead to state 5")
+        #     for i, n in enumerate(indices_prob_5):
+        #         print("Policy     | Probability     ")
+        #         print(f"{self.policies[n]}, {self.Qpi[n, self.current_tstep]}")
+
+        # print("Number of policies that lead to state 5")
+        # print(f"{np.where(self.Qs_ps[:, 5, 0].T > 0.1)[0].shape}")
+        # print(self.policies[np.where(self.Qs_ps[:, 5, 0].T > 0.1)[0]])
+        # print(self.Qpi[np.where(self.Qs_ps[:, 5, 0].T > 0.1)[0], self.current_tstep])
+        # print("Prob that Policy 150 will lead to state 5")
+        # print(f"{self.Qs_ps[150, 5, 0].T}")
 
         ### DEBUGGING ###
         # if self.current_tstep == 5:
@@ -1095,6 +1169,14 @@ class Agent(object):
             self.learning_A,
             self.learning_B,
         )
+
+        print(f"Qs size: {self.Qs.shape}")
+        print("Agent beliefs:")
+        print(np.argmax(self.Qs, axis=0))
+        # print(self.Qs)
+        print("Actual observations:")
+        print(np.argmax(self.current_obs, axis=0))
+        # print(self.current_obs)
 
         # After getting the new parameters, you need to sample from the corresponding Dirichlet distributions
         # to get new approximate posteriors P(A) and P(B). Below we distinguish between different learning
