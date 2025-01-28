@@ -461,12 +461,16 @@ class Agent(object):
         # )
         ### END ###
 
-        # Policy-independent states probabilities distributions, numpy array of size (num_states, timesteps).
+        # Policy-independent states probability distributions, numpy array of size (num_states, timesteps).
         # NOTE: these are used in free energy minimization, they are state beliefs of the common past each
         # policy/plan shares; see perception() method below.
         self.Qs = np.zeros((self.num_states, self.steps))
         # Initialize prior beliefs for the initial step
         self.Qs[:, 0] = 1 / self.num_states
+        # Policy-independent state probability distributions after the perception (free energy minimization)
+        # step, i.e. after the policy-dependent beliefs have been updated, saved at each time step
+        self.Qs_fe = np.zeros((self.num_states, self.steps))
+
         # Policy-dependent state probabilities distributions, or future state beliefs for EACH policy,
         # numpy array of size (num_policies, num_states, plan_horizon).
         # NOTE: they are computed anew at every free energy minimization step (because the policy also change
@@ -933,29 +937,39 @@ class Agent(object):
         # print(f"Prob of optimal policy: {self.Qpi[optimal_index, self.current_tstep]}")
         ### END ###
 
-        # Computing updated policy-independent state probability marginalizing w.r.t to the policies,
-        # e.g. $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$
-        # NOTE: these will be the prior probabilities over states for the next time step but we are saving
-        # them in self.Qs at the index corresponding to the CURRENT time step
-        # print(
-        #     f"self.Qs[:, self.current_tstep].shape: {self.Qs[:, self.current_tstep].shape}"
-        # )
-        # print(f"self.Qs_ps[:,:,0].shape: {self.Qs_ps[:,:,0].shape}")
-        # print(
-        #     f"self.Qpi[:, self.current_tstep].shape: {self.Qpi[:, self.current_tstep].shape}"
-        # )
-        self.Qs[:, self.current_tstep + 1] = (
-            self.Qs_ps[:, :, 0].T @ self.Qpi[:, self.current_tstep]
-        )
+        # Computing updated policy-independent state probabilities by marginalizing w.r.t to policies
+        # NOTE (!!! IMPORTANT !!!): here we are computing two kinds of beliefs:
+        # 1. NEXT time step: $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$, used as prior probabilities
+        # over states for the NEXT time step and saved in self.Qs at the index corresponding to the NEXT time
+        # step, these beliefs will be used at the NEXT time step by the method compute_future_beliefs() to
+        # predict the consequences of each policy;
+        # 2. CURRENT time step: $Q(S_{t}) =  \sum_{\pi} Q(S_{t} | \pi) Q(\pi)$, used as observation-grounded
+        # beliefs for learning, these are crucial for learning to occur properly and they should be considered
+        # as the correct beliefs of the agent as to where it is located at each time step in the environment.
+
+        # Check that we are not at the truncation or terminal point
+        if self.current_tstep != (self.steps - 1) and not truncated and not terminated:
+            self.Qs[:, self.current_tstep + 1] = (
+                self.Qs_ps_traj[:, :, self.current_tstep + 1].T
+                @ self.Qpi[:, self.current_tstep]
+            )
+
+            self.Qs_fe[:, self.current_tstep] = (
+                self.Qs_ps_traj[:, :, self.current_tstep].T
+                @ self.Qpi[:, self.current_tstep]
+            )
+
+        ### DEBUGGING ###
         print(f"Time step {self.current_tstep}")
         index_most_pp = np.argmax(self.Qpi[:, self.current_tstep])
         print(f"Index of most probable policy: {index_most_pp}")
         print(f"Most probable policy: {self.policies[index_most_pp]}")
-        print(
-            f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
-        )
-        print("Next state beliefs:")
-        print(self.Qs[:, self.current_tstep + 1])
+        if self.current_tstep != (self.steps - 1) and not truncated and not terminated:
+            print(
+                f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
+            )
+            print("Next state beliefs:")
+            print(self.Qs[:, self.current_tstep + 1])
 
         # print("Number of policies that lead to state 2")
         # print(f"{np.where(self.Qs_ps[:, 2, 0].T > 0.1)[0].shape}")
@@ -974,30 +988,7 @@ class Agent(object):
         print(f"Policies")
         print(self.policies[pi_indices])
         print(f"Probs: {self.Qpi[pi_indices, self.current_tstep]}")
-        # if len(indices_prob_2) > 0:
-        #     print(f"Policies/probabilities of policies that lead to state 2")
-        #     for i, n in enumerate(indices_prob_2):
-        #         print("Policy     | Probability     ")
-        #         print(f"{self.policies[n]}, {self.Qpi[n, self.current_tstep]}")
 
-        # print(f"Indices of policies to state 5:")
-        # indices_prob_5 = np.where(self.Qs_ps[:, 5, 0].T > 0.2)[0]
-        # print(indices_prob_5)
-
-        # if len(indices_prob_5) > 0:
-        #     print(f"Policies/probabilities of policies that lead to state 5")
-        #     for i, n in enumerate(indices_prob_5):
-        #         print("Policy     | Probability     ")
-        #         print(f"{self.policies[n]}, {self.Qpi[n, self.current_tstep]}")
-
-        # print("Number of policies that lead to state 5")
-        # print(f"{np.where(self.Qs_ps[:, 5, 0].T > 0.1)[0].shape}")
-        # print(self.policies[np.where(self.Qs_ps[:, 5, 0].T > 0.1)[0]])
-        # print(self.Qpi[np.where(self.Qs_ps[:, 5, 0].T > 0.1)[0], self.current_tstep])
-        # print("Prob that Policy 150 will lead to state 5")
-        # print(f"{self.Qs_ps[150, 5, 0].T}")
-
-        ### DEBUGGING ###
         # if self.current_tstep == 5:
         #      print(f'Prob for policy {0}: {self.Qpi[0, self.current_tstep+1]}')
         #      print(f'Prob for policy {1} {self.Qpi[1, self.current_tstep+1]}')
@@ -1058,8 +1049,8 @@ class Agent(object):
 
         print(f"Step {self.current_tstep}")
         print(f"Action selected: {int(action_selected)}")
-        if self.current_tstep == 3:
-            print(a)
+        # if self.current_tstep == 3:
+        #     print(a)
 
         return int(action_selected)
 
@@ -1163,7 +1154,7 @@ class Agent(object):
             self.current_tstep,
             self.current_obs,
             self.actual_action_sequence,
-            self.Qs,
+            self.Qs_fe,
             self.A_params,
             self.B_params,
             self.learning_A,
