@@ -408,6 +408,7 @@ class Agent(object):
         self.learning_B: bool = params["learn_B"]
         self.learning_D: bool = params["learn_D"]
         self.seed: int = params["seed"]
+        self.task_type: str = params["task_type"]
         self.rng = np.random.default_rng(seed=self.seed)
 
         # 1. Generative Model, initializing the relevant components used in the computation
@@ -894,7 +895,7 @@ class Agent(object):
         ### END ###
 
         # Check if the agent has reached the last time step of the episode
-        if self.current_tstep + 1 == self.steps:
+        if self.task_type == "continuing" and self.current_tstep + 1 == self.steps:
             # Save the last policy-independent state probabilities as prior state probabilities for
             # the next episode
             self.D = self.Qs[:, self.current_tstep]
@@ -1539,6 +1540,16 @@ def main():
     parser.add_argument("--learn_D", "-lD", action="store_true")
     # Number of videos to record
     parser.add_argument("--num_videos", "-nvs", type=int, default=0)
+    # Flag to switch from episodic to continuing task (in the former at each episode the agent's location is
+    # the same, set as agent's attribute whereas in the latter the location corresponds to the last reached
+    # state at the previous episode)
+    parser.add_argument(
+        "--task_type",
+        "-tsk",
+        type=str,
+        default="episodic",
+        help="choices: episodic, continuing",
+    )
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1588,6 +1599,8 @@ def main():
 
     # Retrieve name of the environment
     env_module_name = cl_params["gym_id"]
+    # Retrieve task type
+    task_type = cl_params["task_type"]
     # Number of runs (or agents interacting with the env)
     NUM_RUNS = agent_params["num_runs"]
     # Number of episodes
@@ -1634,7 +1647,7 @@ def main():
         # Set a random seed for current run, used by RNG attribute in the agent
         agent_params["seed"] = run
         # Fix agent's location at the FIRST episode or at EACH episode (i.e. agent starts the first episode or
-        # each episode from the same location)
+        # each episode from the same location), depending on the flag 'task_type', see below
         # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
         # what the Gymnasium environment requires.
         AGENT_LOC = convert_state(
@@ -1720,10 +1733,13 @@ def main():
             # Call the logs_writer function to save the episodic info we want
             # NOTE: unpack dictionary with `**` to feed the function with  key-value arguments
             logs_writer.log_episode(run, e, **all_metrics)
-            # Update AGENT_LOC with the last computed policy-independent state probabilities
+
+            # In a continuing task update AGENT_LOC with the last computed policy-independent state probabilities
             # NOTE: this is done so that the environment receives the correct option at the next episode
-            AGENT_LOC = convert_state(int(np.argmax(agent.D)))
-            # Reset the agent before starting a new episode
+            if task_type == "continuing":
+                AGENT_LOC = convert_state(int(np.argmax(agent.D)))
+
+                # Reset the agent before starting a new episode
             agent.reset()
 
             # Record num_videos uniformly distanced throughout the experiment
