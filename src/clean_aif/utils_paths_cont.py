@@ -72,7 +72,7 @@ def vfe(
     #  # Fourth term: sum of dot products from t=2 to T.
     #  - S_2T(Q(s_t|pi) @ log(B_t-1) @ Q(s_t-1|pi)).
 
-    # print("Computing FE...")
+    print("Computing FE...")
 
     # Digamma function used to compute the expectations of matrices A and B if their respective
     # parameters are learned by the agent. Those expectations turn up in the computation of the
@@ -239,7 +239,7 @@ def grad_vfe(
     # print("- logD_pi: ")
     # print(f"{logD_pi}")
 
-    # print("Computing FE gradients...")
+    print("Computing FE gradients...")
     # Initialising the gradient vectors for each Q(s_t|pi)
     grad_F_pi = np.zeros((num_states, steps))
 

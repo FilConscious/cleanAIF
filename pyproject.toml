@@ -37,3 +37,7 @@ vis_aif_paths = "clean_aif.vis_paths:main"
 main_aif_plans = "clean_aif.aif_plans:main"
 # entry script for plotting results from aif_paths.py
 vis_aif_plans = "clean_aif.vis_plans:main"
+# main refers to the function inside the script `aif_paths_cont.py`
+main_aif_paths_cont = "clean_aif.aif_paths_cont:main"
+# entry script for plotting results from aif_paths_cont.py
+vis_aif_paths_cont = "clean_aif.vis_paths_cont:main"
