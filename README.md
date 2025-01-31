@@ -1,25 +1,25 @@
 
 # Table of Contents
 
-1.  [CleanAIF](#orgd733dad)
-2.  [Overview](#orga66a167)
-    1.  [Policies as paths](#org7323585)
-    2.  [Policies as plans](#orgb32879f)
-    3.  [Features of the three agents](#orgef546ef)
-3.  [Installation](#orgfdadd06)
-4.  [Run an experiment](#org99875a9)
-5.  [References](#orgd8ca10f)
+1.  [CleanAIF](#org2849e67)
+2.  [Overview](#orgece0bf2)
+    1.  [Policies as paths](#orgff6e691)
+    2.  [Policies as plans](#org4ab679b)
+    3.  [Features of the three agents](#org8adc89b)
+3.  [Installation](#org7d4f427)
+4.  [Run an experiment](#org8393def)
+5.  [References](#org1db9791)
 
 
 
-<a id="orgd733dad"></a>
+<a id="org2849e67"></a>
 
 # CleanAIF
 
 The code in this repository can be used to train different (discrete) active inference agents in custom Gymnasium environments and visualize various metrics.
 
 
-<a id="orga66a167"></a>
+<a id="orgece0bf2"></a>
 
 # Overview
 
@@ -30,7 +30,7 @@ In a nutshell, the framework provides a recipe to solve a partially observable M
 The main difference between these agents consists in how policies are interpreted, which in turn has some implications for how to run experiments and understand the results. This distinction involving policies is explained below. After that the three agents currently implemented are described in more detail.
 
 
-<a id="org7323585"></a>
+<a id="orgff6e691"></a>
 
 ## Policies as paths
 
@@ -43,7 +43,7 @@ Then, at the planning stage, the agent picks a policy after evaluating its expec
 This perception-planning-action loop is repeated at each time step for a set number of episodes, and at the end of each episode the agent can update parameters related to either the state-observation mapping or the transition probabilities in the environment.
 
 
-<a id="orgb32879f"></a>
+<a id="org4ab679b"></a>
 
 ## Policies as plans
 
@@ -56,13 +56,13 @@ At the planning stage, policies are gain evaluated based on their expected free 
 This perception-planning-action loop is repeated at each time step for a set number of episodes, each potentially lasting a varying number of time steps but not exceeding a maximum number, also know as the truncation point. An agent that correctly learns about the environment will be able to reach the goal state before the truncation point, causing the termination of that episode. At the end of each episode the agent can update parameters related to either the state-observation mapping or the transition probabilities in the environment.
 
 
-<a id="orgef546ef"></a>
+<a id="org8adc89b"></a>
 
 ## Features of the three agents
 
 1.  **Episodic policy-as-path agent**
     
-    This is the original agent I implemented based on my initial understanding/interpretation of <cite:&DaCosta2020>. The key features/aspects are:
+    This is the original agent I implemented based on my initial understanding/interpretation of (Da Costa et al. 2020). The key features/aspects are:
     
     -   the environment is episodic, i.e., it resets after $T$ time steps (truncation point) by bringing the agent back to a fixed (or random), initial state
     
@@ -87,7 +87,7 @@ This perception-planning-action loop is repeated at each time step for a set num
 
 2.  **Episodic policy-as-plan agent**
     
-    This is the agent implemented by <cite:&Heins2022>. The key features/aspects are:
+    This is the agent implemented by (Heins et al. 2022). The key features/aspects are:
     
     -   the environment is episodic, i.e., it resets after a maximum number $T$ of time steps (truncation point) by bringing the agent back to a fixed (or random), initial state
     
@@ -126,7 +126,7 @@ This perception-planning-action loop is repeated at each time step for a set num
 Consider that both agent (1) and agent (2) can be made closer to each other by simply making the truncation point different from the terminal state (for agent 1) or by equating truncation point and time step of terminal state (for agent 2). However, the crucial difference involving the policies remains.
 
 
-<a id="orgfdadd06"></a>
+<a id="org7d4f427"></a>
 
 # Installation
 
@@ -169,7 +169,7 @@ if you have one (see the [GitHub SSH docs](https://docs.github.com/en/authentica
 The latter step installs the package, together with other required libraries/packages, in editable mode. This means that it is possible to modify your working/local copy of the algorithm and used it immediately, without going through the whole process of building the package and installing it again.
 
 
-<a id="org99875a9"></a>
+<a id="org8393def"></a>
 
 # Run an experiment
 
@@ -199,9 +199,11 @@ The latter step installs the package, together with other required libraries/pac
         vis_aif_paths_cont -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3 -xtes 10
 
 
-<a id="orgd8ca10f"></a>
+<a id="org1db9791"></a>
 
 # References
 
-<bibliography:./cleanaif-refs.bib>
+Da Costa, Lancelot, Thomas Parr, Noor Sajid, Sebastijan Veselic, Victorita Neacsu, and Karl Friston. 2020. “Active Inference on Discrete State-Spaces: A Synthesis.” Journal of Mathematical Psychology 99 (December): 102447. <doi:10.1016/j.jmp.2020.102447>.
+
+Heins, Conor, Beren Millidge, Daphne Demekas, Brennan Klein, Karl Friston, Iain D. Couzin, and Alexander Tschantz. 2022. “Pymdp: A Python Library for Active Inference in Discrete State Spaces.” Journal of Open Source Software 7 (73). The Open Journal: 4098. <doi:10.21105/joss.04098>.
 
