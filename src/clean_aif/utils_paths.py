@@ -532,6 +532,66 @@ def efe(
     Exp_A = A_params / np.sum(A_params, axis=0)
     H = -np.diag(np.matmul(Exp_A.T, np.log(Exp_A)))
 
+
+
+    # Is this what you want from the 4 cases?
+    # last_step = np.min(current_tstep + future_steps + 1, episode_steps)
+    # for tau in range(current_tstep, last_step): 
+    #     if learning_A:
+    #         # W matrix needed to compute the A-novelty term of the expected free energy:
+    #         W_A = .5 * (1 / A_params - 1 / np.sum(A_params, axis=0))
+    #         # Computing the A-novelty term
+    #         AsW_As = np.dot(np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau]))
+    #
+    #     if learning_B:
+    #         if tau == (episode_steps - 1):
+    #             AsW_Bs = 0  # B-novelty
+    #         else:
+    #             action = pi_actions[tau]
+    #             W_B = (.5 * (1 / B_params[action, :, :] - 1 / np.sum(B_params[action, :, :], axis=0)))
+    #             # Computing the B-novelty term
+    #             AsW_Bs = np.dot(np.matmul(A, Qs_pi[pi, :, tau + 1]), np.matmul(W_B, Qs_pi[pi, :, tau + 1]))
+    #
+    #         
+    #
+    #     Hs = np.dot(H, Qs_pi[pi, :, tau])
+    #
+    #     if learning_B:          # just for this condition?
+    #         Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
+    #         if pref_type == "states":
+    #             # Computing risk based on preferred states
+    #             slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, tau]))
+    #         else:
+    #             # Computing risk based on preferred observations
+    #             slog_s_over_C = np.dot(np.dot(A, Qs_pi_risk), np.log(np.dot(A, Qs_pi_risk)) - np.log(C[:, tau]))
+    #     else:
+    #         if pref_type == "states":
+    #             # Computing risk term based on preferred states
+    #             slog_s_over_C = np.dot(Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau]))
+    #         else:
+    #             # Computing risk term based on preferred observations
+    #             slog_s_over_C = np.dot(np.dot(A, Qs_pi[pi, :, tau]), np.log(np.dot(A, Qs_pi[pi, :, tau])) - np.log(C[:, tau]))
+    #
+    #     
+    #     # Update the free energy components
+    #     # Ambiguity
+    #     tot_Hs += Hs
+    #     # Risk
+    #     tot_slog_s_over_C += slog_s_over_C
+    #     # A-Novelty
+    #     tot_AsW_As += AsW_As
+    #     # B-Novelty (B-novelty stays at zero because there is no learning of B here)
+    #     tot_AsW_Bs += 0
+    #
+    #     G_pi_tau = Hs + slog_s_over_C
+    #     if learning_A: G_pi_tau -= AsW_As
+    #     if learning_B: G_pi_tau -= AsW_Bs
+    #     G_pi += G_pi_tau
+
+    # MB NOTE: tot_* are only updated in 2 out of 4 cases, sq_AsW_Bs is only updated in 1 out of 4 cases
+    # return G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_B
+
+
     # Considering different learning scenarios
     if learning_A == True and learning_B == True:
         # Both A and B are learned.
@@ -560,14 +620,7 @@ def efe(
                     # Note 1: W_B depends on the parameters of the transition matrix B related to
                     # the action the policy dictates at tau, that's why we need to retrieve that action.
                     action = pi_actions[tau]
-                    W_B = (
-                        1
-                        / 2
-                        * (
-                            1 / B_params[action, :, :]
-                            - 1 / np.sum(B_params[action, :, :], axis=0)
-                        )
-                    )
+                    W_B = (.5 * (1 / B_params[action, :, :] - 1 / np.sum(B_params[action, :, :], axis=0)))
                     # Computing the B-novelty term
                     AsW_Bs = np.dot(
                         np.matmul(A, Qs_pi[pi, :, tau + 1]),
@@ -617,9 +670,7 @@ def efe(
                 # Computing the ambiguity term
                 Hs = np.dot(H, Qs_pi[pi, :, tau])
                 # Computing the A-novelty term
-                AsW_As = np.dot(
-                    np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau])
-                )
+                AsW_As = np.dot(np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau]))
 
                 if pref_type == "states":
                     # Computing the risk term based on preferred states
@@ -676,14 +727,7 @@ def efe(
                     # Note 1: W_B depends on the parameters of the transition matrix B related to the action
                     # the policy dictates at tau, that's why we need to retrieve that action.
                     action = pi_actions[tau]
-                    W_B = (
-                        1
-                        / 2
-                        * (
-                            1 / B_params[action, :, :]
-                            - 1 / np.sum(B_params[action, :, :], axis=0)
-                        )
-                    )
+                    W_B = (.5 * (1 / B_params[action, :, :] - 1 / np.sum(B_params[action, :, :], axis=0)))
 
                     #### DEBUGGING ####
                     # b = 1 / B_params[action, :, :]
