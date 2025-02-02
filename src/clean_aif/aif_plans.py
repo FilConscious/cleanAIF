@@ -9,6 +9,7 @@ Created at 18:00 on 21st July 2024
 
 # Standard libraries imports
 import os
+import sys
 import argparse
 
 # import copy
@@ -60,9 +61,9 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 0
+    start_state: int = 4
     """ index of goal state/location """
-    goal_state: int = 8
+    goal_state: int = 0
     """ number of policies the agent consider at each planning step """
     num_policies: int = 100
     """ planning horizon, also the length of a policy """
@@ -1578,6 +1579,13 @@ def main():
         help="the name of the registered gym environment (choices: GridWorld-v1)",
     )
     parser.add_argument(
+        "--env_layout",
+        "-el",
+        type=str,
+        default="t-maze",
+        help="layout of the gridworld (choices: t-maze)",
+    )
+    parser.add_argument(
         "--num_runs",
         "-nr",
         type=int,
@@ -1616,14 +1624,6 @@ def main():
         default=1,
         help="number of free energy minimization steps",
     )
-    # Agent's preferences type (moved to the Args class specific for the agent)
-    # parser.add_argument(
-    #     "--pref_type",
-    #     "-pt",
-    #     type=str,
-    #     default="states",
-    #     help="choices: states, observations",
-    # )
     # Policy
     parser.add_argument(
         "--num_policies",
@@ -1667,15 +1667,25 @@ def main():
     now = datetime.now()
     # Converting data-time in an appropriate string: '_dd.mm.YYYY_H.M.S'
     dt_string = now.strftime("%d.%m.%Y_%H.%M.%S_")
-    # Create folder (with dt_string as unique identifier) where to store data from current experiment.
-    data_path = LOG_DIR.joinpath(
-        dt_string
-        + f'{cl_params["gym_id"]}_r{cl_params["num_runs"]}_e{cl_params["num_episodes"]}_as{cl_params["action_selection"]}_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
+    # Create string of experiment-specific info
+    exp_info = (
+        f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}'
+        f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_infsteps{cl_params["inf_steps"]}'
+        f'_preftype{cl_params["pref_type"]}_AS{cl_params["action_selection"]}'
+        f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
+    # Create folder (with dt_string as unique identifier) where to store data from current experiment.
+    data_path = LOG_DIR.joinpath(dt_string + exp_info)
     data_path.mkdir(parents=True, exist_ok=True)
 
-    # if not (os.path.exists(data_path)):
-    #     os.makedirs(data_path)
+    # Save the command used to run the script
+    cmd_str = " ".join(sys.argv)
+    cmd_file = os.path.join(data_path, "command.txt")
+
+    with open(cmd_file, "w") as f:
+        f.write(cmd_str + "\n")
+
+    print(f"Command saved to {cmd_file}")
 
     ###############################
     ### 3. INIT AGENT PARAMETERS
@@ -1713,7 +1723,13 @@ def main():
     # what the Gymnasium environment requires.
     AGENT_LOC = convert_state(agent_params["start_state"])  # output: np.array([0, 0])
     # Fix walls location in the environment (the same in every episode)
-    WALLS_LOC = [convert_state(4)]  # output: np.array([1, 1])
+    WALLS_LOC = [
+        convert_state(3),
+        convert_state(5),
+        convert_state(6),
+        convert_state(7),
+        convert_state(8),
+    ]  # output: np.array([1, 1])
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])
 
