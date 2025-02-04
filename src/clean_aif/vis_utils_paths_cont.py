@@ -12,7 +12,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 
-# Functions for Plotting Saved Data
 def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
     """
     Function to plot reward counts across episodes, i.e. the amount of reward the agent has
@@ -1441,7 +1440,8 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
 
 def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
@@ -1542,7 +1542,8 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
 
 def plot_oa_sequence(file_data_path, num_episodes, num_steps):

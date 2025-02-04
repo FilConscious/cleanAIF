@@ -8,9 +8,9 @@ Created at 18:00 on 21st July 2024
 # Standard libraries imports
 
 # Standard libraries imports
+import argparse
 import os
 import sys
-import argparse
 
 # import copy
 from dataclasses import dataclass, field, asdict
@@ -74,8 +74,10 @@ class Args:
             Args.num_policies, Args.plan_horizon, Args.num_actions
         )
     )
-    """ preferences type """
+    """ preference prior type """
     pref_type: str = "states"
+    """ time step(s) on which the preference prior is placed """
+    pref_loc: str = "all_diff"  # "all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
@@ -83,7 +85,11 @@ class Args:
     """ C array: specifies agent's preferred state(s) in the environment """
     C_params: np.ndarray = field(
         default_factory=lambda: Args.init_C_array(
-            Args.num_states, Args.num_steps, Args.goal_state, Args.pref_type
+            Args.num_states,
+            Args.num_steps,
+            Args.goal_state,
+            Args.pref_type,
+            Args.pref_loc,
         )
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
@@ -167,7 +173,11 @@ class Args:
 
     @staticmethod
     def init_C_array(
-        num_states: int, steps: int, goal_state: int, pref_type: str = "states"
+        num_states: int,
+        steps: int,
+        goal_state: int,
+        pref_type: str = "states",
+        pref_loc: str = "last",
     ) -> np.ndarray:
         """
         Initialize preference array/matrix, denoted by C in the active inference literature, where each column
@@ -197,20 +207,28 @@ class Args:
 
         if pref_type == "states":
 
-            # Defining the agent's preferences over states, these are crucial to the computation of
-            # expected free energy
-            # pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
-            # pref_array[8, 4] = 0.9
-            # pref_array[5, 3] = 0.9
-            # pref_array[2, 2] = 0.9
-            # pref_array[1, 1] = 0.9
-            # pref_array[0, 0] = 0.9
-            # assert np.all(np.sum(pref_array, axis=0)) == 1, print('The preferences do not sum to one!')
+            if pref_loc == "last":
+                # (1) At every time step all states have uniform probabilities...
+                pref_array[:, -1] = 0.1 / (num_states - 1)
+                # ...except at the last time step when the goal state is given the highest probability
+                pref_array[goal_state, -1] = 0.9
 
-            # At every time step all states have uniform probabilities...
-            pref_array[:, -1] = 0.1 / (num_states - 1)
-            # ...except at the last time step when the goal state is given the highest probability
-            pref_array[goal_state, -1] = 0.9
+            elif pref_loc == "all_goal":
+                # (2) Set higher preference for the goal state at each time step
+                pref_array[:, :] = 0.1 / (num_states - 1)
+                pref_array[:, -1] = 0.9
+
+            elif pref_loc == "all_diff":
+                # (3) Define agent's preferences for each time step (i.e. a different goal for each step time)
+                pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
+                # IMPORTANT: the probabilities below need to be set MANUALLY depending on the environment
+                # in which the agent acts and based on the trajectory we want it to follow.
+
+                # Example: trajectory in a T-maze leading to the goal (on the left arm) in 3 steps
+                pref_array[0, 2] = 0.9
+                pref_array[1, 1] = 0.9
+                pref_array[4, 0] = 0.9
+
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
                 "The preferences do not sum to one!"
@@ -405,6 +423,7 @@ class Agent(object):
         self.inf_iters: int = params.get("inf_steps")
         self.efe_tsteps: int = params.get("plan_horizon")
         self.pref_type: str = params["pref_type"]
+        self.pref_loc: str = params["pref_loc"]
         self.policies: np.ndarray = params["policies"]
         self.num_policies: int = params["num_policies"]
         self.as_mechanism: str = params["action_selection"]
@@ -1553,6 +1572,26 @@ def main():
         default="episodic",
         help="choices: episodic, continuing",
     )
+    # Preference type prior
+    # NOTE: this is just a label used to identify the experiment, make sure it corresponds
+    # to the attribute/property set in the agent Args class, see top of file
+    parser.add_argument(
+        "--pref_type",
+        "-pft",
+        type=str,
+        default="states",
+        help="choices: states, obs",
+    )
+    # Time step(s) on which preference prior is placed
+    # NOTE: this is just a label used to identify the experiment, make sure it corresponds
+    # to the attribute/property set in the agent Args class, see top of file
+    parser.add_argument(
+        "--pref_loc",
+        "-pfl",
+        type=str,
+        default="last",
+        help="choices: last, all_goal, all_diff",
+    )
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1570,16 +1609,14 @@ def main():
     # Create string of experiment-specific info
     exp_info = (
         f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
-        f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_infsteps{cl_params["inf_steps"]}'
-        f'_preftype{cl_params["pref_type"]}_AS{cl_params["action_selection"]}'
+        f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
+        f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}_prefloc_{cl_params["pref_loc"]}'
+        f'_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
     data_path = LOG_DIR.joinpath(dt_string + exp_info)
     data_path.mkdir(parents=True, exist_ok=True)
-
-    # if not (os.path.exists(data_path)):
-    #     os.makedirs(data_path)
 
     # Save the command used to run the script
     cmd_str = " ".join(sys.argv)
@@ -1603,7 +1640,13 @@ def main():
     # Custom update function not overwriting default parameter's value if the one from the CL is None
     def update_params(default_params, new_params):
         for key, value in new_params.items():
-            if value is not None:
+            # Make sure these keys have values that correspond to how the agent was initialized
+            # i.e. the command line arguments do not change these agent's properties
+            if key == "pref_type" or key == "pref_loc":
+                assert (
+                    value == default_params[key]
+                ), f"Agent was initialized with {key}: {default_params[key]} but you passed {value} as argument."
+            elif value is not None:
                 default_params[key] = value
 
     update_params(agent_params, cl_params)
