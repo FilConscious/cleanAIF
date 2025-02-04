@@ -102,6 +102,13 @@ def main():
 
     # Plotting saved data (see utils_vis.py for more info).
 
+    # Plotting reward counts
+    plot_reward_counts(
+        file_dp,
+        params["x_ticks_estep"],
+        result_dir,
+    )
+
     # 1.a Plotting the free energy conditioned on a policy, i.e. F_pi
     # plot_pi_fe(
     #     file_dp,

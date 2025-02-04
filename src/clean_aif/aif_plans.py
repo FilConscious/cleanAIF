@@ -8,9 +8,9 @@ Created at 18:00 on 21st July 2024
 # Standard libraries imports
 
 # Standard libraries imports
+import argparse
 import os
 import sys
-import argparse
 
 # import copy
 from dataclasses import dataclass, field, asdict
@@ -83,7 +83,9 @@ class Args:
     ``field(default_factory = custom_func)``) TODO: Clarify this note!!!!"""
     """ C array: specifies agent's preferred state(s) in the environment """
     C_params: np.ndarray = field(
-        default_factory=lambda: Args.init_C_array(Args.num_states, Args.pref_type)
+        default_factory=lambda: Args.init_C_array(
+            Args.num_states, Args.goal_state, Args.pref_type
+        )
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
     B_params: np.ndarray = field(
@@ -117,7 +119,7 @@ class Args:
     #     self.pref_array = self.create_pref_array(self.num_states, self.num_steps)
 
     @staticmethod
-    def init_C_array(num_states: int, pref_type: str) -> np.ndarray:
+    def init_C_array(num_states: int, goal_state: int, pref_type: str) -> np.ndarray:
         """
         Initialize preference array, denoted by C in the active inference literature. The vector
         stores the parameters of a categorical distribution with the probability mass concentrated on
@@ -140,9 +142,10 @@ class Args:
         if pref_type == "states":
             print("Setting agent's preferences...")
             # Assign probability to non-goal states...
-            pref_array[:-1, 0] = 0.1 / (num_states - 1)
+            pref_array[:, 0] = 0.1 / (num_states - 1)
             # Assign probability to goal state
-            pref_array[-1, 0] = 0.9
+            pref_array[goal_state, 0] = 0.9
+            print(pref_array)
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
                 "The preferences do not sum to one!"
@@ -203,7 +206,13 @@ class Args:
                 # Down action: 3
                 B_params[3, labels_ud, labels_ud] = 1
                 # Up action: 1
-                B_params[1, labels_ud + 3, labels_ud] = 1
+                B_params[1, labels_ud[0], labels_ud[0]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[1, labels_ud[1] + 3, labels_ud[1]] = 1
+                B_params[1, labels_ud[2], labels_ud[2]] = (
+                    1  # Hitting wall and stay at the same state
+                )
                 # Right action: 0
                 B_params[0, labels_rl + 1, labels_rl] = 1
                 # Left action: 2
@@ -213,11 +222,23 @@ class Args:
                 # Down action: 3
                 B_params[3, labels_ud - 3, labels_ud] = 1
                 # Up action: 1
-                B_params[1, labels_ud + 3, labels_ud] = 1
+                B_params[1, labels_ud[0] + 3, labels_ud[0]] = 1
+                B_params[1, labels_ud[1], labels_ud[1]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[1, labels_ud[2] + 3, labels_ud[2]] = 1
                 # Right action: 0
-                B_params[0, labels_rl + 1, labels_rl] = 1
+                B_params[0, labels_rl[0] + 1, labels_rl[0]] = 1
+                B_params[0, labels_rl[1], labels_rl[1]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[0, labels_rl[2] + 1, labels_rl[2]] = 1
                 # Left action: 2
-                B_params[2, labels_rl - 1, labels_rl] = 1
+                B_params[2, labels_rl[0] - 1, labels_rl[0]] = 1
+                B_params[2, labels_rl[1], labels_rl[1]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[2, labels_rl[2] - 1, labels_rl[2]] = 1
 
             elif r == 2:
                 # Down action: 3
@@ -323,6 +344,7 @@ class Agent(object):
         self.learning_B: bool = params["learn_B"]
         self.learning_D: bool = params["learn_D"]
         self.seed: int = params["seed"]
+        self.task_type: str = params["task_type"]
         self.rng = np.random.default_rng(seed=self.seed)
 
         # 1. Generative Model, initializing the relevant components used in the computation
@@ -651,8 +673,8 @@ class Agent(object):
             if self.current_tstep == 0:
                 # At the first time step we are using the agent's prior probabilities on its location
                 # NOTE: also we are saving them in self.Qs
-                self.Qs[:, 0] = self.D
-                current_state_probs = self.D
+                self.Qs[:, 0] = np.copy(self.D)
+                current_state_probs = np.copy(self.D)
             else:
                 # At other time step we are using the prior state probabilities which were computed
                 # at the previous time step but saved at the current one, see the planning() method.
@@ -940,24 +962,38 @@ class Agent(object):
 
         # Computing updated policy-independent state probabilities by marginalizing w.r.t to policies
         # NOTE (!!! IMPORTANT !!!): here we are computing two kinds of beliefs:
-        # 1. NEXT time step: $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$, used as prior probabilities
+        #
+        # 1. CURRENT time step: $Q(S_{t}) =  \sum_{\pi} Q(S_{t} | \pi) Q(\pi)$, used as observation-grounded
+        # beliefs for learning, these are crucial for learning to occur properly and they should be considered
+        # as the correct beliefs of the agent as to where it is located at each time step in the environment.
+        #
+        # 2. NEXT time step: $Q(S_{t+1}) =  \sum_{\pi} Q(S_{t+1} | \pi) Q(\pi)$, used as prior probabilities
         # over states for the NEXT time step and saved in self.Qs at the index corresponding to the NEXT time
         # step, these beliefs will be used at the NEXT time step by the method compute_future_beliefs() to
         # predict the consequences of each policy;
-        # 2. CURRENT time step: $Q(S_{t}) =  \sum_{\pi} Q(S_{t} | \pi) Q(\pi)$, used as observation-grounded
-        # beliefs for learning, these are crucial for learning to occur properly and they should be considered
-        # as the correct beliefs of the agent as to where it is located at each time step in the environment.
 
-        # Check that we are not at the truncation or terminal point
+        # (1) Computed at ALL time steps
+        self.Qs_fe[:, self.current_tstep] = (
+            self.Qs_ps_traj[:, :, self.current_tstep].T
+            @ self.Qpi[:, self.current_tstep]
+        )
+
+        # # (2) Not computed at the truncation or terminal point
         if self.current_tstep != (self.steps - 1) and not truncated and not terminated:
             self.Qs[:, self.current_tstep + 1] = (
                 self.Qs_ps_traj[:, :, self.current_tstep + 1].T
                 @ self.Qpi[:, self.current_tstep]
             )
 
-            self.Qs_fe[:, self.current_tstep] = (
-                self.Qs_ps_traj[:, :, self.current_tstep].T
-                @ self.Qpi[:, self.current_tstep]
+        # At the terminal/truncation point set new prior over initial states depending on task type
+        if self.task_type == "continuing" and (terminated or truncated):
+            # Save the last policy-independent state probabilities as prior state probabilities for
+            # the next episode
+            self.D = np.copy(self.Qs_fe[:, self.current_tstep])
+            print(f"Prior for next episode:")
+            print(self.Qs_fe[:, self.current_tstep])
+            print(
+                f"Most probable state for next episode: {np.argmax(self.Qs_fe[:, self.current_tstep])}"
             )
 
         ### DEBUGGING ###
@@ -969,26 +1005,29 @@ class Agent(object):
             print(
                 f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
             )
+            print("Current state beliefs:")
+            print(self.Qs_fe[:, self.current_tstep])
+
             print("Next state beliefs:")
             print(self.Qs[:, self.current_tstep + 1])
 
         # print("Number of policies that lead to state 2")
         # print(f"{np.where(self.Qs_ps[:, 2, 0].T > 0.1)[0].shape}")
         # print(f"Indices of policies to state 2:")
-        indices_prob_2 = np.where(self.Qs_ps[:, 2, 0].T > 0.2)[0]
-        print(indices_prob_2)
-        print(self.Qs_ps[:, 2, 0].T)
+        # indices_prob_2 = np.where(self.Qs_ps[:, 2, 0].T > 0.2)[0]
+        # print(indices_prob_2)
+        # print(self.Qs_ps[:, 2, 0].T)
 
-        indices_prob_5 = np.where(self.Qs_ps[:, 5, 0].T > 0.2)[0]
-        print(indices_prob_5)
-        print(self.Qs_ps[:, 5, 0].T)
+        # indices_prob_5 = np.where(self.Qs_ps[:, 5, 0].T > 0.2)[0]
+        # print(indices_prob_5)
+        # print(self.Qs_ps[:, 5, 0].T)
 
-        print("Policies Probs > 0.005")
-        pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
-        print(f"Policies indices: {pi_indices}")
-        print(f"Policies")
-        print(self.policies[pi_indices])
-        print(f"Probs: {self.Qpi[pi_indices, self.current_tstep]}")
+        # print("Policies Probs > 0.005")
+        # pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
+        # print(f"Policies indices: {pi_indices}")
+        # print(f"Policies")
+        # print(self.policies[pi_indices])
+        # print(f"Probs: {self.Qpi[pi_indices, self.current_tstep]}")
 
         # if self.current_tstep == 5:
         #      print(f'Prob for policy {0}: {self.Qpi[0, self.current_tstep+1]}')
@@ -1568,7 +1607,7 @@ def main():
         "--exp_name",
         "-expn",
         type=str,
-        default="aif-paths",
+        default="aif-plans",
         help="the name of this experiment based on the active inference implementation",
     )
     parser.add_argument(
@@ -1653,6 +1692,16 @@ def main():
     parser.add_argument("--learn_D", "-lD", action="store_true")
     # Number of videos to record
     parser.add_argument("--num_videos", "-nvs", type=int, default=0)
+    # Flag to switch from episodic to continuing task (in the former at each episode the agent's location is
+    # the same, set as agent's attribute whereas in the latter the location corresponds to the last reached
+    # state at the previous episode)
+    parser.add_argument(
+        "--task_type",
+        "-tsk",
+        type=str,
+        default="episodic",
+        help="choices: episodic, continuing",
+    )
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1669,9 +1718,9 @@ def main():
     dt_string = now.strftime("%d.%m.%Y_%H.%M.%S_")
     # Create string of experiment-specific info
     exp_info = (
-        f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}'
-        f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_infsteps{cl_params["inf_steps"]}'
-        f'_preftype{cl_params["pref_type"]}_AS{cl_params["action_selection"]}'
+        f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
+        f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
+        f'_infsteps{cl_params["inf_steps"]}_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
@@ -1712,16 +1761,14 @@ def main():
 
     # Retrieve name of the environment
     env_module_name = cl_params["gym_id"]
+    # Retrieve task type
+    task_type = cl_params["task_type"]
     # Number of runs (or agents interacting with the env)
     NUM_RUNS = agent_params["num_runs"]
     # Number of episodes
     NUM_EPISODES = agent_params["num_episodes"]
     # Number of steps in one episode
     NUM_STEPS = agent_params["num_steps"]
-    # Fix agent's location at the beginning of every episode (i.e. agent starts always from the same location)
-    # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
-    # what the Gymnasium environment requires.
-    AGENT_LOC = convert_state(agent_params["start_state"])  # output: np.array([0, 0])
     # Fix walls location in the environment (the same in every episode)
     WALLS_LOC = [
         convert_state(3),
@@ -1761,6 +1808,13 @@ def main():
         print(f"Starting Run {run}...")
         # Set a random seed for current run, used by RNG attribute in the agent
         agent_params["seed"] = run
+        # Fix agent's location at the FIRST episode or at EACH episode (i.e. agent starts the first episode or
+        # each episode from the same location), depending on the flag 'task_type', see below
+        # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
+        # what the Gymnasium environment requires.
+        AGENT_LOC = convert_state(
+            agent_params["start_state"]
+        )  # output: np.array([0, 0])
         # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
         agent = Agent(cast(params, agent_params))
         # Loop over episodes
@@ -1853,6 +1907,12 @@ def main():
             # Call the logs_writer function to save the episodic info we want
             # NOTE: unpack dictionary with `**` to feed the function with  key-value arguments
             logs_writer.log_episode(run, e, **all_metrics)
+
+            # In a continuing task update AGENT_LOC with the last computed policy-independent state probabilities
+            # NOTE: this is done so that the environment receives the correct option at the next episode
+            if task_type == "continuing":
+                AGENT_LOC = convert_state(int(np.argmax(agent.D)))
+
             # Reset the agent before starting a new episode
             agent.reset()
 

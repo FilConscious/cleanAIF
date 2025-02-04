@@ -12,7 +12,58 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 
-# Functions for Plotting Saved Data
+def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
+    """
+    Function to plot reward counts across episodes, i.e. the amount of reward the agent has
+    collected in each episode of whether the goal state has been reached.
+
+    Inputs:
+
+    - file_data_path (string): file path where all metrics have been stored;
+    - x_ticks_estep (integer): step for the ticks in the x axis when plotting as a function of episode number;
+    - save_dir (string): directory where to save the images.
+
+    Outputs:
+
+    - plot showing how the reward count changes across episodes
+
+    """
+
+    # Retrieving the data dictionary and extracting the content of various keys
+    data = np.load(file_data_path, allow_pickle=True).item()
+    num_runs = data["num_runs"]
+    num_episodes = data["num_episodes"]
+    reward_counts = data["reward_counts"]
+    print(reward_counts[:, 0])
+
+    avg_rewards = np.mean(reward_counts, axis=0)
+    std_rewards = np.std(reward_counts, axis=0)
+
+    plt.figure()
+    plt.plot(
+        np.arange(num_episodes),
+        avg_rewards,
+        ".-",
+        label="goal reached (0: false; 1: true)",
+    )
+    plt.xticks(np.arange(0, (num_episodes) + 1, step=x_ticks_estep))
+    plt.xlabel("Episode")
+    # plt.ylabel('Free Energy', rotation=90)
+    plt.legend(loc="upper right")
+    plt.title("Goal Achievement at Every Episode\n")
+    plt.fill_between(
+        np.arange(num_episodes),
+        avg_rewards - (1.96 * std_rewards / np.sqrt(num_runs)),
+        avg_rewards + (1.96 * std_rewards / np.sqrt(num_runs)),
+        alpha=0.3,
+    )
+    plt.savefig(
+        save_dir + "/" + f"avg_reward_counts.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    plt.show()
 
 
 def plot_steps_count(file_data_path, x_ticks_estep, save_dir):
