@@ -381,6 +381,45 @@ def total_free_energy(
     total_F = 0
     # Case where self.current_tstep is neither the first nor the last state
     # (no need for KL[Q(A)|P(A)] and/or KL[Q(B)|P(B)])
+
+    
+    # Computing the E[F_pi] term
+    E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    total_F = E_Fpi
+
+    if current_tstep > 0:
+        KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
+        total_F += KL_Qpi_Ppi
+
+        if learning_A:
+            # Initially, the line below was added to prevent some NaN values in the KL computation.
+            # Then, it was discovered that the cause was another one, but this line turned out to
+            # prevent some gradient overshooting. So, either keep this line or reduce the learning rate
+            # when learning A.
+            A_params = np.where((A_params - prior_A) == 0, (A_params + 0.01), A_params)
+            # Computing KL[Q(A)|P(A)]
+            KL_QA_PA = np.sum(dirichlet_KL(A_params, prior_A))
+            total_F += KL_QA_PA
+
+        if learning_B:
+            # Computing KL[Q(B)|P(B)]
+            # Retrieving the number of actions (first dimension of B_params)
+            num_actions = B_params.shape[0]
+            KL_QB_PB = 0
+            # Since B_params is a tensor, we need to loop over its first dimension (num_actions)
+            # to compute all the Dirichlet for the B matrices.
+            for a in range(num_actions):
+                KL_QB_PB_a = np.sum(dirichlet_KL(B_params[a, :, :], prior_B[a, :, :]))
+                KL_QB_PB += KL_QB_PB_a
+            total_F += KL_QB_PB
+
+
+ 
+
+
+
+
+
     if current_tstep != 0 and current_tstep != (episode_steps - 1):
         # Computing KL[Q(pi)|P(pi)]
         KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
@@ -388,7 +427,7 @@ def total_free_energy(
         E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
         # Computing the total
         total_F = KL_Qpi_Ppi + E_Fpi
-
+        
     # Case where self.current_tstep is the first state (no need for any KL divergence)
     elif current_tstep == 0:
         # Computing the E[F_pi] term
