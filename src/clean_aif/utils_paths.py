@@ -143,44 +143,56 @@ def vfe(
 
     # For every step in the episode retrieve the action that the policy pi dictates at
     # time step t-1,
-    for t in range(steps):
-
-        if learning_B == True:
-            # There is no action at the last time step (i.e. steps-1 because in Python
-            # we start counting from 0) so we retrieve B matrices as long as t is not
-            # the last step.
-            if t < (steps - 1):
-                # Computing the expectation of the Dirichlet distributions using
-                # their parameters and the digamma function
-                action = pi_actions[t]
-                ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
-                logB_pi[t, :, :] = ExplogB
-
+    for t in range(steps-1):
+        action = pi_actions[t]
+        if learning_B:
+            ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
+            logB_pi[t, :, :] = ExplogB
         else:
-            # There is no action at the last time step (i.e. steps-1 because in Python
-            # we start counting from 0) so we retrieve B matrices as long as t is not
-            # the last step.
-            if t < (steps - 1):
-                # Simply retrieving the corresponding transition matrix B because its
-                # parameters are not learned.
-
-                action = pi_actions[t]
-                # print(f"First action is: {action}")
-                # print("Corresponding B matrix is")
-                # print(f"{B[action, :, :]}")
-                logB_pi[t, :, :] = np.log(B[action, :, :])
-
-            # if t < (steps-1):
-            #     action = pi_actions[t]
-            #     ExplogB = psi(B_params[action])  - psi(np.sum(B_params[action], axis=0))
-            #     logB_pi[t, :, :] = ExplogB
-
-        # Adding the computed value to st_logB_stp (because we are computing expectations
-        # of categorical distributions).
+            logB_pi[t, :, :] = np.log(B[action, :, :])
         if t != 0:
             st_logB_stp += np.dot(
                 Qs_pi[pi, :, t], np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
             )
+
+
+    # for t in range(steps):
+    #     if learning_B == True:
+    #         # There is no action at the last time step (i.e. steps-1 because in Python
+    #         # we start counting from 0) so we retrieve B matrices as long as t is not
+    #         # the last step.
+    #         if t < (steps - 1):
+    #             # Computing the expectation of the Dirichlet distributions using
+    #             # their parameters and the digamma function
+    #             action = pi_actions[t]
+    #             ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
+    #             logB_pi[t, :, :] = ExplogB
+    #
+    #     else:
+    #         # There is no action at the last time step (i.e. steps-1 because in Python
+    #         # we start counting from 0) so we retrieve B matrices as long as t is not
+    #         # the last step.
+    #         if t < (steps - 1):
+    #             # Simply retrieving the corresponding transition matrix B because its
+    #             # parameters are not learned.
+    #
+    #             action = pi_actions[t]
+    #             # print(f"First action is: {action}")
+    #             # print("Corresponding B matrix is")
+    #             # print(f"{B[action, :, :]}")
+    #             logB_pi[t, :, :] = np.log(B[action, :, :])
+    #
+    #         # if t < (steps-1):
+    #         #     action = pi_actions[t]
+    #         #     ExplogB = psi(B_params[action])  - psi(np.sum(B_params[action], axis=0))
+    #         #     logB_pi[t, :, :] = ExplogB
+    #
+    #     # Adding the computed value to st_logB_stp (because we are computing expectations
+    #     # of categorical distributions).
+    #     if t != 0:
+    #         st_logB_stp += np.dot(
+    #             Qs_pi[pi, :, t], np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
+    #         )
 
     ##### DEBUGGING #####
     assert math.isnan(st_log_st) != True, "Non computable value!"
@@ -414,93 +426,94 @@ def total_free_energy(
             total_F += KL_QB_PB
 
 
+
  
 
 
 
 
 
-    if current_tstep != 0 and current_tstep != (episode_steps - 1):
-        # Computing KL[Q(pi)|P(pi)]
-        KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
-        # Computing the E[F_pi] term
-        E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
-        # Computing the total
-        total_F = KL_Qpi_Ppi + E_Fpi
-        
-    # Case where self.current_tstep is the first state (no need for any KL divergence)
-    elif current_tstep == 0:
-        # Computing the E[F_pi] term
-        E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
-        # Computing the total
-        total_F = E_Fpi
-
-    # Case where self.current_tstep is the last state (all KL divergences are required
-    # unless there is no parameter learning)
-    elif current_tstep == (episode_steps - 1):
-        # Considering different learning scenarios
-        if learning_A == True and learning_B == True:
-            # Retrieving the number of actions (first dimension of B_params)
-            num_actions = B_params.shape[0]
-            KL_QB_PB = 0
-            # Computing KL[Q(B)|P(B)]
-            # Note 1: since B_params is a tensor, we need to loop over its first dimension (num_actions)
-            # to compute all the Dirichlet KL divergences for the B matrices.
-            for a in range(num_actions):
-                KL_QB_PB_a = np.sum(dirichlet_KL(B_params[a, :, :], prior_B[a, :, :]))
-                KL_QB_PB += KL_QB_PB_a
-
-            # Computing KL[Q(A)|P(A)]
-            KL_QA_PA = np.sum(dirichlet_KL(A_params, prior_A))
-            # Computing KL[Q(pi)|P(pi)]
-            KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
-            # Computing the E[F_pi] term
-            E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
-            # Computing the total
-            total_F = KL_QA_PA + KL_QB_PB + KL_Qpi_Ppi + E_Fpi
-
-        elif learning_A == True and learning_B == False:
-
-            # Initially, the line below was added to prevent some NaN values in the KL computation.
-            # Then, it was discovered that the cause was another one, but this line turned out to
-            # prevent some gradient overshooting. So, either keep this line or reduce the learning rate
-            # when learning A.
-            A_params = np.where((A_params - prior_A) == 0, (A_params + 0.01), A_params)
-            # Computing KL[Q(A)|P(A)]
-            KL_QA_PA = np.sum(dirichlet_KL(A_params, prior_A))
-            # Computing KL[Q(pi)|P(pi)]
-            KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
-            # Computing the E[F_pi] term
-            E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
-            # Computing the total
-            total_F = KL_QA_PA + KL_Qpi_Ppi + E_Fpi
-
-        elif learning_A == False and learning_B == True:
-            # Computing KL[Q(B)|P(B)]
-            # Retrieving the number of actions (first dimension of B_params)
-            num_actions = B_params.shape[0]
-            KL_QB_PB = 0
-            # Since B_params is a tensor, we need to loop over its first dimension (num_actions)
-            # to compute all the Dirichlet for the B matrices.
-            for a in range(num_actions):
-
-                KL_QB_PB_a = np.sum(dirichlet_KL(B_params[a, :, :], prior_B[a, :, :]))
-                KL_QB_PB += KL_QB_PB_a
-            # Computing KL[Q(pi)|P(pi)]
-            KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
-            # Computing the E[F_pi] term
-            E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
-            # Computing the total
-            total_F = KL_QB_PB + KL_Qpi_Ppi + E_Fpi
-
-        elif learning_A == False and learning_B == False:
-            # Computing KL[Q(pi)|P(pi)]
-            KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
-            # Computing the E[F_pi] term
-            E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
-            # Computing the total
-            total_F = KL_Qpi_Ppi + E_Fpi
-
+    # if current_tstep != 0 and current_tstep != (episode_steps - 1):
+    #     # Computing KL[Q(pi)|P(pi)]
+    #     KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
+    #     # Computing the E[F_pi] term
+    #     E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    #     # Computing the total
+    #     total_F = KL_Qpi_Ppi + E_Fpi
+    #     
+    # # Case where self.current_tstep is the first state (no need for any KL divergence)
+    # elif current_tstep == 0:
+    #     # Computing the E[F_pi] term
+    #     E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    #     # Computing the total
+    #     total_F = E_Fpi
+    #
+    # # Case where self.current_tstep is the last state (all KL divergences are required
+    # # unless there is no parameter learning)
+    # elif current_tstep == (episode_steps - 1):
+    #     # Considering different learning scenarios
+    #     if learning_A == True and learning_B == True:
+    #         # Retrieving the number of actions (first dimension of B_params)
+    #         num_actions = B_params.shape[0]
+    #         KL_QB_PB = 0
+    #         # Computing KL[Q(B)|P(B)]
+    #         # Note 1: since B_params is a tensor, we need to loop over its first dimension (num_actions)
+    #         # to compute all the Dirichlet KL divergences for the B matrices.
+    #         for a in range(num_actions):
+    #             KL_QB_PB_a = np.sum(dirichlet_KL(B_params[a, :, :], prior_B[a, :, :]))
+    #             KL_QB_PB += KL_QB_PB_a
+    #
+    #         # Computing KL[Q(A)|P(A)]
+    #         KL_QA_PA = np.sum(dirichlet_KL(A_params, prior_A))
+    #         # Computing KL[Q(pi)|P(pi)]
+    #         KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
+    #         # Computing the E[F_pi] term
+    #         E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    #         # Computing the total
+    #         total_F = KL_QA_PA + KL_QB_PB + KL_Qpi_Ppi + E_Fpi
+    #
+    #     elif learning_A == True and learning_B == False:
+    #
+    #         # Initially, the line below was added to prevent some NaN values in the KL computation.
+    #         # Then, it was discovered that the cause was another one, but this line turned out to
+    #         # prevent some gradient overshooting. So, either keep this line or reduce the learning rate
+    #         # when learning A.
+    #         A_params = np.where((A_params - prior_A) == 0, (A_params + 0.01), A_params)
+    #         # Computing KL[Q(A)|P(A)]
+    #         KL_QA_PA = np.sum(dirichlet_KL(A_params, prior_A))
+    #         # Computing KL[Q(pi)|P(pi)]
+    #         KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
+    #         # Computing the E[F_pi] term
+    #         E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    #         # Computing the total
+    #         total_F = KL_QA_PA + KL_Qpi_Ppi + E_Fpi
+    #
+    #     elif learning_A == False and learning_B == True:
+    #         # Computing KL[Q(B)|P(B)]
+    #         # Retrieving the number of actions (first dimension of B_params)
+    #         num_actions = B_params.shape[0]
+    #         KL_QB_PB = 0
+    #         # Since B_params is a tensor, we need to loop over its first dimension (num_actions)
+    #         # to compute all the Dirichlet for the B matrices.
+    #         for a in range(num_actions):
+    #
+    #             KL_QB_PB_a = np.sum(dirichlet_KL(B_params[a, :, :], prior_B[a, :, :]))
+    #             KL_QB_PB += KL_QB_PB_a
+    #         # Computing KL[Q(pi)|P(pi)]
+    #         KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
+    #         # Computing the E[F_pi] term
+    #         E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    #         # Computing the total
+    #         total_F = KL_QB_PB + KL_Qpi_Ppi + E_Fpi
+    #
+    #     elif learning_A == False and learning_B == False:
+    #         # Computing KL[Q(pi)|P(pi)]
+    #         KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
+    #         # Computing the E[F_pi] term
+    #         E_Fpi = np.dot(Qpi[:, current_tstep], free_energies[:, current_tstep])
+    #         # Computing the total
+    #         total_F = KL_Qpi_Ppi + E_Fpi
+    #
     return total_F
 
 
@@ -977,6 +990,34 @@ def dirichlet_update(
 
     -  Q_A_params, Q_B_params (numpy arrays): matrix/tensor storing the updated parameters.
     """
+    
+    Q_A_params = A_params
+    Q_B_params = B_params
+    if learning_A:
+        Dirichlet_update_A = np.zeros((num_states, num_states))
+        # Computing the Dirichlet update
+        for t in range(steps):
+            Dirichlet_update_A += np.outer(current_obs[:, t], Qs[:, t])
+        Q_A_params += Dirichlet_update_A
+
+    if learning_B:
+        Dirichlet_update_B = np.zeros((num_actions, num_states, num_states))
+        # Computing the Dirichlet updates for B
+        for action in range(num_actions):
+            for t in range(1, steps):
+                for policy in range(policies.shape[0]):
+                    Dirichlet_update_B[action, :, :] += (
+                        (action == policies[policy, t - 1])
+                        * Qpi[policy]
+                        * np.outer(Qs_pi[policy, :, t], Qs_pi[policy, :, t - 1])
+                    )
+        Q_B_params += Dirichlet_update_B
+
+    return Q_A_params, Q_B_params
+
+
+
+
 
     # Considering different learning scenarios
     if learning_A == True and learning_B == True:
