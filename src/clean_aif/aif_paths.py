@@ -349,27 +349,16 @@ class Agent(object):
         # one can initialise A's parameters so that the entries in A's diagonal are close
         # to one or just set A equal to the identity matrix (but the latter may cause some
         # computational errors).
-        if self.learning_A == True:
-            # With learning over A's parameters, initialise matrix A, its Dirichlet parameters,
-            # and sample from them to fill in A
-            self.A = np.zeros((self.num_states, self.num_states))
-            # Parameters initialised uniformly
+        self.A = np.zeros((self.num_states, self.num_states))
+        if self.learning_A:
             self.A_params = np.ones((self.num_states, self.num_states))
-            # For every state draw one sample from the Dirichlet distribution using the corresponding
-            # column of parameters
-            for s in range(self.num_states):
-                self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
-
-        elif self.learning_A == False:
-            # Without learning over A's parameters, initialise matrix A and its parameters so
-            # that the entries in A's diagonal will be close to 1
-            self.A = np.zeros((self.num_states, self.num_states))
-            # Retrieve true parameters form dictionary
+        else:
             self.A_params = params.get("A_params")
-            # For every state draw one sample from the Dirichlet distribution using the corresponding
-            # column of parameters
-            for s in range(self.num_states):
-                self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
+        # For every state draw one sample from the Dirichlet distribution using the corresponding
+        # column of parameters  
+        for s in range(self.num_states):
+            self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
+
 
         # Transition matrices, stored in tensor B, and randomly initialised parameters of
         # their Dirichlet prior distributions.
@@ -380,30 +369,17 @@ class Agent(object):
         # B's parameters so that certain entries in the B matrices are close to one or can
         # just set them equal to one, e.g. to indicate that action 1 from state 1 brings you
         # to state 2 for sure.
-        if self.learning_B == True:
-            # With learning over B's parameters, initialise tensor B, its Dirichlet parameters,
-            # and sample from them to fill in B
-            self.B = np.zeros((self.num_actions, self.num_states, self.num_states))
-            # Parameters initialised uniformly
-            self.B_params = np.ones(
-                (self.num_actions, self.num_states, self.num_states)
-            )
-
-            # For every action and state draw one sample from the Dirichlet distribution using
-            # the corresponding column of parameters
-            for a in range(self.num_actions):
-                for s in range(self.num_states):
-                    self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
-
-        elif self.learning_B == False:
-            # Without learning over B's parameters, initialise matrix B and its parameters so
-            # that entries in B reflect true transitions
-            self.B = np.zeros((self.num_actions, self.num_states, self.num_states))
+        
+        self.B = np.zeros((self.num_actions, self.num_states, self.num_states))
+        if self.learning_B:
+            self.B_params = np.ones((self.num_actions, self.num_states, self.num_states))
+        else:
             self.B_params = params.get("B_params")
 
-            for a in range(self.num_actions):
-                for s in range(self.num_states):
-                    self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
+        for a in range(self.num_actions):
+            for s in range(self.num_states):
+                self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
+
 
         # Agent's preferences represented by matrix C. Each column stores the agent's preferences for a
         # certain time step. Specifically, each column is a categorical distribution with the probability
@@ -414,12 +390,9 @@ class Agent(object):
 
         # Initial state distribution, D (if the state is fixed, then D has the probability mass almost
         # totally concentrated on start_state).
-        if self.learning_D == True:
-
+        if self.learning_D:
             raise NotImplementedError
-
-        elif self.learning_D == False:
-
+        else:
             self.D = np.ones(self.num_states) * 0.0001
             self.D[self.start_state] = 1 - (0.0001 * (self.num_states - 1))
 
@@ -463,16 +436,12 @@ class Agent(object):
         # the state probabilities given a policy for the first step of the episode (while the previous array
         # is overwritten at every step and ends up logging the last step state beliefs for the episode)
         self.Qsf_pi = (
-            np.ones((self.policies.shape[0], self.num_states, self.steps))
-            * 1
-            / self.num_states
+            np.ones((self.policies.shape[0], self.num_states, self.steps))/self.num_states
         )
         # Policy conditioned state-beliefs throughout an episode, i.e. these matrices show how
         # all the Q(S_i|pi) change step after step by doing perceptual inference.
         self.Qt_pi = (
-            np.ones((self.steps, self.policies.shape[0], self.num_states, self.steps))
-            * 1
-            / self.num_states
+            np.ones((self.steps, self.policies.shape[0], self.num_states, self.steps))/self.num_states
         )
         # Policy-independent states probabilities distributions, numpy array of size (num_states, timesteps).
         # See perception() method below.
@@ -634,7 +603,7 @@ class Agent(object):
                 # print("Gradient for update:")
                 # print(f"{grad_F_pi}")
                 self.Qs_pi[pi, :, :] = sigma(
-                    (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1,
+                    - (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1,
                     axis=0,
                 )
 
@@ -696,30 +665,15 @@ class Agent(object):
         sigma = special.softmax
 
         for pi, pi_actions in enumerate(self.policies):
+            # Storing the free energy for the corresponding policy as the corresponding entry
+            # in self.Qpi, that will be normalised below using a softmax to get update probability
+            # over the policies (e.g. sigma(-F_pi))
+            F_pi = self.free_energies[pi, self.current_tstep]
+            self.Qpi[pi, self.current_tstep] = F_pi
+            # Storing the zero expected free energy for reference in self.expected_free_energies
+            self.expected_free_energies[pi, self.current_tstep] = 0
 
-            # At the last time step only update Q(pi) with the computed free energy
-            # (because there is no expected free energy then). for all the other steps
-            # compute the total expected free energy over the remaining time steps.
-            if self.current_tstep == (self.steps - 1):
-                # Storing the free energy for the corresponding policy as the corresponding entry
-                # in self.Qpi, that will be normalised below using a softmax to get update probability
-                # over the policies (e.g. sigma(-F_pi))
-                F_pi = self.free_energies[pi, self.current_tstep]
-                self.Qpi[pi, self.current_tstep] = F_pi
-                # Storing the zero expected free energy for reference in self.expected_free_energies
-                self.expected_free_energies[pi, self.current_tstep] = 0
-
-            else:
-                # Note 1: if B parameters are learned then you need to pass in self.B_params
-                # and self.learning_B (the same applies for A)
-                ### DEBUGGING ###
-                # print(
-                #     f"The B params for action 2 (frist column): {self.B_params[2,:,0]}"
-                # )
-                # print(
-                #     f"The B params for action 2 (frist column): {self.B_params[2,:,3]}"
-                # )
-                ### END ###
+            if self.current_tstep < (self.steps - 1):
                 G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs = (
                     efe(
                         self.num_states,
@@ -738,14 +692,9 @@ class Agent(object):
                         self.learning_B,
                     )
                 )
-
-                # Storing the expected free energy and the free energy for the corresponding policy
-                # as the corresponding entry in self.Qpi, that will be normalised below using a
-                # softmax to get update probability over the policies (e.g. sigma(-F_pi-G_pi))
-                F_pi = self.free_energies[pi, self.current_tstep]
-                self.Qpi[pi, self.current_tstep] = G_pi + F_pi
-                # Storing the expected free energy for reference in self.expected_free_energies
+                self.Qpi += G_pi
                 self.expected_free_energies[pi, self.current_tstep] = G_pi
+                
                 # Storing the expected free energy components for later visualizations
                 self.efe_ambiguity[pi, self.current_tstep] = tot_Hs
                 self.efe_risk[pi, self.current_tstep] = tot_slog_s_over_C
@@ -767,6 +716,9 @@ class Agent(object):
                     print(
                         f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
                     )
+
+
+
 
         # Normalising the negative expected free energies stored as column in self.Qpi to get
         # the posterior over policies Q(pi) to be used for action selection
@@ -850,11 +802,8 @@ class Agent(object):
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
         if argmax_actions.shape == ():
-
             action_selected = argmax_actions
-
         else:
-
             action_selected = self.rng.choice(argmax_actions)
 
         return int(action_selected)
@@ -895,11 +844,8 @@ class Agent(object):
         argmin_actions = np.argwhere(kl_div == np.amin(kl_div)).squeeze()
 
         if argmin_actions.shape == ():
-
             action_selected = argmin_actions
-
         else:
-
             action_selected = self.rng.choice(argmin_actions)
 
         return action_selected
@@ -980,44 +926,17 @@ class Agent(object):
         # scenarios.
         # Note 1: if a set of parameters is not learned, the corresponding matrix(ces) are not considered
         # below (they do not change from their initialised form).
-        if self.learning_A == True and self.learning_B == True:
 
-            print("Updated parameters for matrices A and Bs.")
-            # After learning A's parameters, for every state draw one sample from the Dirichlet
-            # distribution using the corresponding column of parameters.
+        if self.learning_A:
+            print("Updated parameters for matrix A.")
             for s in range(self.num_states):
                 self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
-
-            # After learning B's parameters, sample from them to update the B matrices, i.e. for every
-            # action and state draw one sample from the Dirichlet distribution using the corresponding
-            # column of parameters.
+        if self.learning_B:
+            print("Updated parameters for matrix B.")
             for a in range(self.num_actions):
                 for s in range(self.num_states):
                     self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
-
-        elif self.learning_A == True and self.learning_B == False:
-
-            print("Updated parameters for matrix A (no Bs learning).")
-            # After learning A's parameters, for every state draw one sample from the Dirichlet
-            # distribution using the corresponding column of parameters.
-            for s in range(self.num_states):
-                self.A[:, s] = self.rng.dirichlet(self.A_params[:, s], size=1)
-
-            print("New matrix A:")
-            print(f" {self.A}")
-
-        elif self.learning_A == False and self.learning_B == True:
-
-            print("Updated parameters for matrices Bs (no A learning).")
-            # After learning B's parameters, sample from them to update the B matrices, i.e. for every
-            # action and state draw one sample from the Dirichlet distribution using the corresponding
-            # column of parameters.
-            for a in range(self.num_actions):
-                for s in range(self.num_states):
-                    self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
-
-        elif self.learning_A == False and self.learning_B == False:
-
+        if not(self.learning_A and self.learning_B):
             print("No update (matrices A and Bs not subject to learning).")
 
     def step(self, new_obs):
@@ -1055,13 +974,10 @@ class Agent(object):
         agent_observation = np.random.multinomial(1, self.A[:, new_obs], size=None)
         self.agent_obs[:, self.current_tstep] = agent_observation
 
-        # During an episode perform perception, planning, and action selection based on current observation
+        self.perception()
+        self.planning()
+        
         if self.current_tstep < (self.steps - 1):
-
-            self.perception()
-            self.planning()
-            # Computing the total free energy and store it in self.total_free_energies
-            # (as a reference for the agent performance)
             total_F = total_free_energy(
                 self.current_tstep, self.steps, self.free_energies, self.Qpi
             )
@@ -1073,21 +989,13 @@ class Agent(object):
             # Storing the selected action in self.actual_action_sequence
             self.actual_action_sequence[self.current_tstep] = self.current_action
 
-        # At the end of the episode (terminal state), do perception and update the A and/or B's parameters
-        # (an instance of learning)
-        elif self.current_tstep == (self.steps - 1):
+        else:
             # Saving the P(A) and/or P(B) used during the episode before parameter learning,
             # in this way we conserve the priors for computing the KL divergence(s) for the
             # total free energy at the end of the episode (see below).
             prior_A = self.A_params
             prior_B = self.B_params
-            # Perception (state-estimation)
-            self.perception()
-            # Planning (expected free energy computation)
-            # Note 1 (IMPORTANT): at the last time step self.planning() only serves to update Q(pi) based on
-            # the past as there is no expected free energy to compute.
-            self.planning()
-            # Learning (parameter's updates)
+        
             self.learning()
             self.current_action = None
             # Computing the total free energy and store it in self.total_free_energies (as a reference
