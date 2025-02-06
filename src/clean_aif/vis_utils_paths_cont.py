@@ -12,6 +12,39 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 
+def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
+    """
+    Function to plot action sequences across episodes.
+    """
+
+    # Retrieving the data dictionary and extracting the content of various keys
+    data = np.load(file_data_path, allow_pickle=True).item()
+    num_runs = data["num_runs"]
+    num_episodes = data["num_episodes"]
+    reward_counts = data["reward_counts"]
+    action_seqs = data["actual_action_sequence"]
+
+    episodes = np.repeat(np.arange(num_episodes), 2)
+    # Plotting action sequences for each episode for run/agent 3
+    plt.figure()
+    plt.scatter(episodes, action_seqs[3], alpha=0.7, marker="o")
+
+    plt.xlabel("Episode")
+    plt.ylabel("Action")
+    plt.title("Actions Taken Per Episode")
+    plt.xticks(np.arange(0, (num_episodes) + 1, step=x_ticks_estep))
+    plt.yticks(range(4))  # Assuming four actions: 0, 1, 2, 3
+    plt.grid(axis="x", linestyle="--", alpha=0.5)
+
+    plt.savefig(
+        save_dir + "/" + f"action_seqs_run3.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    plt.show()
+
+
 def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
     """
     Function to plot reward counts across episodes, i.e. the amount of reward the agent has
