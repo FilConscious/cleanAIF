@@ -77,7 +77,7 @@ class Args:
     """ preference prior type """
     pref_type: str = "states"
     """ time step(s) on which the preference prior is placed """
-    pref_loc: str = "all_diff"  # "all_goal", "all_diff"
+    pref_loc: str = "all_goal"  # "last", all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
@@ -208,17 +208,22 @@ class Args:
         if pref_type == "states":
 
             if pref_loc == "last":
-                # (1) At every time step all states have uniform probabilities...
+                print("Setting agent's preferences...")
+                # (1) At every time step all states have uniform probabilities except at the last time step
+                # when the goal state is given the highest probability
                 pref_array[:, -1] = 0.1 / (num_states - 1)
-                # ...except at the last time step when the goal state is given the highest probability
                 pref_array[goal_state, -1] = 0.9
+                print(pref_array)
 
             elif pref_loc == "all_goal":
+                print("Setting agent's preferences...")
                 # (2) Set higher preference for the goal state at each time step
                 pref_array[:, :] = 0.1 / (num_states - 1)
-                pref_array[:, -1] = 0.9
+                pref_array[goal_state, :] = 0.9
+                print(pref_array)
 
             elif pref_loc == "all_diff":
+                print("Setting agent's preferences...")
                 # (3) Define agent's preferences for each time step (i.e. a different goal for each step time)
                 pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
                 # IMPORTANT: the probabilities below need to be set MANUALLY depending on the environment
@@ -228,6 +233,7 @@ class Args:
                 pref_array[0, 2] = 0.9
                 pref_array[1, 1] = 0.9
                 pref_array[4, 0] = 0.9
+                print(pref_array)
 
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
@@ -249,7 +255,6 @@ class Args:
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
                 "The preferences do not sum to one!"
             )
-        print(pref_array)
 
         return pref_array
 
@@ -909,11 +914,11 @@ class Agent(object):
         #     self.Qs_pi[:, :, self.current_tstep].T @ self.Qpi[:, self.current_tstep]
         # )
         # print(self.Qs_test)
-        print(self.policies)
-        print(self.Qs_pi[:, :, 1])
-        print(self.Qs_pi[:, :, 2])
+        # print(self.policies)
+        # print(self.Qs_pi[:, :, 1])
+        # print(self.Qs_pi[:, :, 2])
         print(f"Updated Qs at times step {self.current_tstep}")
-        print(self.Qs[:, self.current_tstep])
+        # print(self.Qs[:, self.current_tstep])
         print(f"Most probable state: {np.argmax(self.Qs[:, self.current_tstep])}")
         ### END ###
 
@@ -1717,9 +1722,10 @@ def main():
         # Loop over episodes
         for e in range(NUM_EPISODES):
             # Printing episode number
-            print("--------------------")
-            print(f"Episode {e}")
-            print("--------------------")
+            print("**********************************************************")
+            print(f"****************** EPISODE {e} **************************")
+            print("**********************************************************")
+
             # Initialize steps and reward counters
             steps_count = 0
             total_reward = 0
@@ -1798,7 +1804,7 @@ def main():
             if task_type == "continuing":
                 AGENT_LOC = convert_state(int(np.argmax(agent.D)))
 
-                # Reset the agent before starting a new episode
+            # Reset the agent before starting a new episode
             agent.reset()
 
             # Record num_videos uniformly distanced throughout the experiment
