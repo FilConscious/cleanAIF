@@ -1767,12 +1767,8 @@ def main():
                     next_obs, reward, terminated, truncated, info = env.step(action)
                     # Retrieve observation of the agent's location
                     next_obs = next_obs["agent"]
-                    # print(f"Next obs: {next_obs}")
-
                     # Convert observation into index representation
                     next_state = process_obs(next_obs)
-
-                    # print(f"Next state: {next_state}")
                     # Update total_reward
                     total_reward += reward
 
