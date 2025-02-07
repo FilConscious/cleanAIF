@@ -655,263 +655,90 @@ def efe(
     Exp_A = A_params / np.sum(A_params, axis=0)
     H = -np.diag(np.matmul(Exp_A.T, np.log(Exp_A)))
 
-    # Considering different learning scenarios
-    if learning_A == True and learning_B == True:
-        # Both A and B are learned.
-        # IMPORTANT: learning both A and B has not been tested yet,
-        # try at you your own risk!
-        # TODO: verify if this works now
+    # Loop over the time steps in which EFE is computed
+    # NOTE: if t is the present time step and EFE is computed for 4 steps, then it is computed at
+    # t, t+1, t+2, and t+3.
+    for tau in range(0, future_steps):
+        # Compute AMBIGUITY term in EFE
+        Hs = np.dot(H, Qs_pi[pi, :, tau])
+        # Add the ambiguity computed at tau to the total
+        tot_Hs += Hs
 
-        # Compute expected free energy for each future time step tau in [0,..,(plan_horizon - 1)]
-        for tau in range(0, future_steps):
-            # Computing the terms of the expected free energy: ambiguity, risk, and novelty
-            # W_A matrix needed to compute the A-novelty term of the expected free energy:
-            # W = 1/2*(1/A_params - 1/np.sum(A_params, axis=0)).
-            W_A = 1 / 2 * (1 / A_params - 1 / np.sum(A_params, axis=0))
-            # At the last state there is no action so when tau = episode_steps-1 the B-novelty
-            # term is dropped from the expected free energy.
+        # IMPORTANT: here we are replacing zero probabilities in the policy-conditioned state probabilitis
+        # with the minimum value in C to  avoid zeroes in logs when we compute the RISK term in EFE.
+        # NOTE: this keeps the meaning of the KL divergence (the risk term) intact because if the Qs_pi
+        # predicts the state has zero probability and the preference is low, then the KL divergence turns
+        # out to be zero (with the above replacement); conversely, if the preference was high then the Qs_pi
+        # got things very wrong and the KL divergence will be high.
+        Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
+        # Compute RISK term in EFE
+        if pref_type == "states":
+            # Computing risk based on preferred states
+            # NOTE (!!! IMPORTANT !!!): we have replaced `np.log(C[:, tau])` with `np.log(C[:, 0])`
+            # because in this active inference implementation we don't currently have the possibility
+            # to specify preferences over a trajectory, which was possible in the original one, we can
+            # only give the agent a single vector of preferences, i.e. a stationary distribution
+            slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, 0]))
+        else:
+            # Computing risk based on preferred observations
+            slog_s_over_C = np.dot(
+                np.dot(A, Qs_pi_risk),
+                np.log(np.dot(A, Qs_pi_risk)) - np.log(C[:, tau]),
+            )
+        # Add risk computed at tau to the total
+        tot_slog_s_over_C += slog_s_over_C
+
+        # If A matrix is learned compute A-NOVELTY term in EFE
+        if learning_A:
+            # W matrix needed to compute the A-novelty term of the expected free energy:
+            W_A = 0.5 * (1 / A_params - 1 / np.sum(A_params, axis=0))
+            # Computing the A-novelty term
+            AsW_As = np.dot(
+                np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau])
+            )
+            # Add the A-novelty computed at tau to the total
+            tot_AsW_As += AsW_As
+
+        # If B matrices are learned compute B-NOVELTY terms in EFE
+        if learning_B:
+            # At tau = episode_steps - 1 there is no action so the B-novelty terms are zero
             if tau == (future_steps - 1):
-                AsW_Bs = 0  # B-novelty
+                AsW_Bs = 0
             else:
-                # Action that policy pi dictates at time step tau and W_B matrix needed to
-                # compute the B-novelty term.
-                # Note 1: W_B depends on the parameters of the transition matrix B related to
-                # the action the policy dictates at tau, that's why we need to retrieve that action.
+                # Action that policy pi dictates at time step tau and W_B matrix needed
+                # to compute the B-novelty term.
+                # NOTE: W_B depends on the parameters of the transition matrix B related to the action
+                # the policy dictates at tau, that's why we need to retrieve that action.
                 action = pi_actions[tau]
-                W_B = (
-                    1
-                    / 2
-                    * (
-                        1 / B_params[action, :, :]
-                        - 1 / np.sum(B_params[action, :, :], axis=0)
-                    )
+                W_B = 0.5 * (
+                    1 / B_params[action, :, :]
+                    - 1 / np.sum(B_params[action, :, :], axis=0)
                 )
                 # Computing the B-novelty term
                 AsW_Bs = np.dot(
                     np.matmul(A, Qs_pi[pi, :, tau + 1]),
                     np.matmul(W_B, Qs_pi[pi, :, tau + 1]),
                 )
-            # Computing the Ambiguity term
-            Hs = np.dot(H, Qs_pi[pi, :, tau])
-            # Computing the A-novelty term
-            AsW_As = np.dot(
-                np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau])
-            )
 
-            if pref_type == "states":
-                # Computing the risk terms based on preferred states
-                slog_s_over_C = np.dot(
-                    Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau])
-                )
+            # Save B-novelty component computed at tau (to have the full sequence of B-novelties
+            # for each policy)
+            # print(f"EFE at future time step {tau}: {AsW_Bs}")
+            sq_AsW_Bs[tau] = AsW_Bs
 
-            else:
-                # Computing the risk term based on preferred observations
-                slog_s_over_C = np.dot(
-                    np.dot(A, Qs_pi[pi, :, tau]),
-                    np.log(np.dot(A, Qs_pi[pi, :, tau])) - np.log(C[:, tau]),
-                )
-
-            # Summing all terms to obtain (an approximation of) expected free energy at the tau
-            # time step, and adding the value to G to get the expected free energy over the future
-            # ("imagined") trajectory considered.
-            G_pi_tau = Hs + slog_s_over_C - AsW_Bs - AsW_As
-            G_pi += G_pi_tau
-
-        return G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs
-
-    elif learning_A == True and learning_B == False:
-        # A is learned but not B.
-
-        # Compute expected free energy for each future time step tau in [0,..,(plan_horizon - 1)]
-        for tau in range(0, future_steps):
-            # W matrix needed to compute the A-novelty term of the expected free energy:
-            # W = 1/2*(1/A_params - 1/np.sum(A_params, axis=0)).
-            W_A = 1 / 2 * (1 / A_params - 1 / np.sum(A_params, axis=0))
-            # Computing the terms of the expected free energy: ambiguity, risk, and novelty
-            # Computing the ambiguity term
-            Hs = np.dot(H, Qs_pi[pi, :, tau])
-            # Computing the A-novelty term
-            AsW_As = np.dot(
-                np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau])
-            )
-
-            if pref_type == "states":
-                # Computing the risk term based on preferred states
-                slog_s_over_C = np.dot(
-                    Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau])
-                )
-
-            else:
-                # Computing the risk term based on preferred observations
-                slog_s_over_C = np.dot(
-                    np.dot(A, Qs_pi[pi, :, tau]),
-                    np.log(np.dot(A, Qs_pi[pi, :, tau])) - np.log(C[:, tau]),
-                )
-
-            # Update the free energy components
-            # Ambiguity
-            tot_Hs += Hs
-            # Risk
-            tot_slog_s_over_C += slog_s_over_C
-            # A-Novelty
-            tot_AsW_As += AsW_As
-            # B-Novelty (B-novelty stays at zero because there is no learning of B here)
-            tot_AsW_Bs += 0
-            # Summing the terms to obtain (an approximation of) expected free energy at the
-            # tau time step, and adding the value to G to get the expected free energy over
-            # the future ("imagined") trajectory considered.
-            # N.B.: the update of G_pi should go here, inside the if statement, otherwise the for loop
-            # would consider values from previous time steps
-            G_pi_tau = Hs + slog_s_over_C - AsW_As
-            G_pi += G_pi_tau
-
-        # assert type(G_pi)==float, 'Free energy is not of type float; it is of type: ' + str(type(G_pi))
-        return G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs
-
-    elif learning_A == False and learning_B == True:
-        # B is learned but not A.
-
-        # Compute expected free energy for each future time step tau in [0,..,(plan_horizon - 1)]
-        for tau in range(0, future_steps):
-            print(f"Computing EFE for future step {tau}...")
-            # Computing the terms of the expected free energy: ambiguity, risk, and novelty
-            # At the last state there is no action so when tau = future_steps - 1 the B-novelty term
-            # is dropped from the expected free energy.
-            if tau == (future_steps - 1):
-                AsW_Bs = 0  # B-novelty
-            else:
-                # Action that policy pi dictates at time step tau and W_B matrix needed
-                # to compute the B-novelty term.
-                # Note 1: W_B depends on the parameters of the transition matrix B related to the action
-                # the policy dictates at tau, that's why we need to retrieve that action.
-                action = pi_actions[tau]
-                W_B = (
-                    1
-                    / 2
-                    * (
-                        1 / B_params[action, :, :]
-                        - 1 / np.sum(B_params[action, :, :], axis=0)
-                    )
-                )
-
-                #### DEBUGGING ####
-                # b = 1 / B_params[action, :, :]
-                # b_zero = 1 / np.sum(B_params[action, :, :], axis=0)
-                # print(f"First row of b: {b[0,:]}")
-                # print(f"First row of b_zero: {b_zero[0]}")
-                # print(f"The Q(s|pi): {Qs_pi[pi, :, tau]}")
-                # print(
-                #     f"The A @ Q(s|pi) matrix for B-novelty: {np.matmul(A, Qs_pi[pi, :, tau])}"
-                # )
-                # print(
-                #     f"The W_B @ Q(s|pi) matrix for B-novelty: {np.matmul(W_B, Qs_pi[pi, :, tau])}"
-                # )
-                #### END ####
-
-                # Computing B-novelty term
-                AsW_Bs = np.dot(
-                    np.matmul(A, Qs_pi[pi, :, tau + 1]),
-                    np.matmul(W_B, Qs_pi[pi, :, tau]),
-                )
-                # print(f"EFE at future time step {tau}: {AsW_Bs}")
-                # Save B-novelty component computed at tau (to have the full sequence of B-novelties
-                # for each policy)
-                sq_AsW_Bs[tau] = AsW_Bs
-
-            # IMPORTANT: here we are replacing zero probabilities with the minimum value in C to
-            # avoid zeroes in logs. Note that this keeps the meaning of the KL divergence
-            # (the risk term) intact because if the Qs_pi predicts the state has zero probability
-            # and the preference is low, then the KL divergence turns out to be zero (with
-            # the above replacement); conversely, if the preference was high then the Qs_pi got
-            # things very wrong and the KL divergence will be high.
-            Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
-            # Computing the ambiguity term
-            Hs = np.dot(H, Qs_pi[pi, :, tau])  # ambiguity
-
-            if pref_type == "states":
-                # Computing risk based on preferred states
-                # print(f"Shape of C: {C.shape}")
-                # print(f"Tau: {tau}")
-                # NOTE (!!! IMPORTANT !!!): we have replaced `np.log(C[:, tau])` with `np.log(C[:, 0])`
-                # because in this active inference implementation we don't currently have the possibility
-                # to specify preferences over a trajectory, which was possible in the original one, we can
-                # only give the agent a single vector of preferences, i.e. a stationary distribution
-                slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, 0]))
-                ### DEBUGGING ###
-                print(f"Q(s|pi), corrected: {Qs_pi_risk} ; Preferences: {C}")
-                print(f"logQ(S|pi): {np.log(Qs_pi_risk)}")
-                print(f"logQ(S|pi) - log C: {np.log(Qs_pi_risk) - np.log(C[:, 0])}")
-                print(f"Risk: {slog_s_over_C}")
-                ### END ###
-
-            else:
-                # Computing risk based on preferred observations
-                slog_s_over_C = np.dot(
-                    np.dot(A, Qs_pi_risk),
-                    np.log(np.dot(A, Qs_pi_risk)) - np.log(C[:, tau]),
-                )
-
-            # Update the free energy components
-            # Ambiguity
-            tot_Hs += Hs
-            # Risk
-            tot_slog_s_over_C += slog_s_over_C
-            # A-Novelty (A-novelty stays at zero because there is no learning of A here)
-            tot_AsW_As += 0
-            # B-Novelty
+            # Add the B-novelty term computed at tau to the total
             tot_AsW_Bs += AsW_Bs
 
-            # Summing the terms to obtain (an approximation of) expected free energy at the tau
-            # time step, and adding the value to G to get the expected free energy over the
-            # future ("imagined") trajectory considered.
-            G_pi_tau = Hs + slog_s_over_C - AsW_Bs
-            # N.B.: the update of G_pi should go here, inside the if statement, otherwise the for loop
-            # would consider values from previous time steps
-            G_pi += G_pi_tau
+        # Adding all the terms appropriately to obtain (an approximation of) expected free energy G_pi_tau
+        # for the given policy at tau, and adding that value to G to get the expected free energy over the
+        # future ("imagined") trajectory considered by the policy.
+        G_pi_tau = Hs + slog_s_over_C
+        if learning_A:
+            G_pi_tau -= AsW_As
+        if learning_B:
+            G_pi_tau -= AsW_Bs
+        G_pi += G_pi_tau
 
-        # assert type(G_pi)==float, 'Free energy is not of type float; it is of type: ' + str(type(G_pi))
-        return G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs
-
-    else:
-        # Neither A nor B is learned
-
-        # Compute expected free energy for each future time step tau in [0,..,(plan_horizon - 1)]
-        for tau in range(0, future_steps):
-            # Computing the terms of the expected free energy: ambiguity and risk
-            # (no novelty terms because neither A nor B are learned)
-
-            # IMPORTANT: here we are replacing zero probabilities with the minimum value in C to
-            # avoid zeroes in logs. Note that this keeps the meaning of the KL divergence
-            # (the risk term) intact because if the Qs_pi predicts the state has zero probability
-            # and the preference is low, then the KL divergence turns out to be zero (with
-            # the above replacement); conversely, if the preference was high then the Qs_pi got
-            # things very wrong and the KL divergence will be high.
-            Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
-            # Computing ambiguity term
-            Hs = np.dot(H, Qs_pi[pi, :, tau])
-
-            if pref_type == "states":
-                # Computing risk term based on preferred states
-                # slog_s_over_C = np.dot(
-                #     Qs_pi[pi, :, tau], np.log(Qs_pi[pi, :, tau]) - np.log(C[:, tau])
-                # )
-
-                slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, 0]))
-
-            else:
-                # Computing risk term based on preferred observations
-                slog_s_over_C = np.dot(
-                    np.dot(A, Qs_pi[pi, :, tau]),
-                    np.log(np.dot(A, Qs_pi[pi, :, tau])) - np.log(C[:, tau]),
-                )
-
-            # Summing the terms to obtain (an approximation of) expected free energy at the
-            # tau time step, and adding the value to G to get the expected free energy over
-            # the future ("imagined") trajectory considered.
-            G_pi_tau = Hs + slog_s_over_C
-            G_pi += G_pi_tau
-
-        return G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs
+    return G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs
 
 
 def dirichlet_update(
@@ -1037,10 +864,10 @@ def dirichlet_update(
         # Getting the approximate posterior
         Q_A_params = A_params  # Nothing is learned here
         # assert np.array_equal(Dirichlet_update_B[2,:,:], Dirichlet_update_B[3,:,:]) == False, 'Updates suspiciously identical!'
-        print(f"Old B params {B_params[2,:]}")
+        # print(f"Old B params {B_params[2,:]}")
         # print(f"Dirichlet update: {Dirichlet_update_B}")
         Q_B_params = B_params + Dirichlet_update_B
-        print(f"New B params {B_params[2,:]}")
+        # print(f"New B params {B_params[2,:]}")
         # Returning the approximate posterior for the learned parameters (Q_A_params is equal to
         # A_params because A is not learned)
         return Q_A_params, Q_B_params
