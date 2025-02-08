@@ -68,12 +68,12 @@ class Args:
     num_policies: int = 100
     """ planning horizon, also the length of a policy """
     """ NOTE: also MAX number of future steps for which expected free energy is computed """
-    plan_horizon: int = 4
+    plan_horizon: int = 2
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ init empty agent's policies arrays """
     policies: np.ndarray = field(
-        default_factory=lambda: Args.init_policies(Args.num_actions)
+        default_factory=lambda: Args.init_policies(Args.plan_horizon)
     )
     """ preferences type """
     pref_type: str = "states"
@@ -98,14 +98,14 @@ class Args:
 
     # !!! ATTENTION !!!: probably not needed, check if it is OK removing
     @staticmethod
-    def init_policies(num_actions: int) -> np.ndarray:
+    def init_policies(policy_len: int) -> np.ndarray:
         """
         Create initial agent's policies array.
 
         """
 
         # Array to store policies crated at the planning stage
-        policies = np.empty((0, num_actions))
+        policies = np.empty((0, policy_len))
 
         return policies
 
@@ -453,6 +453,9 @@ class Agent(object):
         # List of actions, dictionary with all the policies, and array with their corresponding probabilities.
         self.actions = list(range(self.num_actions))
         self.policies = params.get("policies")
+        self.ordered_policies = np.zeros(
+            (self.steps, self.num_policies, self.efe_tsteps), dtype=np.int64
+        )
 
         # Array to store policies probability
         # NOTE: these are reassigned at every time step when new policies are computed/selected
@@ -836,7 +839,7 @@ class Agent(object):
         # state_belief = np.argmax(self.Qs[:, self.current_tstep], axis=0)
         # self.states_beliefs[self.current_tstep] = state_belief
 
-    def planning(self, truncated, terminated):
+    def planning(self, unfolding):
         """Method for planning, which involves computing the expected free energy for all the policies
         to update their probabilities, i.e. Q(pi), which are then used for action selection.
 
@@ -858,7 +861,7 @@ class Agent(object):
             # At the last time step only update Q(pi) with the computed free energy
             # (because there is no expected free energy then). for all the other steps
             # compute the total expected free energy over the remaining time steps.
-            if self.current_tstep == (self.steps - 1) or truncated or terminated:
+            if self.current_tstep == (self.steps - 1) or not unfolding:
                 # Storing the free energy for the corresponding policy as the corresponding entry
                 # in self.Qpi, that will be normalised below using a softmax to get update probability
                 # over the policies (e.g. sigma(-F_pi))
@@ -979,14 +982,14 @@ class Agent(object):
         )
 
         # # (2) Not computed at the truncation or terminal point
-        if self.current_tstep != (self.steps - 1) and not truncated and not terminated:
+        if self.current_tstep != (self.steps - 1) and unfolding:
             self.Qs[:, self.current_tstep + 1] = (
                 self.Qs_ps_traj[:, :, self.current_tstep + 1].T
                 @ self.Qpi[:, self.current_tstep]
             )
 
         # At the terminal/truncation point set new prior over initial states depending on task type
-        if self.task_type == "continuing" and (terminated or truncated):
+        if self.task_type == "continuing" and not unfolding:
             # Save the last policy-independent state probabilities as prior state probabilities for
             # the next episode
             self.D = np.copy(self.Qs_fe[:, self.current_tstep])
@@ -1001,7 +1004,7 @@ class Agent(object):
         index_most_pp = np.argmax(self.Qpi[:, self.current_tstep])
         print(f"Index of most probable policy: {index_most_pp}")
         print(f"Most probable policy: {self.policies[index_most_pp]}")
-        if self.current_tstep != (self.steps - 1) and not truncated and not terminated:
+        if self.current_tstep != (self.steps - 1) and unfolding:
             print(
                 f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
             )
@@ -1247,11 +1250,13 @@ class Agent(object):
                 for s in range(self.num_states):
                     self.B[a, :, s] = self.rng.dirichlet(self.B_params[a, :, s], size=1)
 
+            print(self.B[0])
+
         elif self.learning_A == False and self.learning_B == False:
 
             print("No update (matrices A and Bs not subject to learning).")
 
-    def step(self, new_obs, done):
+    def step(self, new_obs, unfolding):
         """This method brings together all computational processes defined above, forming the
         perception-action loop of an active inference agent at every time step during an episode.
 
@@ -1264,7 +1269,8 @@ class Agent(object):
         """
 
         # Retrieve done information
-        truncated, terminated = done
+        # truncated, terminated = done
+
         # During an episode the counter self.current_tstep goes up by one unit at every time step
         self.current_tstep += 1
         # Updating the matrix of observations and agent obs with the observations at the first time step
@@ -1273,6 +1279,9 @@ class Agent(object):
         self.policies = self.set_policies(
             self.num_policies, self.efe_tsteps, self.num_actions
         )
+        print(f"Computing policies at time step {self.current_tstep}")
+        # Save new set of policy for current time step
+        self.ordered_policies[self.current_tstep, :, :] = np.copy(self.policies)
         # Initialize total free energy variable
         total_F = 0
 
@@ -1293,17 +1302,16 @@ class Agent(object):
         ### END ###
 
         # During an episode perform perception, planning, and action selection based on current observation
-        if self.current_tstep < self.steps - 1 and not truncated and not terminated:
-
+        if self.current_tstep < self.steps - 1 and unfolding:
             # Free-energy minimization, i.e. inference or state estimation
             self.perception()
             # Expected free energy minimization, i.e. planning and update of policies probabilities
-            self.planning(truncated, terminated)
+            self.planning(unfolding)
             # Compute total free energy, i.e. sum of free energies scaled by policies' probabilities Q(pi)
             # NOTE: this should be computed after the planning stage because it requires old policy
             # probabilities as well as the updated ones
             total_F = total_free_energy(
-                self.current_tstep, truncated, terminated, self.free_energies, self.Qpi
+                self.current_tstep, unfolding, self.free_energies, self.Qpi
             )
 
             print("---------------------")
@@ -1315,7 +1323,7 @@ class Agent(object):
 
         # At the end of the episode (terminal state), do perception and update the A and/or B's parameters
         # (an instance of learning)
-        elif self.current_tstep == self.steps - 1 or truncated or terminated:
+        elif self.current_tstep == self.steps - 1 or not unfolding:
             # Saving the P(A) and/or P(B) used during the episode before parameter learning,
             # in this way we conserve the priors for computing the KL divergence(s) for the
             # total free energy at the end of the episode (see below).
@@ -1326,7 +1334,7 @@ class Agent(object):
             # Expected free energy minimization, i.e. planning and update of policies probabilities
             # Note 1 (IMPORTANT): at the last time step self.planning() only serves to update Q(pi) based on
             # the past as there is no expected free energy to compute.
-            self.planning(truncated, terminated)
+            self.planning(unfolding)
             # Learning (parameter's updates)
             self.learning()
             self.current_action = None
@@ -1336,8 +1344,7 @@ class Agent(object):
             # the updated ones
             total_F = total_free_energy(
                 self.current_tstep,
-                truncated,
-                terminated,
+                unfolding,
                 self.free_energies,
                 self.Qpi,
                 prior_A=prior_A,
@@ -1372,6 +1379,10 @@ class Agent(object):
         self.Qpi = np.zeros((self.num_policies, self.steps))
         # Reset prior probabilities over policies to be uniform
         self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
+        # Rest array for ordered list of policies at each times step
+        self.ordered_policies = np.zeros(
+            (self.steps, self.num_policies, self.efe_tsteps), dtype=np.int64
+        )
         # Reset other attributes used to store episodic data related to free energy
         self.free_energies = np.zeros((self.num_policies, self.steps))
         self.expected_free_energies = np.zeros((self.num_policies, self.steps))
@@ -1514,6 +1525,16 @@ class LogData(object):
                 self.num_states,
             )
         )
+        """Policies in the order in which they are sampled at each time step"""
+        self.ordered_policies: np.ndarray = np.zeros(
+            (
+                self.num_runs,
+                self.num_episodes,
+                self.num_max_steps,
+                self.num_policies,
+                self.efe_tsteps,
+            )
+        )
 
     def log_step(self, run, episode, next_state):
         """Method to log data at every step"""
@@ -1554,6 +1575,7 @@ class LogData(object):
         self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
         self.so_mappings[run, episode, :, :] = kwargs["A"]
         self.transitions_prob[run, episode, :, :, :] = kwargs["B"]
+        self.ordered_policies[run, episode, :, :, :] = kwargs["ordered_policies"]
 
     def save_data(self, log_dir, file_name="data"):
         """Method to save to file the collected data"""
@@ -1588,6 +1610,7 @@ class LogData(object):
         data["pi_probabilities"] = self.pi_probabilities
         data["so_mappings"] = self.so_mappings
         data["transition_prob"] = self.transitions_prob
+        data["ordered_policies"] = self.ordered_policies
         # Save data to local file
         file_data_path = log_dir.joinpath(file_name)
         np.save(file_data_path, data)
@@ -1853,25 +1876,30 @@ def main():
             # Current state (updated at every step and passed to the agent)
             current_state = start_state
 
+            # Establish different agent-environment interaction loops based on task_type
+            if task_type == "episodic":
+                unfolding = not terminated and not truncated
+            elif task_type == "continuing":
+                unfolding = not truncated
+            else:
+                raise ValueError(
+                    f"Invalid value: {task_type}. Allowed values are: episodic, continuing"
+                )
+
             # Agent and environment interact until the environment is truncated or terminated.
             # NOTE: the maximum number of steps is NUM_STEPS, i.e. the time step at which the environment
             # is truncated regardless of whether the agent has reached the goal state or not..
-            while not truncated and not terminated:
+            print(f"Unfolding is {unfolding}")
+            while unfolding:
+
                 # Agent returns an action based on current observation/state
-                action = agent.step(current_state, (truncated, terminated))
-                print(f"Terminated: {terminated}")
-                print(f"Truncated: {truncated}")
-                print(f"Agent action {action}, {type(action)}")
-                print(f"Step_count: {steps_count}")
+                action = agent.step(current_state, unfolding)
                 # Environment outputs based on agent action
                 next_obs, reward, terminated, truncated, info = env.step(action)
                 # Retrieve observation of the agent's location
                 next_obs = next_obs["agent"]
-                print(f"Next obs: {next_obs}")
-
                 # Convert observation into index representation
                 next_state = process_obs(next_obs)
-                print(f"Next state: {next_state}")
                 # Update total_reward
                 total_reward += reward
 
@@ -1888,11 +1916,22 @@ def main():
                 current_state = next_state
                 # Update step count
                 steps_count += 1
+                # Update unfolding flag
+                if task_type == "episodic":
+                    unfolding = not terminated and not truncated
+                elif task_type == "continuing":
+                    unfolding = not truncated
+                else:
+                    raise ValueError(
+                        f"Invalid value: {task_type}. Allowed values are: continuing, episodic"
+                    )
+                print(f"Unfolding AFTER STEP is {unfolding}")
 
             # After the environment is truncated/terminated we use agent.step outside the loop one more time
             # to update specific agent's parameters, those of A or B matrices, based on the trajectory the
             # agent has realized; in the active inference literature this is an instance of learning.
-            action = agent.step(current_state, (truncated, terminated))
+            print(f"Unfolding before LEARNING is {unfolding}")
+            action = agent.step(current_state, unfolding)
 
             print("-------- EPISODE SUMMARY --------")
             print(f"Step Count: {steps_count}")

@@ -453,9 +453,7 @@ def grad_vfe(
     return grad_F_pi
 
 
-def total_free_energy(
-    current_tstep, truncated, terminated, free_energies, Qpi, **kwargs
-):
+def total_free_energy(current_tstep, unfolding, free_energies, Qpi, **kwargs):
     """Function that computes the total free energy,  i.e. F = KL[Q(A)|P(A)] + KL[Q(B)|P(B)] +
     + KL[Q(pi)|P(pi)] + E[F_pi], at the current time step based on Equation (5) in Da Costa et al.
     2020, pp. 7-8 (DOI: 10.1016/j.jmp.2020.102447). The value is then stored in the agent's
@@ -499,7 +497,7 @@ def total_free_energy(
     total_F = 0
     # Case where self.current_tstep is neither the first nor the last state
     # (no need for KL[Q(A)|P(A)] and/or KL[Q(B)|P(B)])
-    if current_tstep != 0 and not truncated and not terminated:
+    if current_tstep != 0 and unfolding:
         # Computing KL[Q(pi)|P(pi)]
         KL_Qpi_Ppi = cat_KL(Qpi[:, current_tstep], Qpi[:, current_tstep - 1])
         # Computing the E[F_pi] term
@@ -516,7 +514,7 @@ def total_free_energy(
 
     # Case where the terminal or end state of the episode has been reached (all KL divergences are required
     # unless there is no parameter learning)
-    elif terminated or truncated:
+    elif not unfolding:
         # Retrieve prior B_params
         prior_B = kwargs["prior_B"]
         # Retrieve B_params
