@@ -281,7 +281,8 @@ class Args:
         env_matrix_labels = np.reshape(np.arange(9), (3, 3))
 
         # Assigning 1s to correct transitions for every action.
-        # IMPORTANT: The code below works for a maze of size (3, 3) only.
+        # IMPORTANT: The code below works for a maze of size (3, 3) only and specifically for env_layout = 't-maze-3'
+        # TODO: Implement an automatic way to load these B-matrices depending on layout
         # Basically, we are looping over the 3 rows of the maze (indexed from 0 to 2)
         # and assigning 1s to the correct transitions.
         for r in range(3):
@@ -1496,8 +1497,8 @@ def main():
         "--env_layout",
         "-el",
         type=str,
-        default="t-maze",
-        help="layout of the gridworld (choices: t-maze)",
+        default="t-maze-2",
+        help="layout of the gridworld (choices: t-maze-2, t-maze-3)",
     )
     parser.add_argument(
         "--num_runs",
@@ -1671,14 +1672,22 @@ def main():
     NUM_EPISODES = agent_params["num_episodes"]
     # Number of steps in one episode
     NUM_STEPS = agent_params["num_steps"]
-    # Fix walls location in the environment (the same in every episode)
-    WALLS_LOC = [
-        convert_state(3),
-        convert_state(5),
-        convert_state(6),
-        convert_state(7),
-        convert_state(8),
-    ]  # output: np.array([1, 1])
+    # Fix walls location in the environment depending on env_layout
+    env_layout = agent_params["env_layout"]
+    if env_layout == "t-maze-2":
+        WALLS_LOC = [
+            convert_state(3),
+            convert_state(5),
+            convert_state(6),
+            convert_state(7),
+            convert_state(8),
+        ]
+    elif env_layout == "t-maze-3":
+        WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
+    else:
+        raise ValueError(
+            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-2, t-maze-3."
+        )
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])
 
