@@ -10,6 +10,7 @@ import os
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 
 def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
@@ -23,18 +24,36 @@ def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
     num_episodes = data["num_episodes"]
     reward_counts = data["reward_counts"]
     action_seqs = data["actual_action_sequence"]
-
+    # Data for a specific run/agent (use index according to desired run/agent)
+    run_actions = action_seqs[3]
+    # Create episode index repeated for each action (x axis)
     episodes = np.repeat(np.arange(num_episodes), 2)
+    # Create time steps, just 0 and 1 for each episode (y axis)
+    timesteps = np.tile([0, 1], num_episodes)  # Alternating time steps 0 and 1
+    # Define colors based on action values (0=right, 1=up, 2=left, 3=down)
+    action_colors = {0: "blue", 1: "red", 2: "green", 3: "orange"}
+    colors = [action_colors[a] for a in run_actions.flatten()]
+
     # Plotting action sequences for each episode for run/agent 3
-    plt.figure()
-    plt.scatter(episodes, action_seqs[3], alpha=0.7, marker="o")
+    plt.figure(figsize=(15, 3))
+    plt.scatter(episodes, timesteps, c=colors, s=100, edgecolors="black")
+
+    # plt.scatter(episodes, action_seqs[3], alpha=0.7, marker="o")
 
     plt.xlabel("Episode")
-    plt.ylabel("Action")
-    plt.title("Actions Taken Per Episode")
-    plt.xticks(np.arange(0, (num_episodes) + 1, step=x_ticks_estep))
-    plt.yticks(range(4))  # Assuming four actions: 0, 1, 2, 3
-    plt.grid(axis="x", linestyle="--", alpha=0.5)
+    plt.ylabel("Time Step")
+    plt.title("Actions Sequences Per Episode")
+
+    plt.xticks(np.arange(0, num_episodes, step=1))
+    plt.yticks([0, 1])  # Since we only have 2 time steps per episode
+    plt.grid(True, linestyle="--", alpha=0.5)
+
+    # Create a legend
+    legend_patches = [
+        Patch(color=color, label=f"Action {action}")
+        for action, color in action_colors.items()
+    ]
+    plt.legend(handles=legend_patches, title="Actions")
 
     plt.savefig(
         save_dir + "/" + f"action_seqs_run3.jpg",
