@@ -981,6 +981,7 @@ class Agent(object):
             (self.policies[:, self.current_tstep] == actions_matrix),
             self.Qpi[:, self.current_tstep],
         )
+        # TODO: what if instead of taking the greedy action action we sample?
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
         if argmax_actions.shape == ():
@@ -1131,7 +1132,7 @@ class Agent(object):
 
         elif self.learning_A == True and self.learning_B == False:
 
-            print("Updated parameters for matrix A (no Bs learning).")
+            print("Updated parameters for matrix A only.")
             # After learning A's parameters, for every state draw one sample from the Dirichlet
             # distribution using the corresponding column of parameters.
             for s in range(self.num_states):
@@ -1142,7 +1143,7 @@ class Agent(object):
 
         elif self.learning_A == False and self.learning_B == True:
 
-            print("Updated parameters for matrices Bs (no A learning).")
+            print("Updated parameters for matrices Bs only.")
             # After learning B's parameters, sample from them to update the B matrices, i.e. for every
             # action and state draw one sample from the Dirichlet distribution using the corresponding
             # column of parameters.

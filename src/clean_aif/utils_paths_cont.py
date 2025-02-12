@@ -537,6 +537,7 @@ def efe(
     # Loop over the time steps following the current one for which EFE is computed
     # NOTE: if current_tstep = 0 and episode_steps = 5, then EFE is computed at 1,2,3,4; here 4 is the
     # index of the last (fifth) time step in the episode
+    # TODO (INVESTIGATE): not entirely clear whether the start tau should be current_tstep or current_tstep + 1
     for tau in range(current_tstep + 1, last_step):
         # Compute AMBIGUITY term in EFE
         Hs = np.dot(H, Qs_pi[pi, :, tau])
