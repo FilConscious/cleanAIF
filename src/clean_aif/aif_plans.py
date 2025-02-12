@@ -48,7 +48,7 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Max number of steps in an episode """
-    num_steps: int = 100
+    num_steps: int = 3
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
     num_states: int = 9
     ### Agent ###
@@ -61,11 +61,11 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 4
+    start_state: int = 7
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent consider at each planning step """
-    num_policies: int = 100
+    num_policies: int = 16
     """ planning horizon, also the length of a policy """
     """ NOTE: also MAX number of future steps for which expected free energy is computed """
     plan_horizon: int = 2
@@ -1792,14 +1792,22 @@ def main():
     NUM_EPISODES = agent_params["num_episodes"]
     # Number of steps in one episode
     NUM_STEPS = agent_params["num_steps"]
-    # Fix walls location in the environment (the same in every episode)
-    WALLS_LOC = [
-        convert_state(3),
-        convert_state(5),
-        convert_state(6),
-        convert_state(7),
-        convert_state(8),
-    ]  # output: np.array([1, 1])
+    # Fix walls location in the environment depending on env_layout
+    env_layout = agent_params["env_layout"]
+    if env_layout == "t-maze-2":
+        WALLS_LOC = [
+            convert_state(3),
+            convert_state(5),
+            convert_state(6),
+            convert_state(7),
+            convert_state(8),
+        ]
+    elif env_layout == "t-maze-3":
+        WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
+    else:
+        raise ValueError(
+            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-2, t-maze-3."
+        )
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])
 
