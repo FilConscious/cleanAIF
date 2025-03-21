@@ -13,7 +13,7 @@ from pathlib import Path
 from glob import glob
 
 # Custom packages/modules imports
-from .vis_utils_paths import *
+from .vis_utils_paths_cont import *
 from .config import LOG_DIR, RESULTS_DIR
 
 
@@ -102,15 +102,28 @@ def main():
 
     # Plotting saved data (see utils_vis.py for more info).
 
-    # 1.a Plotting the free energy conditioned on a policy, i.e. F_pi
-    plot_pi_fe(
+    # Plotting reward counts
+    plot_reward_counts(
         file_dp,
-        params["step_fe_pi"],
         params["x_ticks_estep"],
-        params["x_ticks_tstep"],
-        params["select_policy"],
         result_dir,
     )
+
+    plot_action_seq(
+        file_dp,
+        params["x_ticks_estep"],
+        result_dir,
+    )
+
+    # 1.a Plotting the free energy conditioned on a policy, i.e. F_pi
+    # plot_pi_fe(
+    #     file_dp,
+    #     params["step_fe_pi"],
+    #     params["x_ticks_estep"],
+    #     params["x_ticks_tstep"],
+    #     params["select_policy"],
+    #     result_dir,
+    # )
     # 1.b Plotting the policy-conditioned free energies (F_pi) in the same plot
     plot_pi_fe_compare(
         file_dp,
@@ -132,7 +145,7 @@ def main():
     plot_efe(file_dp, params["select_policy"], result_dir)
     # 2.c Plotting the expected free energy components for each policy
     plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=0)
-    plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)
+    # plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)
     # 3.a Plotting the policies probabilities, i.e. Q(pi)
     plot_pi_prob(file_dp, params["x_ticks_tstep"], params["select_policy"], result_dir)
     plot_pi_prob_last(
@@ -143,24 +156,24 @@ def main():
         result_dir,
     )
     # 3.b Plotting beliefs over states at a certain time step for every policy, i.e. Q(s|pi)
-    plot_Qs_pi_prob(
-        file_dp,
-        params["x_ticks_estep"],
-        params["index_Si"],
-        params["value_Si"],
-        params["select_policy"],
-        result_dir,
-    )
+    # plot_Qs_pi_prob(
+    #     file_dp,
+    #     params["x_ticks_estep"],
+    #     params["index_Si"],
+    #     params["value_Si"],
+    #     params["select_policy"],
+    #     result_dir,
+    # )
     # 3.c Plotting beliefs over states at certain time step for every policy, i.e. Q(s|pi), *as a
     # function of the experiment steps*
-    plot_Qt_pi_prob(
-        file_dp,
-        params["x_ticks_tstep"],
-        params["index_tSi"],
-        params["value_tSi"],
-        params["select_policy"],
-        result_dir,
-    )
+    # plot_Qt_pi_prob(
+    #     file_dp,
+    #     params["x_ticks_tstep"],
+    #     params["index_tSi"],
+    #     params["value_tSi"],
+    #     params["select_policy"],
+    #     result_dir,
+    # )
     # 4. Plotting related to matrices A, i.e., state-observation mappings
     plot_so_mapping(
         file_dp,

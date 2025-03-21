@@ -10,9 +10,112 @@ import os
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 
-# Functions for Plotting Saved Data
+def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
+    """
+    Function to plot action sequences across episodes.
+    """
+
+    # Retrieving the data dictionary and extracting the content of various keys
+    data = np.load(file_data_path, allow_pickle=True).item()
+    num_runs = data["num_runs"]
+    num_episodes = data["num_episodes"]
+    reward_counts = data["reward_counts"]
+    action_seqs = data["actual_action_sequence"]
+    # Data for a specific run/agent (use index according to desired run/agent)
+    run_actions = action_seqs[0]
+    # Create episode index repeated for each action (x axis)
+    episodes = np.repeat(np.arange(num_episodes), 2)
+    # Create time steps, just 0 and 1 for each episode (y axis)
+    timesteps = np.tile([0, 1], num_episodes)  # Alternating time steps 0 and 1
+    # Define colors based on action values (0=right, 1=up, 2=left, 3=down)
+    action_colors = {0: "blue", 1: "red", 2: "green", 3: "orange"}
+    colors = [action_colors[a] for a in run_actions.flatten()]
+
+    # Plotting action sequences for each episode for run/agent 3
+    plt.figure(figsize=(15, 3))
+    plt.scatter(episodes, timesteps, c=colors, s=100, edgecolors="black")
+
+    # plt.scatter(episodes, action_seqs[3], alpha=0.7, marker="o")
+
+    plt.xlabel("Episode")
+    plt.ylabel("Time Step")
+    plt.title("Actions Sequences Per Episode")
+
+    plt.xticks(np.arange(0, num_episodes, step=1))
+    plt.yticks([0, 1])  # Since we only have 2 time steps per episode
+    plt.grid(True, linestyle="--", alpha=0.5)
+
+    # Create a legend
+    legend_patches = [
+        Patch(color=color, label=f"Action {action}")
+        for action, color in action_colors.items()
+    ]
+    plt.legend(handles=legend_patches, title="Actions")
+
+    plt.savefig(
+        save_dir + "/" + f"action_seqs_run3.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    plt.show()
+
+
+def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
+    """
+    Function to plot reward counts across episodes, i.e. the amount of reward the agent has
+    collected in each episode of whether the goal state has been reached.
+
+    Inputs:
+
+    - file_data_path (string): file path where all metrics have been stored;
+    - x_ticks_estep (integer): step for the ticks in the x axis when plotting as a function of episode number;
+    - save_dir (string): directory where to save the images.
+
+    Outputs:
+
+    - plot showing how the reward count changes across episodes
+
+    """
+
+    # Retrieving the data dictionary and extracting the content of various keys
+    data = np.load(file_data_path, allow_pickle=True).item()
+    num_runs = data["num_runs"]
+    num_episodes = data["num_episodes"]
+    reward_counts = data["reward_counts"]
+    print(reward_counts[:, 0])
+
+    avg_rewards = np.mean(reward_counts, axis=0)
+    std_rewards = np.std(reward_counts, axis=0)
+
+    plt.figure()
+    plt.plot(
+        np.arange(num_episodes),
+        avg_rewards,
+        ".-",
+        label="goal reached (0: false; 1: true)",
+    )
+    plt.xticks(np.arange(0, (num_episodes) + 1, step=x_ticks_estep))
+    plt.xlabel("Episode")
+    # plt.ylabel('Free Energy', rotation=90)
+    plt.legend(loc="upper right")
+    plt.title("Goal Achievement at Every Episode\n")
+    plt.fill_between(
+        np.arange(num_episodes),
+        avg_rewards - (1.96 * std_rewards / np.sqrt(num_runs)),
+        avg_rewards + (1.96 * std_rewards / np.sqrt(num_runs)),
+        alpha=0.3,
+    )
+    plt.savefig(
+        save_dir + "/" + f"avg_reward_counts.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    plt.show()
 
 
 def plot_pi_fe(
@@ -68,12 +171,15 @@ def plot_pi_fe(
         # Computing the mean (average) and std of one policy's free energies over the runs
         # TODO: handle rare case in which you train only for one episode, in that case squeeze()
         # will raise the exception
-        avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0).squeeze()
-        std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0).squeeze()
+        avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+        std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         # Making sure avg_pi_fe has the right dimensions
         # print(avg_pi_fe.shape)
         # print((num_episodes, num_steps))
-        assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+        assert avg_pi_fe.shape == (
+            num_episodes,
+            num_steps,
+        ), f"Wrong dimenions. avg_pi_fe is of shape {avg_pi_fe.shape} but should be {(num_episodes, num_steps)}"
         # Plotting the free energy for every time step
         x1 = np.arange(num_episodes * num_steps)
         y1 = avg_pi_fe.flatten()
@@ -174,8 +280,8 @@ def plot_pi_fe_compare(
         # Computing the mean (average) and std of one policy's free energies over the runs
         # TODO: handle rare case in which you train only for one episode, in that case squeeze()
         # will raise the exception
-        avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0).squeeze()
-        std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0).squeeze()
+        avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+        std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         # Making sure avg_pi_fe has the right dimensions
         # print(avg_pi_fe.shape)
         # print((num_episodes, num_steps))
@@ -184,7 +290,7 @@ def plot_pi_fe_compare(
         x1 = np.arange(num_episodes * num_steps)
         y1 = avg_pi_fe.flatten()
 
-        ax.plot(x1, y1, ".-", label=f"Policy $\\pi_{p}$")
+        ax.plot(x1, y1, ".-", label=f"Policy $\\pi_{{{p}}}$")
 
     # Completing drawing axes for Figure 1
     ax.set_xticks(np.arange(0, (num_episodes * num_steps) + 1, step=x_ticks_tstep))
@@ -211,8 +317,8 @@ def plot_pi_fe_compare(
         # Computing the mean (average) and std of one policy's free energies over the runs
         # TODO: handle rare case in which you train only for one episode, in that case squeeze()
         # will raise the exception
-        avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0).squeeze()
-        std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0).squeeze()
+        avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+        std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         # Making sure avg_pi_fe has the right dimensions
         # print(avg_pi_fe.shape)
         # print((num_episodes, num_steps))
@@ -225,10 +331,10 @@ def plot_pi_fe_compare(
 
         ax.plot(x2, y2, ".-", label=f"Policy $\\pi_{p}$")
         ax.fill_between(
-        x2,
-        y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
-        y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
-        alpha=0.3,
+            x2,
+            y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+            y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+            alpha=0.3,
         )
 
     # Completing drawing axes for Figure 2
@@ -285,8 +391,8 @@ def plot_total_fe(
         total_fe = data["total_free_energies"]
 
     # Computing the mean (average) and std of the total free energies over the runs
-    avg_total_fe = np.mean(total_fe, axis=0).squeeze()
-    std_total_fe = np.std(total_fe, axis=0).squeeze()
+    avg_total_fe = np.mean(total_fe, axis=0)  # .squeeze()
+    std_total_fe = np.std(total_fe, axis=0)  # .squeeze()
     # Making sure avg_total_fe has the right dimensions
     assert avg_total_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
     # Taking only the last step total free energy for each episode
@@ -369,7 +475,7 @@ def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
         pi_prob = data["pi_probabilities"]
 
     # Averaging the policies' probabilities over the runs
-    avg_pi_prob = np.mean(pi_prob, axis=0).squeeze()
+    avg_pi_prob = np.mean(pi_prob, axis=0)  # .squeeze()
     # Making sure avg_pi_prob_ls has the right dimensions
     assert avg_pi_prob.shape == (
         num_episodes,
@@ -403,7 +509,9 @@ def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
     plt.show()
 
 
-def plot_pi_prob_last(file_data_path,  x_ticks_estep, x_ticks_tstep, select_policy, save_dir):
+def plot_pi_prob_last(
+    file_data_path, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+):
     """Plotting the probability over policies, Q(pi), averaged over the runs at the first time step of each
     episode during the experiment.
 
@@ -438,8 +546,8 @@ def plot_pi_prob_last(file_data_path,  x_ticks_estep, x_ticks_tstep, select_poli
         pi_prob = data["pi_probabilities"]
 
     # Averaging the policies' probabilities over the runs for first step of each episode only
-    avg_pi_prob = np.mean(pi_prob[:, :, :, 0], axis=0).squeeze()
-    std_pi_prob = np.std(pi_prob[:, :, :, 0], axis=0).squeeze()
+    avg_pi_prob = np.mean(pi_prob[:, :, :, 0], axis=0)  # .squeeze()
+    std_pi_prob = np.std(pi_prob[:, :, :, 0], axis=0)  # .squeeze()
     # Making sure avg_pi_prob_ls has the right dimensions
     assert avg_pi_prob.shape == (num_episodes, num_policies), "Wrong dimenions!"
     # assert np.all(np.sum(avg_pi_prob_ls, axis=1)) == True, 'Probabilities do not sum to one!'
@@ -508,7 +616,7 @@ def plot_efe(file_data_path, select_policy, save_dir):
         efe = data["expected_free_energies"]
 
     # Averaging the expected free energies over the runs
-    avg_efe = np.mean(efe, axis=0).squeeze()
+    avg_efe = np.mean(efe, axis=0)  # .squeeze()
     # Making sure efe has the right dimensions
     assert avg_efe.shape == (num_episodes, num_policies, num_steps), "Wrong dimenions!"
 
@@ -581,15 +689,15 @@ def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
         efe_Bnovelty = data["efe_Bnovelty"]
 
     # Averaging the expected free energies and their components over the runs
-    avg_efe = np.mean(efe, axis=0).squeeze()
-    avg_efe_ambiguity = np.mean(efe_ambiguity, axis=0).squeeze()
-    std_efe_ambiguity = np.std(efe_ambiguity, axis=0).squeeze()
-    avg_efe_risk = np.mean(efe_risk, axis=0).squeeze()
-    std_efe_risk = np.std(efe_risk, axis=0).squeeze()
-    avg_efe_Anovelty = np.mean(efe_Anovelty, axis=0).squeeze()
-    std_efe_Anovelty = np.std(efe_Anovelty, axis=0).squeeze()
-    avg_efe_Bnovelty = np.mean(efe_Bnovelty, axis=0).squeeze()
-    std_efe_Bnovelty = np.std(efe_Bnovelty, axis=0).squeeze()
+    avg_efe = np.mean(efe, axis=0)  # .squeeze()
+    avg_efe_ambiguity = np.mean(efe_ambiguity, axis=0)  # .squeeze()
+    std_efe_ambiguity = np.std(efe_ambiguity, axis=0)  # .squeeze()
+    avg_efe_risk = np.mean(efe_risk, axis=0)  # .squeeze()
+    std_efe_risk = np.std(efe_risk, axis=0)  # .squeeze()
+    avg_efe_Anovelty = np.mean(efe_Anovelty, axis=0)  # .squeeze()
+    std_efe_Anovelty = np.std(efe_Anovelty, axis=0)  # .squeeze()
+    avg_efe_Bnovelty = np.mean(efe_Bnovelty, axis=0)  # .squeeze()
+    std_efe_Bnovelty = np.std(efe_Bnovelty, axis=0)  # .squeeze()
     # Making sure efe has the right dimensions
     assert avg_efe.shape == (num_episodes, num_policies, num_steps), "Wrong dimenions!"
     assert avg_efe_ambiguity.shape == (
@@ -730,8 +838,8 @@ def plot_efe_Bcomps(file_data_path, select_policy, save_dir):
         efe_Bnovelty_t = data["efe_Bnovelty_t"]
 
     # Averaging the expected free energies and their components over the runs
-    avg_efe_Bnovelty_t = np.mean(efe_Bnovelty_t, axis=0).squeeze()
-    std_efe_Bnovelty_t = np.std(efe_Bnovelty_t, axis=0).squeeze()
+    avg_efe_Bnovelty_t = np.mean(efe_Bnovelty_t, axis=0)  # .squeeze()
+    std_efe_Bnovelty_t = np.std(efe_Bnovelty_t, axis=0)  # .squeeze()
     # Making sure efe has the right dimensions
     assert avg_efe_Bnovelty_t.shape == (
         num_episodes,
@@ -840,7 +948,7 @@ def plot_Qs_pi_prob(
         policy_state_prob = data["policy_state_prob"]
 
     # Averaging the state probabilities conditioned on policies over the runs
-    avg_prob = np.mean(policy_state_prob, axis=0).squeeze()
+    avg_prob = np.mean(policy_state_prob, axis=0)  # .squeeze()
 
     # Retrieving the number of episodes
     num_episodes = avg_prob.shape[0]
@@ -935,7 +1043,7 @@ def plot_Qt_pi_prob(
         every_tstep_prob = data["every_tstep_prob"]
 
         # Averaging the state probabilities conditioned on policies over the runs and episodes
-    avg_prob = np.mean(every_tstep_prob, axis=0).squeeze()
+    avg_prob = np.mean(every_tstep_prob, axis=0)  # .squeeze()
     # avg_prob = np.mean(avg_prob, axis=0).squeeze()
     # assert avg_prob.shape == (num_policies, num_states, num_steps)
 
@@ -975,8 +1083,15 @@ def plot_Qt_pi_prob(
                 # for t in tSi_ticks:
                 #     plt.axvline(x=t)
 
-                plt.vlines(x=np.arange(2, (num_episodes * num_steps) + 1, step=x_ticks_tstep),
-                           ymin=0, ymax=1.0, colors='purple', ls=':', lw=0.5, label='t = 2')
+                plt.vlines(
+                    x=np.arange(2, (num_episodes * num_steps) + 1, step=x_ticks_tstep),
+                    ymin=0,
+                    ymax=1.0,
+                    colors="purple",
+                    ls=":",
+                    lw=0.5,
+                    label="t = 2",
+                )
 
                 plt.xlabel("Step")
                 plt.ylabel("Probability Mass", rotation=90)
@@ -1039,15 +1154,15 @@ def plot_so_mapping(file_data_path, x_ticks_estep, state_A, select_policy, save_
 
     # Computing the mean (avg) and std of the emission probabilities over the runs
     # Note 1: so_mapping is of shape (num_runs, num_episodes, num_states, num_states)
-    avg_som = np.mean(so_mappings, axis=0).squeeze()
-    std_som = np.std(so_mappings, axis=0).squeeze()
+    avg_som = np.mean(so_mappings, axis=0)  # .squeeze()
+    std_som = np.std(so_mappings, axis=0)  # .squeeze()
     # Selecting a specific state-observation mapping, i.e., the emission probabilities when in state
     # state_A, stored in the corresponding column of A
     # Note 2: we are basically singling out a column of A to see how it changes episode after episode
     # (due to the agent learning)
     s = state_A
-    avg_som_state = avg_som[:, :, s].squeeze()
-    std_som_state = std_som[:, :, s].squeeze()
+    avg_som_state = avg_som[:, :, s]  # .squeeze()
+    std_som_state = std_som[:, :, s]  # .squeeze()
     # Plotting the state-observation mapping from state s throughout the experiment
     x = np.arange(num_episodes)
     y_data = avg_som_state[:, :]
@@ -1174,8 +1289,8 @@ def plot_transitions(
         transitions_prob = data["transition_prob"]
 
     # Computing the mean (avg) and std of the transition probabilities over the runs
-    avg_transitions_prob = np.mean(transitions_prob, axis=0).squeeze()
-    std_transitions_prob = np.std(transitions_prob, axis=0).squeeze()
+    avg_transitions_prob = np.mean(transitions_prob, axis=0)  # .squeeze()
+    std_transitions_prob = np.std(transitions_prob, axis=0)  # .squeeze()
 
     # Making sure state_B and action_B are valid values to select a matrix B and slice it
     assert action_B >= 0 and action_B <= 3, "Invalid action index."
@@ -1183,12 +1298,12 @@ def plot_transitions(
     # Selecting the avg and std transition probabilities for a specific action (a=0, a=1, a=2, a=3)
     # throughout the experiment, i.e. for B_a
     a = action_B
-    transition_prob_action = avg_transitions_prob[:, a, :, :].squeeze()
-    std_tpa = std_transitions_prob[:, a, :, :].squeeze()
+    transition_prob_action = avg_transitions_prob[:, a, :, :]  # .squeeze()
+    std_tpa = std_transitions_prob[:, a, :, :]  # .squeeze()
     # Selecting a specific state transition throughout the experiment
     s = state_B
-    transition_state = transition_prob_action[:, :, s].squeeze()
-    std_transition_state = std_tpa[:, :, s].squeeze()
+    transition_state = transition_prob_action[:, :, s]  # .squeeze()
+    std_transition_state = std_tpa[:, :, s]  # .squeeze()
     # Plotting the transition probabilites from state s for action a throughout the experiment.
     # For example, we could plot the transition probability from the state just before the goal for
     # the action that would bring the agent there to see if the agent learned the way to get to the
@@ -1300,6 +1415,7 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
     num_episodes = data["num_episodes"]
     num_steps = data["num_steps"]
     num_states = data["num_states"]
+    policies = data["policies"]
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -1312,7 +1428,7 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
         Qs_pi_prob = data["policy_state_prob"]
 
     # Averaging the Q(S|pi) over the runs
-    avg_Qspi = np.mean(Qs_pi_prob, axis=0).squeeze()
+    avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
     # Selecting the probabilities for the last episode only
     last_episode_Qspi = avg_Qspi[-1, :, :, :]
 
@@ -1330,7 +1446,7 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
         qspi_labels = []
         for s in range(num_steps):
             # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
-            qspi_labels.append(rf"$Q(s_{s}|\pi_{p})$")
+            qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
 
         ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
         ax.set_xticklabels(qspi_labels, minor=True)
@@ -1365,7 +1481,9 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
         ax.invert_yaxis()
         ax.set_yticks(np.arange(num_states))
         ax.set_ylabel("State", rotation=90)
-        ax.set_title(f"Last-step State Beliefs for Policy $\\pi_{p}$")
+        ax.set_title(
+            f"Last-step State Beliefs for Policy $\\pi_{{{p}}}$: [{', '.join(map(str, policies[p]))}]"
+        )
 
         # Save figure and show
         plt.savefig(
@@ -1374,7 +1492,8 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
 
 def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
@@ -1398,6 +1517,7 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
     num_episodes = data["num_episodes"]
     num_steps = data["num_steps"]
     num_states = data["num_states"]
+    policies = data["policies"]
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -1410,7 +1530,7 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
         Qs_pi_prob = data["policy_state_prob_first"]
 
     # Averaging the Q(S|pi) over the runs
-    avg_Qspi = np.mean(Qs_pi_prob, axis=0).squeeze()
+    avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
     # Selecting the probabilities for the last episode only
     last_episode_Qspi = avg_Qspi[-1, :, :, :]
 
@@ -1428,7 +1548,7 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
         qspi_labels = []
         for s in range(num_steps):
             # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
-            qspi_labels.append(rf"$Q(s_{s}|\pi_{p})$")
+            qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
 
         ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
         ax.set_xticklabels(qspi_labels, minor=True)
@@ -1463,7 +1583,9 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
         ax.invert_yaxis()
         ax.set_yticks(np.arange(num_states))
         ax.set_ylabel("State", rotation=90)
-        ax.set_title(f"First-step State Beliefs for Policy $\\pi_{p}$")
+        ax.set_title(
+            f"First-step State Beliefs for Policy $\\pi_{{{p}}}$: [{', '.join(map(str, policies[p]))}]"
+        )
 
         # Save figure and show
         plt.savefig(
@@ -1472,7 +1594,9 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
+
 
 def plot_oa_sequence(file_data_path, num_episodes, num_steps):
     """Plotting the sequences of observations and actions for one or more runs and one or more episodes.
