@@ -197,10 +197,9 @@ def main():
     # Plotting categorical distributions Q(S|pi) from the last episode and *first* step (averaged over the runs)
     # plot_Qs_pi_first(file_dp, params["select_policy"], result_dir)
     # Plotting state visits (averaged over the runs)
-    # plot_state_visits(
-    #     file_dp, params["v_len"], params["h_len"], params["select_policy"], result_dir
-    # )
-    #
+    plot_state_visits(
+        file_dp, params["v_len"], params["h_len"], params["select_policy"], result_dir
+    )
 
     # 7. Plot number of time steps to termination/truncation of the environment
     plot_steps_count(

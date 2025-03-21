@@ -25,7 +25,7 @@ def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
     reward_counts = data["reward_counts"]
     action_seqs = data["actual_action_sequence"]
     # Data for a specific run/agent (use index according to desired run/agent)
-    run_actions = action_seqs[3]
+    run_actions = action_seqs[0]
     # Create episode index repeated for each action (x axis)
     episodes = np.repeat(np.arange(num_episodes), 2)
     # Create time steps, just 0 and 1 for each episode (y axis)
