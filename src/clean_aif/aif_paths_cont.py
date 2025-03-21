@@ -56,15 +56,14 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 4
+    start_state: int = 7
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent considers for planning """
     num_policies: int = 16
     """ planning horizon, also the length of a policy """
     """ NOTE 1: also MAX number of future steps for which expected free energy is computed"""
-    """ NOTE 2: the length of a policy should be num_steps - 1 because there is no action at the
-    last time step"""
+    """ NOTE 2: the length of a policy should be num_steps - 1 because there is no action at the last time step"""
     plan_horizon: int = 2
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
@@ -1154,6 +1153,43 @@ class Agent(object):
         elif self.learning_A == False and self.learning_B == False:
 
             print("No update (matrices A and Bs not subject to learning).")
+
+    def update_C(self):
+        """
+        Function to update agent's preferences.
+        """
+
+        # Compute action probabilities, i.e. P(a)
+        actions_matrix = np.array([self.actions] * self.num_policies).T
+        actions_logits = np.zeros((self.num_actions))
+
+        for t in range(self.efe_tsteps):
+            actions_logits += np.matmul(
+                (self.policies[:, t] == actions_matrix),
+                self.Qpi[:, -1],
+            )
+
+        actions_probs = special.softmax(actions_logits)
+
+        # Compute action-conditioned surprisal for each state value
+        last_qs = self.Qs[:, -1]
+        new_prefs = np.zeros_like(last_qs)
+
+        for a in range(self.num_actions):
+            new_prefs = actions_probs[a] * np.sum(
+                -((self.B_params[a] * last_qs.T) @ np.log(self.B_params[a].T))
+                @ np.eye(self.num_states),
+                axis=1,
+            )
+
+            new_prefs += new_prefs
+
+        new_prefs = special.softmax(new_prefs)[:, np.newaxis]
+        self.C = new_prefs * np.ones((1, self.steps))
+        print(self.C.shape)
+        print("New preferences set to:")
+        print(self.C)
+        print(f"Agent new goal is: state {np.argmax(self.C[:, -1])}")
 
     def step(self, new_obs):
         """This method brings together all computational processes defined above, forming the
