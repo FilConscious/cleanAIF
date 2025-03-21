@@ -8,14 +8,17 @@ Created at 18:00 on 21st July 2024
 # Standard libraries imports
 
 # Standard libraries imports
-import os
 import argparse
+import os
+import sys
 
 # import copy
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import gymnasium
 import gymnasium_env  # Needed otherwise NamespaceNotFound error
+from itertools import product
+
 import numpy as np
 import os
 from typing import TypedDict, cast, Tuple
@@ -39,8 +42,8 @@ class Args:
     ### Environment ###
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
-    """ Max number of steps in an episode """
-    num_steps: int = 5
+    """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
+    num_steps: int = 3
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
     num_states: int = 9
     ### Agent ###
@@ -53,23 +56,40 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 0
+    start_state: int = 7
     """ index of goal state/location """
-    goal_state: int = 8
+    goal_state: int = 0
+    """ number of policies the agent considers for planning """
+    num_policies: int = 16
     """ planning horizon, also the length of a policy """
-    """ NOTE: also MAX number of future steps for which expected free energy is computed """
-    plan_horizon: int = 4
+    """ NOTE 1: also MAX number of future steps for which expected free energy is computed"""
+    """ NOTE 2: the length of a policy should be num_steps - 1 because there is no action at the last time step"""
+    plan_horizon: int = 2
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ hard-coded agent's policies """
-    policies: np.ndarray = field(default_factory=lambda: Args.init_policies())
+    policies: np.ndarray = field(
+        default_factory=lambda: Args.init_policies(
+            Args.num_policies, Args.plan_horizon, Args.num_actions
+        )
+    )
+    """ preference prior type """
+    pref_type: str = "states"
+    """ time step(s) on which the preference prior is placed """
+    pref_loc: str = "all_goal"  # "last", all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
     ``field(default_factory = custom_func)``)"""
     """ C array: specifies agent's preferred state(s) in the environment """
     C_params: np.ndarray = field(
-        default_factory=lambda: Args.init_C_array(Args.num_states, Args.num_steps)
+        default_factory=lambda: Args.init_C_array(
+            Args.num_states,
+            Args.num_steps,
+            Args.goal_state,
+            Args.pref_type,
+            Args.pref_loc,
+        )
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
     B_params: np.ndarray = field(
@@ -80,20 +100,66 @@ class Args:
         default_factory=lambda: Args.init_A_params(Args.num_states)
     )
 
+    # @staticmethod
+    # def init_policies() -> np.ndarray:
+    #     """
+    #     Method to specify the agent's policies for the duration of an episode; the agent is given some
+    #     "motor plans" (sequences of actions) to try out and perform during an episode. Note: policies
+    #     are usually hard coded in the discrete active inference literature (but also see recent
+    #     implementations: pymdp).
+    #     """
+
+    #     # Policies to move in Gridworld-v1
+    #     # NOTE: 0: "right", 1: "up", 2: "left", 3: "down"
+    #     policies = np.array([[1, 1, 0, 2], [0, 0, 1, 1]])
+
+    #    return policies
+
     @staticmethod
-    def init_policies() -> np.ndarray:
-        """
-        Method to specify the agent's policies for the duration of an episode; the agent is given some
-        "motor plans" (sequences of actions) to try out and perform during an episode. Note: policies
-        are usually hard coded in the discrete active inference literature (but also see recent
-        implementations: pymdp).
+    def init_policies(
+        num_policies: int, policy_len: int, num_actions: int
+    ) -> np.ndarray:
+        """Function to create and select the policies the agent will use to plan and pick an action at
+        one step in the interaction with the environment.
+
+        The policies are sequences of actions that correspond to all the k-tuples over the set S of actions,
+        S = [0,.., (num_actions - 1)] and k = policy_len, with repetitions allowed. They amount to the elements
+        of the k-fold Cartesian product [0,.., (num_actions - 1)] x .. x [0,.., (num_actions - 1)] for a total
+        of (num_actions**policy_len) sequences.
+
+        Inputs:
+        - num_policies: number of policies to use (if one does not want to consider all the permutations)
+        - policy_len: number of actions in a policy (length of a policy)
+        - num_actions: number of available actions, represented by the integers in [0, .. , (num_actions - 1)]
+
+        Output:
+        - policy_array: array of shape (num_policies, policy_len), all the policies stored as rows
         """
 
-        # Policies to move in Gridworld-v1
-        # NOTE: 0: "right", 1: "up", 2: "left", 3: "down"
-        policies = np.array([[1, 1, 0, 2], [0, 0, 1, 1]])
+        # Init RNG for shuffling list of policies below
+        rng = np.random.default_rng()
+        # Set of actions
+        actions = np.arange(num_actions, dtype=np.int64)
+        # Create all the policies
+        policies_list = [p for p in product(actions, repeat=policy_len)]
+        # Convert list into array
+        policies_array = np.array(policies_list, dtype=np.int64)
+        # Number of all the sequences
+        num_all_pol = num_actions**policy_len
+        # All the row indices of policies_array
+        indices = np.arange(num_all_pol)
+        # Shuffle the indices
+        rng.shuffle(indices)
+        # Randomly select num_policies from the array with all the policies
+        # NOTE 1: if num_policies equals the number of all sequences, the end result is just
+        # policies_array with its rows shuffled
+        # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+        # the selected policies may not include the optimal policy in this implementation
+        sel_policies = policies_array[indices[:num_policies], :]
+        # print("Policies")
+        # print(sel_policies)
 
-        return policies
+        return sel_policies
 
     # def __post_init__(self):
     #     """
@@ -106,7 +172,11 @@ class Args:
 
     @staticmethod
     def init_C_array(
-        num_states: int, steps: int, pref_type: str = "states"
+        num_states: int,
+        steps: int,
+        goal_state: int,
+        pref_type: str = "states",
+        pref_loc: str = "last",
     ) -> np.ndarray:
         """
         Initialize preference array/matrix, denoted by C in the active inference literature, where each column
@@ -122,6 +192,7 @@ class Args:
         Input:
         - num_states: number of states in the environment
         - steps: number of steps in an episode
+        - goal_state: index of the state the agent wants to reach
         - pref_type: preference type ("state" or "obs")
 
         Ouput:
@@ -135,20 +206,34 @@ class Args:
 
         if pref_type == "states":
 
-            # Defining the agent's preferences over states, these are crucial to the computation of
-            # expected free energy
-            # pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
-            # pref_array[8, 4] = 0.9
-            # pref_array[5, 3] = 0.9
-            # pref_array[2, 2] = 0.9
-            # pref_array[1, 1] = 0.9
-            # pref_array[0, 0] = 0.9
-            # assert np.all(np.sum(pref_array, axis=0)) == 1, print('The preferences do not sum to one!')
+            if pref_loc == "last":
+                print("Setting agent's preferences...")
+                # (1) At every time step all states have uniform probabilities except at the last time step
+                # when the goal state is given the highest probability
+                pref_array[:, -1] = 0.1 / (num_states - 1)
+                pref_array[goal_state, -1] = 0.9
+                print(pref_array)
 
-            # At every time step all states have uniform probabilities...
-            pref_array[:-1, -1] = 0.1 / (num_states - 1)
-            # ...except at the last time step when the goal state is given the highest probability
-            pref_array[-1, -1] = 0.9
+            elif pref_loc == "all_goal":
+                print("Setting agent's preferences...")
+                # (2) Set higher preference for the goal state at each time step
+                pref_array[:, :] = 0.1 / (num_states - 1)
+                pref_array[goal_state, :] = 0.9
+                print(pref_array)
+
+            elif pref_loc == "all_diff":
+                print("Setting agent's preferences...")
+                # (3) Define agent's preferences for each time step (i.e. a different goal for each step time)
+                pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
+                # IMPORTANT: the probabilities below need to be set MANUALLY depending on the environment
+                # in which the agent acts and based on the trajectory we want it to follow.
+
+                # Example: trajectory in a T-maze leading to the goal (on the left arm) in 3 steps
+                pref_array[0, 2] = 0.9
+                pref_array[1, 1] = 0.9
+                pref_array[4, 0] = 0.9
+                print(pref_array)
+
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
                 "The preferences do not sum to one!"
@@ -195,7 +280,8 @@ class Args:
         env_matrix_labels = np.reshape(np.arange(9), (3, 3))
 
         # Assigning 1s to correct transitions for every action.
-        # IMPORTANT: The code below works for a maze of size (3, 3) only.
+        # IMPORTANT: The code below works for a maze of size (3, 3) only and specifically for env_layout = 't-maze-3'
+        # TODO: Implement an automatic way to load these B-matrices depending on layout
         # Basically, we are looping over the 3 rows of the maze (indexed from 0 to 2)
         # and assigning 1s to the correct transitions.
         for r in range(3):
@@ -209,7 +295,13 @@ class Args:
                 # Down action: 3
                 B_params[3, labels_ud, labels_ud] = 1
                 # Up action: 1
-                B_params[1, labels_ud + 3, labels_ud] = 1
+                B_params[1, labels_ud[0], labels_ud[0]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[1, labels_ud[1] + 3, labels_ud[1]] = 1
+                B_params[1, labels_ud[2], labels_ud[2]] = (
+                    1  # Hitting wall and stay at the same state
+                )
                 # Right action: 0
                 B_params[0, labels_rl + 1, labels_rl] = 1
                 # Left action: 2
@@ -219,11 +311,23 @@ class Args:
                 # Down action: 3
                 B_params[3, labels_ud - 3, labels_ud] = 1
                 # Up action: 1
-                B_params[1, labels_ud + 3, labels_ud] = 1
+                B_params[1, labels_ud[0] + 3, labels_ud[0]] = 1
+                B_params[1, labels_ud[1], labels_ud[1]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[1, labels_ud[2] + 3, labels_ud[2]] = 1
                 # Right action: 0
-                B_params[0, labels_rl + 1, labels_rl] = 1
+                B_params[0, labels_rl[0] + 1, labels_rl[0]] = 1
+                B_params[0, labels_rl[1], labels_rl[1]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[0, labels_rl[2] + 1, labels_rl[2]] = 1
                 # Left action: 2
-                B_params[2, labels_rl - 1, labels_rl] = 1
+                B_params[2, labels_rl[0] - 1, labels_rl[0]] = 1
+                B_params[2, labels_rl[1], labels_rl[1]] = (
+                    1  # Hitting wall and stay at the same state
+                )
+                B_params[2, labels_rl[2] - 1, labels_rl[2]] = 1
 
             elif r == 2:
                 # Down action: 3
@@ -238,6 +342,7 @@ class Args:
         # Increasing the magnitude of the Dirichlet parameters so that when the B matrices are sampled
         # the correct transitions for every action will have a value close to 1.
         B_params = B_params * 199 + 1
+        print(B_params[0])
 
         return B_params
 
@@ -279,7 +384,6 @@ class params(TypedDict):
     learning_rate: float
     seed: int
     inf_steps: int
-    pref_type: str
     num_policies: int
     plan_horizon: int  # also included in Args
     action_selection: str
@@ -287,6 +391,7 @@ class params(TypedDict):
     learn_B: bool
     learn_D: bool
     num_videos: int
+    task_type: str
     # Parameters unique to class Args above
     exp_name: str
     num_states: int
@@ -297,6 +402,7 @@ class params(TypedDict):
     start_state: int
     goal_state: int
     num_actions: int
+    pref_type: str
     policies: np.ndarray
     A_params: np.ndarray
     B_params: np.ndarray
@@ -322,6 +428,7 @@ class Agent(object):
         self.inf_iters: int = params.get("inf_steps")
         self.efe_tsteps: int = params.get("plan_horizon")
         self.pref_type: str = params["pref_type"]
+        self.pref_loc: str = params["pref_loc"]
         self.policies: np.ndarray = params["policies"]
         self.num_policies: int = params["num_policies"]
         self.as_mechanism: str = params["action_selection"]
@@ -329,6 +436,7 @@ class Agent(object):
         self.learning_B: bool = params["learn_B"]
         self.learning_D: bool = params["learn_D"]
         self.seed: int = params["seed"]
+        self.task_type: str = params["task_type"]
         self.rng = np.random.default_rng(seed=self.seed)
 
         # 1. Generative Model, initializing the relevant components used in the computation
@@ -761,12 +869,12 @@ class Agent(object):
                 print(f"A-novelty {pi}: {tot_AsW_As}")
                 print(f"B-novelty {pi}: {tot_AsW_Bs}")
                 #### END ####
-                if self.current_tstep == 0:
-                    print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
-                    self.efe_Bnovelty_t[pi] += sq_AsW_Bs
-                    print(
-                        f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
-                    )
+                # if self.current_tstep == 0:
+                #     print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
+                #     self.efe_Bnovelty_t[pi] += sq_AsW_Bs
+                #     print(
+                #         f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
+                #     )
 
         # Normalising the negative expected free energies stored as column in self.Qpi to get
         # the posterior over policies Q(pi) to be used for action selection
@@ -798,6 +906,31 @@ class Agent(object):
             # without any prior values whereas Qpi above was initialized with uniform probabilities at index 0
             self.Qs[:, self.current_tstep] += (
                 self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
+            )
+
+        ### DEBUGGING ###
+        # self.Qs_test = np.zeros_like(self.Qs)
+        # self.Qs_test[:, self.current_tstep] += (
+        #     self.Qs_pi[:, :, self.current_tstep].T @ self.Qpi[:, self.current_tstep]
+        # )
+        # print(self.Qs_test)
+        # print(self.policies)
+        # print(self.Qs_pi[:, :, 1])
+        # print(self.Qs_pi[:, :, 2])
+        print(f"Updated Qs at times step {self.current_tstep}")
+        # print(self.Qs[:, self.current_tstep])
+        print(f"Most probable state: {np.argmax(self.Qs[:, self.current_tstep])}")
+        ### END ###
+
+        # Check if the agent has reached the last time step of the episode
+        if self.task_type == "continuing" and self.current_tstep + 1 == self.steps:
+            # Save the last policy-independent state probabilities as prior state probabilities for
+            # the next episode
+            self.D = self.Qs[:, self.current_tstep]
+            print(f"Prior for next episode:")
+            print(self.Qs[:, self.current_tstep])
+            print(
+                f"Most probable state for next episode: {np.argmax(self.Qs[:, self.current_tstep])}"
             )
 
     def action_selection_KD(self):
@@ -847,6 +980,7 @@ class Agent(object):
             (self.policies[:, self.current_tstep] == actions_matrix),
             self.Qpi[:, self.current_tstep],
         )
+        # TODO: what if instead of taking the greedy action action we sample?
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
         if argmax_actions.shape == ():
@@ -997,7 +1131,7 @@ class Agent(object):
 
         elif self.learning_A == True and self.learning_B == False:
 
-            print("Updated parameters for matrix A (no Bs learning).")
+            print("Updated parameters for matrix A only.")
             # After learning A's parameters, for every state draw one sample from the Dirichlet
             # distribution using the corresponding column of parameters.
             for s in range(self.num_states):
@@ -1008,7 +1142,7 @@ class Agent(object):
 
         elif self.learning_A == False and self.learning_B == True:
 
-            print("Updated parameters for matrices Bs (no A learning).")
+            print("Updated parameters for matrices Bs only.")
             # After learning B's parameters, sample from them to update the B matrices, i.e. for every
             # action and state draw one sample from the Dirichlet distribution using the corresponding
             # column of parameters.
@@ -1019,6 +1153,43 @@ class Agent(object):
         elif self.learning_A == False and self.learning_B == False:
 
             print("No update (matrices A and Bs not subject to learning).")
+
+    def update_C(self):
+        """
+        Function to update agent's preferences.
+        """
+
+        # Compute action probabilities, i.e. P(a)
+        actions_matrix = np.array([self.actions] * self.num_policies).T
+        actions_logits = np.zeros((self.num_actions))
+
+        for t in range(self.efe_tsteps):
+            actions_logits += np.matmul(
+                (self.policies[:, t] == actions_matrix),
+                self.Qpi[:, -1],
+            )
+
+        actions_probs = special.softmax(actions_logits)
+
+        # Compute action-conditioned surprisal for each state value
+        last_qs = self.Qs[:, -1]
+        new_prefs = np.zeros_like(last_qs)
+
+        for a in range(self.num_actions):
+            new_prefs = actions_probs[a] * np.sum(
+                -((self.B_params[a] * last_qs.T) @ np.log(self.B_params[a].T))
+                @ np.eye(self.num_states),
+                axis=1,
+            )
+
+            new_prefs += new_prefs
+
+        new_prefs = special.softmax(new_prefs)[:, np.newaxis]
+        self.C = new_prefs * np.ones((1, self.steps))
+        print(self.C.shape)
+        print("New preferences set to:")
+        print(self.C)
+        print(f"Agent new goal is: state {np.argmax(self.C[:, -1])}")
 
     def step(self, new_obs):
         """This method brings together all computational processes defined above, forming the
@@ -1156,6 +1327,7 @@ class LogData(object):
         self.num_states: int = params.get("num_states")
         self.num_max_steps: int = params.get("num_steps")
         self.num_actions: int = params.get("num_actions")
+        self.policies: np.ndarray = params.get("policies")
         self.num_policies: int = params.get("num_policies")
         self.num_videos: int = params.get("num_videos")
         self.learnA: bool = params.get("learn_A")
@@ -1306,6 +1478,7 @@ class LogData(object):
         data["num_episodes"] = self.num_episodes
         data["num_states"] = self.num_states
         data["num_steps"] = self.num_max_steps
+        data["policies"] = self.policies
         data["num_policies"] = self.num_policies
         data["learn_A"] = self.learnA
         data["learn_B"] = self.learnB
@@ -1358,6 +1531,13 @@ def main():
         help="the name of the registered gym environment (choices: GridWorld-v1)",
     )
     parser.add_argument(
+        "--env_layout",
+        "-el",
+        type=str,
+        default="t-maze-2",
+        help="layout of the gridworld (choices: t-maze-2, t-maze-3)",
+    )
+    parser.add_argument(
         "--num_runs",
         "-nr",
         type=int,
@@ -1396,21 +1576,13 @@ def main():
         default=1,
         help="number of free energy minimization steps",
     )
-    # Agent's preferences type
-    parser.add_argument(
-        "--pref_type",
-        "-pt",
-        type=str,
-        default="states",
-        help="choices: states, observations",
-    )
     # Policy
     parser.add_argument(
         "--num_policies",
         "-np",
         type=int,
-        default=2,
-        help="number of policies (i.e. sequences of actions) in planning",
+        nargs="?",
+        help="number of policies (i.e. sequences of actions) for planning",
     )
     parser.add_argument(
         "--plan_horizon",
@@ -1433,6 +1605,36 @@ def main():
     parser.add_argument("--learn_D", "-lD", action="store_true")
     # Number of videos to record
     parser.add_argument("--num_videos", "-nvs", type=int, default=0)
+    # Flag to switch from episodic to continuing task (in the former at each episode the agent's location is
+    # the same, set as agent's attribute whereas in the latter the location corresponds to the last reached
+    # state at the previous episode)
+    parser.add_argument(
+        "--task_type",
+        "-tsk",
+        type=str,
+        default="episodic",
+        help="choices: episodic, continuing",
+    )
+    # Preference type prior
+    # NOTE: this is just a label used to identify the experiment, make sure it corresponds
+    # to the attribute/property set in the agent Args class, see top of file
+    parser.add_argument(
+        "--pref_type",
+        "-pft",
+        type=str,
+        default="states",
+        help="choices: states, obs",
+    )
+    # Time step(s) on which preference prior is placed
+    # NOTE: this is just a label used to identify the experiment, make sure it corresponds
+    # to the attribute/property set in the agent Args class, see top of file
+    parser.add_argument(
+        "--pref_loc",
+        "-pfl",
+        type=str,
+        default="last",
+        help="choices: last, all_goal, all_diff",
+    )
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1447,15 +1649,26 @@ def main():
     now = datetime.now()
     # Converting data-time in an appropriate string: '_dd.mm.YYYY_H.M.S'
     dt_string = now.strftime("%d.%m.%Y_%H.%M.%S_")
-    # Create folder (with dt_string as unique identifier) where to store data from current experiment.
-    data_path = LOG_DIR.joinpath(
-        dt_string
-        + f'{cl_params["gym_id"]}_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_infsteps{cl_params["inf_steps"]}_preftype{cl_params["pref_type"]}AS{cl_params["action_selection"]}lA{str(cl_params["learn_A"])[0]}lB{str(cl_params["learn_B"])[0]}lD{str(cl_params["learn_D"])[0]}'
+    # Create string of experiment-specific info
+    exp_info = (
+        f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
+        f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
+        f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}_prefloc_{cl_params["pref_loc"]}'
+        f'_AS{cl_params["action_selection"]}'
+        f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
+    # Create folder (with dt_string as unique identifier) where to store data from current experiment.
+    data_path = LOG_DIR.joinpath(dt_string + exp_info)
     data_path.mkdir(parents=True, exist_ok=True)
 
-    # if not (os.path.exists(data_path)):
-    #     os.makedirs(data_path)
+    # Save the command used to run the script
+    cmd_str = " ".join(sys.argv)
+    cmd_file = os.path.join(data_path, "command.txt")
+
+    with open(cmd_file, "w") as f:
+        f.write(cmd_str + "\n")
+
+    print(f"Command saved to {cmd_file}")
 
     ###############################
     ### 3. INIT AGENT PARAMETERS
@@ -1470,7 +1683,13 @@ def main():
     # Custom update function not overwriting default parameter's value if the one from the CL is None
     def update_params(default_params, new_params):
         for key, value in new_params.items():
-            if value is not None:
+            # Make sure these keys have values that correspond to how the agent was initialized
+            # i.e. the command line arguments do not change these agent's properties
+            if key == "pref_type" or key == "pref_loc":
+                assert (
+                    value == default_params[key]
+                ), f"Agent was initialized with {key}: {default_params[key]} but you passed {value} as argument."
+            elif value is not None:
                 default_params[key] = value
 
     update_params(agent_params, cl_params)
@@ -1482,18 +1701,30 @@ def main():
 
     # Retrieve name of the environment
     env_module_name = cl_params["gym_id"]
+    # Retrieve task type
+    task_type = cl_params["task_type"]
     # Number of runs (or agents interacting with the env)
     NUM_RUNS = agent_params["num_runs"]
     # Number of episodes
     NUM_EPISODES = agent_params["num_episodes"]
     # Number of steps in one episode
     NUM_STEPS = agent_params["num_steps"]
-    # Fix agent's location at the beginning of every episode (i.e. agent starts always from the same location)
-    # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
-    # what the Gymnasium environment requires.
-    AGENT_LOC = convert_state(agent_params["start_state"])  # output: np.array([0, 0])
-    # Fix walls location in the environment (the same in every episode)
-    WALLS_LOC = [convert_state(4)]  # output: np.array([1, 1])
+    # Fix walls location in the environment depending on env_layout
+    env_layout = agent_params["env_layout"]
+    if env_layout == "t-maze-2":
+        WALLS_LOC = [
+            convert_state(3),
+            convert_state(5),
+            convert_state(6),
+            convert_state(7),
+            convert_state(8),
+        ]
+    elif env_layout == "t-maze-3":
+        WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
+    else:
+        raise ValueError(
+            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-2, t-maze-3."
+        )
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])
 
@@ -1525,14 +1756,22 @@ def main():
         print(f"Starting Run {run}...")
         # Set a random seed for current run, used by RNG attribute in the agent
         agent_params["seed"] = run
+        # Fix agent's location at the FIRST episode or at EACH episode (i.e. agent starts the first episode or
+        # each episode from the same location), depending on the flag 'task_type', see below
+        # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
+        # what the Gymnasium environment requires.
+        AGENT_LOC = convert_state(
+            agent_params["start_state"]
+        )  # output: np.array([0, 0])
         # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
         agent = Agent(cast(params, agent_params))
         # Loop over episodes
         for e in range(NUM_EPISODES):
             # Printing episode number
-            print("--------------------")
-            print(f"Episode {e}")
-            print("--------------------")
+            print("**********************************************************")
+            print(f"****************** EPISODE {e} **************************")
+            print("**********************************************************")
+
             # Initialize steps and reward counters
             steps_count = 0
             total_reward = 0
@@ -1574,15 +1813,8 @@ def main():
                     next_obs, reward, terminated, truncated, info = env.step(action)
                     # Retrieve observation of the agent's location
                     next_obs = next_obs["agent"]
-                    # print(f"Next obs: {next_obs}")
-
                     # Convert observation into index representation
                     next_state = process_obs(next_obs)
-                    assert (
-                        next_state != 4
-                    ), f"Next state is {next_state}, which should not be accessible."
-
-                    # print(f"Next state: {next_state}")
                     # Update total_reward
                     total_reward += reward
 
@@ -1608,6 +1840,12 @@ def main():
             # Call the logs_writer function to save the episodic info we want
             # NOTE: unpack dictionary with `**` to feed the function with  key-value arguments
             logs_writer.log_episode(run, e, **all_metrics)
+
+            # In a continuing task update AGENT_LOC with the last computed policy-independent state probabilities
+            # NOTE: this is done so that the environment receives the correct option at the next episode
+            if task_type == "continuing":
+                AGENT_LOC = convert_state(int(np.argmax(agent.D)))
+
             # Reset the agent before starting a new episode
             agent.reset()
 
