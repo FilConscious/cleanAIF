@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from matplotlib.ticker import PercentFormatter
 
 
 def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
@@ -41,8 +42,8 @@ def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
     # plt.scatter(episodes, action_seqs[3], alpha=0.7, marker="o")
 
     plt.xlabel("Episode")
-    plt.ylabel("Time Step")
-    plt.title("Actions Sequences Per Episode")
+    plt.ylabel("Time step")
+    plt.title("Actions sequences per episode")
 
     plt.xticks(np.arange(0, num_episodes, step=1))
     plt.yticks([0, 1])  # Since we only have 2 time steps per episode
@@ -99,16 +100,21 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
         label="goal reached (0: false; 1: true)",
     )
     plt.xticks(np.arange(0, (num_episodes) + 1, step=x_ticks_estep))
+    # Get current axis and set y-axis to percentages
+    plt.gca().yaxis.set_major_formatter(PercentFormatter(xmax=1))
     plt.xlabel("Episode")
-    # plt.ylabel('Free Energy', rotation=90)
-    plt.legend(loc="upper right")
-    plt.title("Goal Achievement at Every Episode\n")
-    plt.fill_between(
-        np.arange(num_episodes),
-        avg_rewards - (1.96 * std_rewards / np.sqrt(num_runs)),
-        avg_rewards + (1.96 * std_rewards / np.sqrt(num_runs)),
-        alpha=0.3,
-    )
+    plt.ylabel("Percentage of agents", rotation=90)
+    # plt.legend(loc="upper right") # not needed for single line
+    plt.title("Agents solving the task\n")
+
+    # Confidence interval (if needed, uncomment the following lines)
+    # plt.fill_between(
+    #     np.arange(num_episodes),
+    #     avg_rewards - (1.96 * std_rewards / np.sqrt(num_runs)),
+    #     avg_rewards + (1.96 * std_rewards / np.sqrt(num_runs)),
+    #     alpha=0.3,
+    # )
+
     plt.savefig(
         save_dir + "/" + f"avg_reward_counts.jpg",
         format="jpg",
@@ -119,7 +125,12 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
 
 
 def plot_pi_fe(
-    file_data_path, step_fe_pi, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    select_policy,
+    save_dir,
 ):
     """Plotting the free energy conditioned on a specific policy, F_pi, averaged over the runs.
 
@@ -228,7 +239,12 @@ def plot_pi_fe(
 
 
 def plot_pi_fe_compare(
-    file_data_path, step_fe_pi, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    select_policy,
+    save_dir,
 ):
     """This function is almost the same as plot_pi_fe() (the previous plotting function) with the only
     difference that all policy-conditioned free energies, F_pi (potentially averaged over runs) are plotted
@@ -272,8 +288,10 @@ def plot_pi_fe_compare(
         step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
     ) or step_fe_pi == -1, "Invalid step number."
 
-    fig, ax = plt.subplots()
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", num_policies)
 
+    fig, ax = plt.subplots()
     # Looping over the policies for Figure 1
     for p in range(num_policies):
 
@@ -290,14 +308,21 @@ def plot_pi_fe_compare(
         x1 = np.arange(num_episodes * num_steps)
         y1 = avg_pi_fe.flatten()
 
-        ax.plot(x1, y1, ".-", label=f"Policy $\\pi_{{{p}}}$")
+        ax.plot(x1, y1, ".-", color=cmap(p), label=f"Policy $\\pi_{{{p}}}$")
 
     # Completing drawing axes for Figure 1
     ax.set_xticks(np.arange(0, (num_episodes * num_steps) + 1, step=x_ticks_tstep))
     ax.set_xlabel("Step")
     # ax1.ylabel('Free Energy', rotation=90)
-    ax.legend(loc="upper right")
-    ax.set_title("Free Energy at Every Step\n")
+    ax.legend(
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    # ax.legend(loc="upper right")
+    ax.set_title("Free energy at each step across episodes\n")
 
     # Save figures and show
     fig.savefig(
@@ -329,20 +354,29 @@ def plot_pi_fe_compare(
         x2 = np.arange(num_episodes)
         y2 = avg_pi_fe[:, step_fe_pi]
 
-        ax.plot(x2, y2, ".-", label=f"Policy $\\pi_{p}$")
-        ax.fill_between(
-            x2,
-            y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
-            y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
-            alpha=0.3,
-        )
+        ax.plot(x2, y2, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        # Confidence intervals (if needed, uncomment following lines)
+        # ax.fill_between(
+        #     x2,
+        #     y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
 
     # Completing drawing axes for Figure 2
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
-    # ax2.set_ylabel('Free Energy', rotation=90)
-    ax.legend(loc="upper right")
-    ax.set_title("Last Step Free Energy\n")
+    ax.set_ylabel("Free energy", rotation=90)
+    ax.legend(
+        title="Policies",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    ax.set_title("Last-step free energy across episodes\n")
 
     fig.savefig(
         save_dir + "/" + f"pi_fes_compare_last_step.jpg",
@@ -407,9 +441,9 @@ def plot_total_fe(
     plt.plot(x1, y1, ".-", label="Total FE")
     plt.xticks(np.arange(0, (num_episodes * num_steps) + 1, step=x_ticks_tstep))
     plt.xlabel("Step")
-    # plt.ylabel('Total Free Energy', rotation=90)
-    plt.legend(loc="upper right")
-    plt.title("Total Free Energy at Every Step\n")
+    plt.ylabel("Total free energy", rotation=90)
+    # plt.legend(loc="upper right") # No need for legend
+    plt.title("Every-step total free energy across episodes\n")
     plt.show()
 
     # Plotting the total free energy at the last time step of every episode
@@ -421,9 +455,9 @@ def plot_total_fe(
     ax.plot(x2, y2, ".-", label="Total FE")
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
-    # ax.set_ylabel('Total Free Energy', rotation=90)
-    ax.legend(loc="upper right")
-    ax.set_title("Total Free Energy at the Last Step\n")
+    ax.set_ylabel("Total free energy", rotation=90)
+    # ax.legend(loc="upper right") # No need for legend
+    ax.set_title("Last-step total free energy across episodes\n")
     ax.fill_between(
         x2,
         y2 - (1.96 * std_total_fe[:, -1] / np.sqrt(num_runs)),
@@ -552,13 +586,16 @@ def plot_pi_prob_last(
     assert avg_pi_prob.shape == (num_episodes, num_policies), "Wrong dimenions!"
     # assert np.all(np.sum(avg_pi_prob_ls, axis=1)) == True, 'Probabilities do not sum to one!'
 
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", num_policies)
+
     plt.figure()
     x = np.arange(num_episodes)
 
     for p in range(num_policies):
         y = avg_pi_prob[:, p].flatten()
         std = std_pi_prob[:, p].flatten()
-        plt.plot(x, y, ".-", label=f"Policy $\\pi_{p}$")
+        plt.plot(x, y, ".-", label=f"$\\pi_{p}$")
 
         plt.fill_between(
             x,
@@ -569,12 +606,19 @@ def plot_pi_prob_last(
 
     plt.xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     plt.xlabel("Episode")
-    plt.ylabel("Probability Mass", rotation=90)
-    # plt.legend(['Policy 1', 'Policy 2', 'Policy 3', 'Policy 4', 'Policy 5'], loc='upper right')
-    plt.legend(loc="upper right")
+    plt.ylabel("Probability mass", rotation=90)
+    # plt.legend(loc="upper right")
+    plt.legend(
+        title="Policies",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
     plt.ticklabel_format(style="plain")
     plt.ticklabel_format(useOffset=False)
-    plt.title("First-Step Policy Probability\n")
+    plt.title("First-step policy probability\n")
     # Save figure and show
     plt.savefig(
         save_dir + "/" + f"pi_probs_first.jpg",
@@ -585,13 +629,15 @@ def plot_pi_prob_last(
     plt.show()
 
 
-def plot_efe(file_data_path, select_policy, save_dir):
+def plot_efe(file_data_path, select_policy, save_dir, select_step=None):
     """Plotting the expected free energy, EFE, for a given policy over all the steps averaged over the runs.
 
     Inputs:
 
     - file_data_path (string): file path where the total free energy data was stored (i.e. where log_data
       was saved)
+    - select_policy (integer): index to include/exclude some policies from data plotting;
+    - select_step (integer): index to select same step at each episode to plot corresponding EFE value;
     - save_dir (string): directory where to save the images.
 
     Outputs:
@@ -621,25 +667,42 @@ def plot_efe(file_data_path, select_policy, save_dir):
     assert avg_efe.shape == (num_episodes, num_policies, num_steps), "Wrong dimenions!"
 
     plt.figure()
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", num_policies)
+    # colors = plt.cm.plasma(np.linspace(0, 1, num_policies))
 
-    for p in range(num_policies):
+    if select_step == None:
+        x_label = "Step"
+        plot_title = "Expected free energy at every step"
+        # Plotting all the time steps across episodes
+        for p in range(num_policies):
+            x = np.arange(num_episodes * num_steps)
+            # x = np.arange(1*(num_steps-1))
+            y = avg_efe[:, p, :].flatten()
+            # y = np.reshape(-avg_efe[2, p, 0:-1], (1*(num_steps-1)))
+            plt.plot(x, y, ".-", color=cmap(p), label=f"Policy $\\pi_{{{p}}}$")
 
-        # Plotting all the time steps
-        # x = np.arange(num_episodes*num_steps)
-        # y = np.reshape(-avg_efe[:, p, :], (num_episodes*num_steps))
+    else:
+        x_label = "Episode"
+        plot_title = f"Expected free energy at step {select_step} across episodes"
+        # Plotting EFE at single time step for each episode
+        for p in range(num_policies):
+            x = np.arange(num_episodes)
+            y = avg_efe[:, p, select_step].flatten()
+            plt.plot(x, y, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
 
-        # Plotting a subset of the time steps
-        x = np.arange(num_episodes * num_steps)
-        # x = np.arange(1*(num_steps-1))
-        y = avg_efe[:, p, :].flatten()
-        # y = np.reshape(-avg_efe[2, p, 0:-1], (1*(num_steps-1)))
-
-        plt.plot(x, y, ".-", label=f"Policy $\\pi_{p}$")
-
-    plt.xlabel("Step")
-    plt.ylabel("Expected Free Energy", rotation=90)
-    plt.legend(loc="upper right")
-    plt.title("Expected Free Energy at Every Step\n")
+    plt.xlabel(f"{x_label}")
+    plt.ylabel("Expected free energy", rotation=90)
+    plt.legend(
+        title="Policies",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    # plt.legend(loc="upper right")
+    plt.title(f"{plot_title}\n")
     # Save figure and show
     plt.savefig(
         save_dir + "/" + "efe.jpg", format="jpg", bbox_inches="tight", pad_inches=0.1
@@ -721,82 +784,156 @@ def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
         num_steps,
     ), "Wrong dimenions!"
 
-    plt.figure()
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", num_policies)
+    # Plotting risk and B-novelty in separate subplots
+    fig_1, axes_1 = plt.subplots(1, 2, figsize=(12, 5))  # 1 row, 2 columns
 
     for p in range(num_policies):
 
-        # Plotting all the time steps
-        # x = np.arange(num_episodes*num_steps)
-        # y = np.reshape(-avg_efe[:, p, :], (num_episodes*num_steps))
-
         # Plotting all time steps unless a specific time step is provided
         if num_tsteps != None:
+            x_label = "Episode"
+            title_label = f"Step {num_tsteps}"
             x = np.arange(num_episodes)
-            # x = np.arange(1*(num_steps-1))
-            y_efea = avg_efe_ambiguity[:, p, num_tsteps].flatten()
-            stdy_efea = std_efe_ambiguity[:, p, num_tsteps].flatten()
-            # print(y_efea.shape)
-            # print(y_efea[0:10])
+            # Risk
             y_efer = avg_efe_risk[:, p, num_tsteps].flatten()
             stdy_efer = std_efe_risk[:, p, num_tsteps].flatten()
-            y_efeA = avg_efe_Anovelty[:, p, num_tsteps].flatten()
-            stdy_efeA = std_efe_Anovelty[:, p, num_tsteps].flatten()
+            # B-novelty
             y_efeB = avg_efe_Bnovelty[:, p, num_tsteps].flatten()
             stdy_efeB = std_efe_Bnovelty[:, p, num_tsteps].flatten()
-            # y = np.reshape(-avg_efe[2, p, 0:-1], (1*(num_steps-1)))
         else:
+            x_label = "Step"
+            title_label = "all steps"
             x = np.arange(num_episodes * num_steps)
-            # x = np.arange(1*(num_steps-1))
-            y_efea = avg_efe_ambiguity[:, p, :].flatten()
-            stdy_efea = std_efe_ambiguity[:, p, :].flatten()
-            # print(y_efea.shape)
-            # print(y_efea[0:10])
+            # Risk
             y_efer = avg_efe_risk[:, p, :].flatten()
             stdy_efer = std_efe_risk[:, p, :].flatten()
-            y_efeA = avg_efe_Anovelty[:, p, :].flatten()
-            stdy_efeA = std_efe_Anovelty[:, p, :].flatten()
+            # Ambiguity
             y_efeB = avg_efe_Bnovelty[:, p, :].flatten()
             stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
-            # y = np.reshape(-avg_efe[2, p, 0:-1], (1*(num_steps-1)))
 
-        plt.plot(x, y_efea, ".-", label=f"Ambiguity for $\\pi_{p}$")
-        plt.plot(x, y_efer, ".-", label=f"Risk for $\\pi_{p}$")
-        plt.plot(x, y_efeA, ".-", label=f"A-novelty for $\\pi_{p}$")
-        plt.plot(x, y_efeB, ".-", label=f"B-novelty for $\\pi_{p}$")
+        # Plot on subplots
+        axes_1[0].plot(x, y_efer, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_1[1].plot(x, y_efeB, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        # Create confidence intervals for Risk and B-novelty (if needed, uncomment following lines)
+        # axes_1[0].fill_between(
+        #     x,
+        #     y_efer - (1.96 * stdy_efer / np.sqrt(num_runs)),
+        #     y_efer + (1.96 * stdy_efer / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
 
-        plt.fill_between(
-            x,
-            y_efea - (1.96 * stdy_efea / np.sqrt(num_runs)),
-            y_efea + (1.96 * stdy_efea / np.sqrt(num_runs)),
-            alpha=0.3,
-        )
-        plt.fill_between(
-            x,
-            y_efer - (1.96 * stdy_efer / np.sqrt(num_runs)),
-            y_efer + (1.96 * stdy_efer / np.sqrt(num_runs)),
-            alpha=0.3,
-        )
+        # axes_1[1].fill_between(
+        #     x,
+        #     y_efeB - (1.96 * stdy_efeB / np.sqrt(num_runs)),
+        #     y_efeB + (1.96 * stdy_efeB / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
 
-        plt.fill_between(
-            x,
-            y_efeA - (1.96 * stdy_efeA / np.sqrt(num_runs)),
-            y_efeA + (1.96 * stdy_efeA / np.sqrt(num_runs)),
-            alpha=0.3,
-        )
-        plt.fill_between(
-            x,
-            y_efeB - (1.96 * stdy_efeB / np.sqrt(num_runs)),
-            y_efeB + (1.96 * stdy_efeB / np.sqrt(num_runs)),
-            alpha=0.3,
-        )
-
-    plt.xlabel("Step")
-    plt.ylabel("Value", rotation=90)
-    plt.legend(loc="upper left")
-    plt.title("Expected Free Energy Components at Every Step\n")
+    axes_1[0].set_xlabel(x_label)
+    axes_1[1].set_xlabel(x_label)
+    axes_1[0].set_ylabel("Risk", rotation=90)
+    axes_1[1].set_ylabel("B-novelty", rotation=90)
+    axes_1[0].legend(
+        title="Polices",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    axes_1[1].legend(
+        title="Policies",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    axes_1[0].set_title(f"Risk at {title_label} across episodes\n")
+    axes_1[1].set_title(f"B-novelty at {title_label} across episodes\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "efe_comps.jpg",
+        save_dir + "/" + "efe_risk_bnovelty.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    plt.show()
+
+    # Plotting A-novelty and B-novelty in separate subplots
+    fig_2, axes_2 = plt.subplots(1, 2, figsize=(12, 5))  # 1 row, 2 columns
+
+    for p in range(num_policies):
+        # Plotting all time steps unless a specific time step is provided
+        if num_tsteps != None:
+            x_label = "Episode"
+            title_label = f"step {num_tsteps}"
+            x = np.arange(num_episodes)
+            # Ambiguity
+            y_efea = avg_efe_ambiguity[:, p, num_tsteps].flatten()
+            stdy_efea = std_efe_ambiguity[:, p, num_tsteps].flatten()
+            # A-novelty
+            y_efeA = avg_efe_Anovelty[:, p, num_tsteps].flatten()
+            stdy_efeA = std_efe_Anovelty[:, p, num_tsteps].flatten()
+        else:
+            x_label = "Step"
+            title_label = "all steps"
+            x = np.arange(num_episodes * num_steps)
+            # Ambiguity
+            y_efea = avg_efe_ambiguity[:, p, :].flatten()
+            stdy_efea = std_efe_ambiguity[:, p, :].flatten()
+            # A-novelty
+            y_efeA = avg_efe_Anovelty[:, p, :].flatten()
+            stdy_efeA = std_efe_Anovelty[:, p, :].flatten()
+
+        # Plot subplots
+        axes_2[0].plot(x, y_efea, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_2[1].plot(x, y_efeA, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        # Confidence intervals for ambiguity and A-novelty
+        # axes_2[0].fill_between(
+        #     x,
+        #     y_efea - (1.96 * stdy_efea / np.sqrt(num_runs)),
+        #     y_efea + (1.96 * stdy_efea / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
+        # axes_2[1].fill_between(
+        #     x,
+        #     y_efeA - (1.96 * stdy_efeA / np.sqrt(num_runs)),
+        #     y_efeA + (1.96 * stdy_efeA / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
+
+    axes_2[0].set_xlabel(x_label)
+    axes_2[1].set_xlabel(x_label)
+    axes_2[0].set_ylabel("Ambiguity", rotation=90)
+    axes_2[1].set_ylabel("A-novelty", rotation=90)
+    axes_2[0].legend(
+        title="Policies",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    axes_2[1].legend(
+        title="Policies",
+        ncol=4,
+        fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        fancybox=True,
+    )
+    axes_2[0].set_title(f"Ambiguity at {title_label} across episodes\n")
+    axes_2[1].set_title(f"A-novelty at {title_label} across episodes\n")
+    # Save figure and show
+    plt.savefig(
+        save_dir + "/" + "efe_ambiguity_anovelty.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -1707,9 +1844,11 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir):
 
     # Create colorbar
     cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel("State Visits Percentage", rotation=-90, va="bottom")
+    cbar.ax.set_ylabel("Percentage of time steps", rotation=-90, va="bottom")
+    # Format color bar as percentages
+    cbar.ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
 
-    ax.set_title(f"State Visits")
+    ax.set_title(f"State-access frequency in the experiment")
 
     # Save figure and show
     plt.savefig(

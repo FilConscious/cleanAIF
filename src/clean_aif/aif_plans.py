@@ -61,7 +61,7 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 7
+    start_state: int = 4
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent consider at each planning step """
@@ -312,6 +312,7 @@ class params(TypedDict):
     goal_state: int
     num_actions: int
     policies: np.ndarray
+    policies_indices: np.ndarray
     pref_type: str
     A_params: np.ndarray
     B_params: np.ndarray
@@ -456,6 +457,17 @@ class Agent(object):
         self.ordered_policies = np.zeros(
             (self.steps, self.num_policies, self.efe_tsteps), dtype=np.int64
         )
+        # Number of all the sequences
+        num_all_pol = self.num_actions**self.efe_tsteps
+        # Create a list of shuffled indices, one for each policy
+        # !!!IMPORTANT!!!: this fixed array of indices is used to shuffle the list of policies in the
+        # set_policies method *in the same way* across episodes ONLY at the first step in the episode;
+        # this is a workaround to plot policy data at that time step across episode (if the policies array
+        # was not randomed, then the same rows in the metrics arrays for the first step across episodes would
+        # not be referring to the same policy)
+        # TODO: find a way to re-order the policies at the plotting stage
+        self.policies_indices = np.arange(num_all_pol)
+        self.rng.shuffle(self.policies_indices)
 
         # Array to store policies probability
         # NOTE: these are reassigned at every time step when new policies are computed/selected
@@ -580,7 +592,11 @@ class Agent(object):
     from math import factorial
 
     def set_policies(
-        self, num_policies: int, policy_len: int, num_actions: int
+        self,
+        num_policies: int,
+        policy_len: int,
+        num_actions: int,
+        shuffle_policies: bool = True,
     ) -> np.ndarray:
         """Function to create and select the policies the agent will use to plan and pick an action at
         one step in the interaction with the environment.
@@ -607,18 +623,32 @@ class Agent(object):
         policies_array = np.array(policies_list, dtype=np.int64)
         # Number of all the sequences
         num_all_pol = num_actions**policy_len
-        # All the row indices of policies_array
-        indices = np.arange(num_all_pol)
-        # Shuffle the indices
-        self.rng.shuffle(indices)
-        # Randomly select num_policies from the array with all the policies
-        # NOTE 1: if num_policies equals the number of all sequences, the end result is just
-        # policies_array with its rows shuffled
-        # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
-        # the selected policies may not include the optimal policy in this implementation
-        sel_policies = policies_array[indices[:num_policies], :]
-        # print("Policies")
-        # print(sel_policies)
+
+        if shuffle_policies:
+            if self.task_type == "episodic" and self.current_tstep == 0:
+                # Shuffle policies with the same array of indices across episodes' firt step,
+                # only when the task is episodic and only for the first step
+                print(
+                    f"Policies indices at first step of each episode: {self.policies_indices}"
+                )
+                sel_policies = policies_array[self.policies_indices[:num_policies], :]
+            else:
+                # All the row indices of policies_array
+                indices = np.arange(num_all_pol)
+                # Shuffle the indices
+                self.rng.shuffle(indices)
+                # Randomly select num_policies from the array with all the policies
+                # NOTE 1: if num_policies equals the number of all sequences, the end result is just
+                # policies_array with its rows shuffled
+                # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+                # the selected policies may not include the optimal policy in this implementation
+                sel_policies = policies_array[indices[:num_policies], :]
+                # print("Policies")
+                # print(sel_policies)
+        else:
+            # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+            # the selected policies may not include the optimal policy in this implementation
+            sel_policies = policies_array[:num_policies, :]
 
         return sel_policies
 
@@ -1644,8 +1674,8 @@ def main():
         "--env_layout",
         "-el",
         type=str,
-        default="t-maze",
-        help="layout of the gridworld (choices: t-maze)",
+        default="t-maze-2",
+        help="layout of the gridworld (choices: t-maze-2, t-maze-3)",
     )
     parser.add_argument(
         "--num_runs",

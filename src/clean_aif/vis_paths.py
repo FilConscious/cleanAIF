@@ -13,7 +13,7 @@ from pathlib import Path
 from glob import glob
 
 # Custom packages/modules imports
-from .vis_utils_paths_cont import *
+from .vis_utils_paths import *
 from .config import LOG_DIR, RESULTS_DIR
 
 
@@ -142,7 +142,7 @@ def main():
         result_dir,
     )
     # 2.b Plotting the expected free energy for each policy
-    plot_efe(file_dp, params["select_policy"], result_dir)
+    plot_efe(file_dp, params["select_policy"], result_dir, select_step=0)
     # 2.c Plotting the expected free energy components for each policy
     plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=0)
     # plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)

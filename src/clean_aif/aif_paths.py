@@ -56,7 +56,7 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 7
+    start_state: int = 4
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent considers for planning """
