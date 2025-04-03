@@ -125,29 +125,29 @@ def main():
     #     result_dir,
     # )
     # 1.b Plotting the policy-conditioned free energies (F_pi) in the same plot
-    # plot_pi_fe_compare(
-    #     file_dp,
-    #     params["step_fe_pi"],
-    #     params["x_ticks_estep"],
-    #     params["x_ticks_tstep"],
-    #     params["select_policy"],
-    #     result_dir,
-    # )
+    plot_pi_fe_compare(
+        file_dp,
+        params["step_fe_pi"],
+        params["x_ticks_estep"],
+        params["x_ticks_tstep"],
+        params["select_policy"],
+        result_dir,
+    )
     # 2.a Plotting the total free energy, i.e. E_pi[F_pi]
-    # plot_total_fe(
-    #     file_dp,
-    #     params["x_ticks_estep"],
-    #     params["x_ticks_tstep"],
-    #     params["select_policy"],
-    #     result_dir,
-    # )
+    plot_total_fe(
+        file_dp,
+        params["x_ticks_estep"],
+        params["x_ticks_tstep"],
+        params["select_policy"],
+        result_dir,
+    )
     # 2.b Plotting the expected free energy for each policy
-    # plot_efe(file_dp, params["select_policy"], result_dir)
+    plot_efe(file_dp, params["select_policy"], result_dir, select_step=0)
     # 2.c Plotting the expected free energy components for each policy
-    # plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=0)
+    plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=0)
     # plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)
     # 3.a Plotting the policies probabilities, i.e. Q(pi)
-    # plot_pi_prob(file_dp, params["x_ticks_tstep"], params["select_policy"], result_dir)
+    plot_pi_prob(file_dp, params["x_ticks_tstep"], params["select_policy"], result_dir)
     plot_pi_prob_last(
         file_dp,
         params["x_ticks_estep"],

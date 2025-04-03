@@ -62,24 +62,19 @@ def plot_action_seq(file_data_path, x_ticks_estep, save_dir):
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
     """
-    Function to plot reward counts across episodes, i.e. the amount of reward the agent has
-    collected in each episode of whether the goal state has been reached.
+    Function to plot the average number of agents reaching the goal state in each episode.
 
     Inputs:
 
     - file_data_path (string): file path where all metrics have been stored;
     - x_ticks_estep (integer): step for the ticks in the x axis when plotting as a function of episode number;
     - save_dir (string): directory where to save the images.
-
-    Outputs:
-
-    - plot showing how the reward count changes across episodes
-
     """
 
     # Retrieving the data dictionary and extracting the content of various keys
@@ -87,7 +82,6 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
     num_runs = data["num_runs"]
     num_episodes = data["num_episodes"]
     reward_counts = data["reward_counts"]
-    print(reward_counts[:, 0])
 
     avg_rewards = np.mean(reward_counts, axis=0)
     std_rewards = np.std(reward_counts, axis=0)
@@ -97,7 +91,7 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
         np.arange(num_episodes),
         avg_rewards,
         ".-",
-        label="goal reached (0: false; 1: true)",
+        label="",
     )
     plt.xticks(np.arange(0, (num_episodes) + 1, step=x_ticks_estep))
     # Get current axis and set y-axis to percentages
@@ -121,16 +115,12 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_pi_fe(
-    file_data_path,
-    step_fe_pi,
-    x_ticks_estep,
-    x_ticks_tstep,
-    select_policy,
-    save_dir,
+    file_data_path, step_fe_pi, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
 ):
     """Plotting the free energy conditioned on a specific policy, F_pi, averaged over the runs.
 
@@ -185,8 +175,6 @@ def plot_pi_fe(
         avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         # Making sure avg_pi_fe has the right dimensions
-        # print(avg_pi_fe.shape)
-        # print((num_episodes, num_steps))
         assert avg_pi_fe.shape == (
             num_episodes,
             num_steps,
@@ -208,7 +196,8 @@ def plot_pi_fe(
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
         # Plotting the free energy at the last time step of every episode for all episodes
         # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
@@ -235,21 +224,15 @@ def plot_pi_fe(
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
 
 def plot_pi_fe_compare(
-    file_data_path,
-    step_fe_pi,
-    x_ticks_estep,
-    x_ticks_tstep,
-    select_policy,
-    save_dir,
+    file_data_path, step_fe_pi, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
 ):
-    """This function is almost the same as plot_pi_fe() (the previous plotting function) with the only
-    difference that all policy-conditioned free energies, F_pi (potentially averaged over runs) are plotted
-    on the same figure for comparison (of course, this might result in a difficult-to-read plot if you have
-    too many runs and/or policies).
+    """Function similar to plot_pi_fe() with the only difference that all policy-conditioned free energies,
+    F_pi are plotted on the same figure for comparison (ideal when there aren't many runs or policies).
 
     Inputs:
 
@@ -301,19 +284,17 @@ def plot_pi_fe_compare(
         avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
         # Making sure avg_pi_fe has the right dimensions
-        # print(avg_pi_fe.shape)
-        # print((num_episodes, num_steps))
         assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
         # Plotting the free energy for every time step
         x1 = np.arange(num_episodes * num_steps)
         y1 = avg_pi_fe.flatten()
 
-        ax.plot(x1, y1, ".-", color=cmap(p), label=f"Policy $\\pi_{{{p}}}$")
+        ax.plot(x1, y1, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
 
     # Completing drawing axes for Figure 1
     ax.set_xticks(np.arange(0, (num_episodes * num_steps) + 1, step=x_ticks_tstep))
     ax.set_xlabel("Step")
-    # ax1.ylabel('Free Energy', rotation=90)
+    ax.set_ylabel("Free Energy", rotation=90)
     ax.legend(
         ncol=4,
         fontsize=8,
@@ -321,7 +302,6 @@ def plot_pi_fe_compare(
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
     )
-    # ax.legend(loc="upper right")
     ax.set_title("Free energy at each step across episodes\n")
 
     # Save figures and show
@@ -331,9 +311,8 @@ def plot_pi_fe_compare(
         bbox_inches="tight",
         pad_inches=0.1,
     )
-
-    plt.show()
-    # plt.close()
+    # plt.show()
+    plt.close()
 
     fig, ax = plt.subplots()
     # Looping over the policies for Figure 2
@@ -384,9 +363,8 @@ def plot_pi_fe_compare(
         bbox_inches="tight",
         pad_inches=0.1,
     )
-
-    plt.show()
-    # plt.close()
+    # plt.show()
+    plt.close()
 
 
 def plot_total_fe(
@@ -444,7 +422,8 @@ def plot_total_fe(
     plt.ylabel("Total free energy", rotation=90)
     # plt.legend(loc="upper right") # No need for legend
     plt.title("Every-step total free energy across episodes\n")
-    plt.show()
+    # plt.show()
+    plt.close()
 
     # Plotting the total free energy at the last time step of every episode
     # Note 1: another time step can be chosen by changing the index number, i, in avg_total_fe[:, i]
@@ -471,11 +450,12 @@ def plot_total_fe(
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
-    """Plotting the probability over policies, Q(pi), averaged over the runs at every time step during
+    """Function to plot the probability over policies, Q(pi), averaged over the runs at every time step during
     the experiment.
 
     Inputs:
@@ -523,7 +503,7 @@ def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
 
     for p in range(num_policies):
         y = avg_pi_prob[:, p, :].flatten()
-        plt.plot(x, y, ".-", label=f"Policy $\\pi_{p}$")
+        plt.plot(x, y, ".-", label=f"$\\pi_{{{p}}}$")
 
     plt.xticks(np.arange(0, (num_episodes * num_steps) + 1, step=x_ticks_tstep))
     plt.xlabel("Step")
@@ -546,8 +526,8 @@ def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
 def plot_pi_prob_last(
     file_data_path, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
 ):
-    """Plotting the probability over policies, Q(pi), averaged over the runs at the first time step of each
-    episode during the experiment.
+    """Function to plot the probability over policies, Q(pi), averaged over the runs at the first time
+    step of each episode during the experiment.
 
     Inputs:
 
@@ -595,7 +575,7 @@ def plot_pi_prob_last(
     for p in range(num_policies):
         y = avg_pi_prob[:, p].flatten()
         std = std_pi_prob[:, p].flatten()
-        plt.plot(x, y, ".-", label=f"$\\pi_{p}$")
+        plt.plot(x, y, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
 
         plt.fill_between(
             x,
@@ -607,7 +587,6 @@ def plot_pi_prob_last(
     plt.xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     plt.xlabel("Episode")
     plt.ylabel("Probability mass", rotation=90)
-    # plt.legend(loc="upper right")
     plt.legend(
         title="Policies",
         ncol=4,
@@ -626,11 +605,13 @@ def plot_pi_prob_last(
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_efe(file_data_path, select_policy, save_dir, select_step=None):
-    """Plotting the expected free energy, EFE, for a given policy over all the steps averaged over the runs.
+    """Function to plot the expected free energy, EFE, for a given policy over all the steps
+    averaged over the runs.
 
     Inputs:
 
@@ -669,7 +650,6 @@ def plot_efe(file_data_path, select_policy, save_dir, select_step=None):
     plt.figure()
     # Pre-generate distinct colors
     cmap = plt.cm.get_cmap("tab20", num_policies)
-    # colors = plt.cm.plasma(np.linspace(0, 1, num_policies))
 
     if select_step == None:
         x_label = "Step"
@@ -707,7 +687,8 @@ def plot_efe(file_data_path, select_policy, save_dir, select_step=None):
     plt.savefig(
         save_dir + "/" + "efe.jpg", format="jpg", bbox_inches="tight", pad_inches=0.1
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
@@ -862,7 +843,8 @@ def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
     # Plotting A-novelty and B-novelty in separate subplots
     fig_2, axes_2 = plt.subplots(1, 2, figsize=(12, 5))  # 1 row, 2 columns
@@ -938,7 +920,8 @@ def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_efe_Bcomps(file_data_path, select_policy, save_dir):
@@ -1038,7 +1021,8 @@ def plot_efe_Bcomps(file_data_path, select_policy, save_dir):
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_Qs_pi_prob(
@@ -1132,7 +1116,8 @@ def plot_Qs_pi_prob(
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_Qt_pi_prob(
@@ -1242,7 +1227,8 @@ def plot_Qt_pi_prob(
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
 
 def plot_so_mapping(file_data_path, x_ticks_estep, state_A, select_policy, save_dir):
@@ -1378,7 +1364,8 @@ def plot_so_mapping(file_data_path, x_ticks_estep, state_A, select_policy, save_
     plt.savefig(
         save_dir + "/" + "so_map.jpg", format="jpg", bbox_inches="tight", pad_inches=0.1
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
 
 def plot_transitions(
@@ -1494,7 +1481,8 @@ def plot_transitions(
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
 
     # Heatmap of the transition probabilites from all states for action all the actions at the end
     # of the experiment; the actions range from 0 to 3 (included)
@@ -1528,7 +1516,8 @@ def plot_transitions(
             bbox_inches="tight",
             pad_inches=0.1,
         )
-        plt.show()
+        # plt.show()
+        plt.close()
 
 
 def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
@@ -1808,14 +1797,18 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir):
     else:
         state_visits = data["state_visits"]
 
+    # Average over runs
     run_avg_sv = np.mean(state_visits, axis=0)
-    tot_avg_sv = np.mean(run_avg_sv, axis=0)
+    # Total visitation counts
+    tot_sv = np.sum(run_avg_sv, axis=0)
+    # Total number of steps
+    total_steps = np.sum(tot_sv)
 
     # Reshaping the state counts vector into a matrix so as to visualise the maze
-    env_matrix = np.reshape(tot_avg_sv, (v_len, h_len))
+    env_matrix = np.reshape(tot_sv, (v_len, h_len))
 
     # Heatmap of the state counts over all the experiment's episodes
-    percentage_sv = env_matrix * 100
+    percentage_sv = env_matrix / total_steps * 100
     fig, ax = plt.subplots()
     im = ax.imshow(percentage_sv)
 
@@ -1857,4 +1850,5 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir):
         bbox_inches="tight",
         pad_inches=0.1,
     )
-    plt.show()
+    # plt.show()
+    plt.close()
