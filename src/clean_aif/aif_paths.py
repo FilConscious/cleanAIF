@@ -43,7 +43,7 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
-    num_steps: int = 3
+    num_steps: int = 4
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
     num_states: int = 9
     ### Agent ###
@@ -56,15 +56,15 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 4
+    start_state: int = 7
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent considers for planning """
-    num_policies: int = 16
+    num_policies: int = 64
     """ planning horizon, also the length of a policy """
     """ NOTE 1: also MAX number of future steps for which expected free energy is computed"""
     """ NOTE 2: the length of a policy should be num_steps - 1 because there is no action at the last time step"""
-    plan_horizon: int = 2
+    plan_horizon: int = 3
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ hard-coded agent's policies """
@@ -386,7 +386,9 @@ class params(TypedDict):
     inf_steps: int
     num_policies: int
     plan_horizon: int  # also included in Args
+    policy_prior: bool
     action_selection: str
+    pref_loc: str
     learn_A: bool
     learn_B: bool
     learn_D: bool
@@ -431,6 +433,7 @@ class Agent(object):
         self.pref_loc: str = params["pref_loc"]
         self.policies: np.ndarray = params["policies"]
         self.num_policies: int = params["num_policies"]
+        self.policy_prior: bool = params["policy_prior"]
         self.as_mechanism: str = params["action_selection"]
         self.learning_A: bool = params["learn_A"]
         self.learning_B: bool = params["learn_B"]
@@ -802,6 +805,16 @@ class Agent(object):
         # Retrieving the softmax function needed to normalise the values of vector Q(pi) after
         # updating them with the expected free energies.
         sigma = special.softmax
+        # Prior over policies
+        if self.policy_prior:
+            # With prior check if we are at the beginning of the experiment
+            if self.current_tstep == 0:
+                pi_prior_probs = np.log(self.Qpi[:, 0])
+            else:
+                pi_prior_probs = np.log(self.Qpi[:, self.current_tstep - 1])
+        else:
+            # No prior when updating policy probabilities
+            pi_prior_probs = 0
 
         for pi, pi_actions in enumerate(self.policies):
 
@@ -860,15 +873,16 @@ class Agent(object):
                 self.efe_Anovelty[pi, self.current_tstep] = tot_AsW_As
                 self.efe_Bnovelty[pi, self.current_tstep] = tot_AsW_Bs
                 #### DEBUGGING ####
-                print(f"--- Policy {pi} ---")
-                print(f"--- Summary of planning at time step {self.current_tstep} ---")
-                print(f"FE_{pi}: {F_pi}")
-                print(f"EFE_{pi}: {G_pi}")
-                print(f"Risk_{pi}: {tot_slog_s_over_C}")
-                print(f"Ambiguity {pi}: {tot_Hs}")
-                print(f"A-novelty {pi}: {tot_AsW_As}")
-                print(f"B-novelty {pi}: {tot_AsW_Bs}")
+                # print(f"--- Policy {pi} ---")
+                # print(f"--- Summary of planning at time step {self.current_tstep} ---")
+                # print(f"FE_{pi}: {F_pi}")
+                # print(f"EFE_{pi}: {G_pi}")
+                # print(f"Risk_{pi}: {tot_slog_s_over_C}")
+                # print(f"Ambiguity {pi}: {tot_Hs}")
+                # print(f"A-novelty {pi}: {tot_AsW_As}")
+                # print(f"B-novelty {pi}: {tot_AsW_Bs}")
                 #### END ####
+
                 # if self.current_tstep == 0:
                 #     print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
                 #     self.efe_Bnovelty_t[pi] += sq_AsW_Bs
@@ -879,19 +893,23 @@ class Agent(object):
         # Normalising the negative expected free energies stored as column in self.Qpi to get
         # the posterior over policies Q(pi) to be used for action selection
         print(f"Computing posterior over policy Q(pi)...")
-        self.Qpi[:, self.current_tstep] = sigma(-self.Qpi[:, self.current_tstep])
+        self.Qpi[:, self.current_tstep] = sigma(
+            -self.Qpi[:, self.current_tstep] + pi_prior_probs
+        )
         # print(f"Before adding noise - Q(pi): {self.Qpi}")
         # Replacing zeroes with 0.0001, to avoid the creation of nan values and multiplying by 5 to make sure
         # the concentration of probabilities is preserved when reapplying the softmax
+        # TODO: re-check if this is still necessary
         self.Qpi[:, self.current_tstep] = np.where(
             self.Qpi[:, self.current_tstep] == 1, 5, self.Qpi[:, self.current_tstep]
         )
         self.Qpi[:, self.current_tstep] = np.where(
             self.Qpi[:, self.current_tstep] == 0,
-            0.0001,
+            np.amax(self.Qpi[:, self.current_tstep]) / 1000,  # 0.0001,
             self.Qpi[:, self.current_tstep],
         )
         self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
+
         # Computing the policy-independent state probability at self.current_tstep and storing it in self.Qs
         for pi, _ in enumerate(self.policies):
             #### DEBUGGING ####
@@ -917,9 +935,9 @@ class Agent(object):
         # print(self.policies)
         # print(self.Qs_pi[:, :, 1])
         # print(self.Qs_pi[:, :, 2])
-        print(f"Updated Qs at times step {self.current_tstep}")
+        # print(f"Updated Qs at times step {self.current_tstep}")
         # print(self.Qs[:, self.current_tstep])
-        print(f"Most probable state: {np.argmax(self.Qs[:, self.current_tstep])}")
+        # print(f"Most probable state: {np.argmax(self.Qs[:, self.current_tstep])}")
         ### END ###
 
         # Check if the agent has reached the last time step of the episode
@@ -947,7 +965,7 @@ class Agent(object):
         we store the approximate posterior in the next available column, with the first one being occupied
         by the initial Q(pi). This makes sense because the new Q(pi) becomes the prior for the next time step.
         But because it is also the approximate posterior at the current time step it is used for selecting
-        the action.
+        the action. [EXPLANATION LIKELY NOT CORRECT]
         """
 
         # Matrix of shape (num_actions, num_policies) with each row being populated by the same integer,
@@ -1036,7 +1054,7 @@ class Agent(object):
 
             action_selected = self.rng.choice(argmin_actions)
 
-        return action_selected
+        return int(action_selected)
 
     def action_selection_probs(self):
         """Method for action selection based on update policies probabilities. That is, action selection
@@ -1066,7 +1084,7 @@ class Agent(object):
                 self.policies[argmax_policies, self.current_tstep]
             )
 
-        return action_selected
+        return int(action_selected)
 
     def learning(self):
         """Method for parameters learning. This occurs at the end of the episode.
@@ -1534,8 +1552,8 @@ def main():
         "--env_layout",
         "-el",
         type=str,
-        default="t-maze-2",
-        help="layout of the gridworld (choices: t-maze-2, t-maze-3)",
+        default="t-maze-3",
+        help="layout of the gridworld (choices: t-maze-3, t-maze-4, t-maze-5)",
     )
     parser.add_argument(
         "--num_runs",
@@ -1635,6 +1653,8 @@ def main():
         default="last",
         help="choices: last, all_goal, all_diff",
     )
+    # Whether to use a policy prior when udapting the policies' probabilities
+    parser.add_argument("--policy_prior", "-ppr", action="store_true")
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1654,6 +1674,7 @@ def main():
         f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
         f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
         f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}_prefloc_{cl_params["pref_loc"]}'
+        f'_npol{cl_params["num_policies"]}_phor{cl_params["policy_horizon"]}_ppr{cl_params["policy_prior"]}'
         f'_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
@@ -1711,7 +1732,7 @@ def main():
     NUM_STEPS = agent_params["num_steps"]
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
-    if env_layout == "t-maze-2":
+    if env_layout == "t-maze-3":
         WALLS_LOC = [
             convert_state(3),
             convert_state(5),
@@ -1719,11 +1740,18 @@ def main():
             convert_state(7),
             convert_state(8),
         ]
-    elif env_layout == "t-maze-3":
+    elif env_layout == "t-maze-4":
+        WALLS_LOC = [
+            convert_state(3),
+            convert_state(5),
+            convert_state(6),
+            convert_state(8),
+        ]
+    elif env_layout == "y-maze-4":
         WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
     else:
         raise ValueError(
-            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-2, t-maze-3."
+            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-3, t-maze-4, t-maze-5."
         )
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])

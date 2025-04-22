@@ -48,7 +48,7 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Max number of steps in an episode """
-    num_steps: int = 3
+    num_steps: int = 4
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
     num_states: int = 9
     ### Agent ###
@@ -61,14 +61,14 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 4
+    start_state: int = 7
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent consider at each planning step """
-    num_policies: int = 16
+    num_policies: int = 64
     """ planning horizon, also the length of a policy """
     """ NOTE: also MAX number of future steps for which expected free energy is computed """
-    plan_horizon: int = 2
+    plan_horizon: int = 3
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ init empty agent's policies arrays """
@@ -296,11 +296,13 @@ class params(TypedDict):
     inf_steps: int
     num_policies: int  # also included in Args
     plan_horizon: int  # also included in Args
+    policy_prior: bool
     action_selection: str
     learn_A: bool
     learn_B: bool
     learn_D: bool
     num_videos: int
+    task_type: str
     # Parameters unique to class Args above
     exp_name: str
     num_states: int
@@ -340,6 +342,8 @@ class Agent(object):
         self.pref_type: str = params["pref_type"]
         self.policies: np.ndarray = params["policies"]
         self.num_policies: int = params["num_policies"]
+        self.policy_prior: bool = params["policy_prior"]
+        self.policies_indices: np.ndarray = params["policies_indices"]
         self.as_mechanism: str = params["action_selection"]
         self.learning_A: bool = params["learn_A"]
         self.learning_B: bool = params["learn_B"]
@@ -457,17 +461,6 @@ class Agent(object):
         self.ordered_policies = np.zeros(
             (self.steps, self.num_policies, self.efe_tsteps), dtype=np.int64
         )
-        # Number of all the sequences
-        num_all_pol = self.num_actions**self.efe_tsteps
-        # Create a list of shuffled indices, one for each policy
-        # !!!IMPORTANT!!!: this fixed array of indices is used to shuffle the list of policies in the
-        # set_policies method *in the same way* across episodes ONLY at the first step in the episode;
-        # this is a workaround to plot policy data at that time step across episode (if the policies array
-        # was not randomed, then the same rows in the metrics arrays for the first step across episodes would
-        # not be referring to the same policy)
-        # TODO: find a way to re-order the policies at the plotting stage
-        self.policies_indices = np.arange(num_all_pol)
-        self.rng.shuffle(self.policies_indices)
 
         # Array to store policies probability
         # NOTE: these are reassigned at every time step when new policies are computed/selected
@@ -623,11 +616,14 @@ class Agent(object):
         policies_array = np.array(policies_list, dtype=np.int64)
         # Number of all the sequences
         num_all_pol = num_actions**policy_len
+        # Don't shuffle policies (FALSE) when the agent has a policy prior (TRUE)
+        shuffle_policies = not self.policy_prior
 
         if shuffle_policies:
             if self.task_type == "episodic" and self.current_tstep == 0:
-                # Shuffle policies with the same array of indices across episodes' firt step,
-                # only when the task is episodic and only for the first step
+                # Set policy order using list of indices passed to agent at init
+                # NOTE 1: this makes sure that the array of policies is ordered the same way across
+                # runs/agents at the first step of each episode.
                 print(
                     f"Policies indices at first step of each episode: {self.policies_indices}"
                 )
@@ -643,12 +639,14 @@ class Agent(object):
                 # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
                 # the selected policies may not include the optimal policy in this implementation
                 sel_policies = policies_array[indices[:num_policies], :]
-                # print("Policies")
-                # print(sel_policies)
+
         else:
+            # Set policy order using list of indices passed to agent at init
+            # NOTE 1: this makes sure that the array of policies is ordered the same way across runs/agents
+            # *and* across time steps/episodes.
             # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
             # the selected policies may not include the optimal policy in this implementation
-            sel_policies = policies_array[:num_policies, :]
+            sel_policies = policies_array[self.policies_indices[:num_policies], :]
 
         return sel_policies
 
@@ -885,6 +883,16 @@ class Agent(object):
         # Retrieving the softmax function needed to normalise the values of vector Q(pi) after
         # updating them with the expected free energies.
         sigma = special.softmax
+        # Prior over policies
+        if self.policy_prior:
+            # With prior check if we are at the beginning of the experiment
+            if self.current_tstep == 0:
+                pi_prior_probs = np.log(self.Qpi[:, 0])
+            else:
+                pi_prior_probs = np.log(self.Qpi[:, self.current_tstep - 1])
+        else:
+            # No prior when updating policy probabilities
+            pi_prior_probs = 0
 
         for pi, pi_actions in enumerate(self.policies):
 
@@ -939,6 +947,7 @@ class Agent(object):
                 self.efe_risk[pi, self.current_tstep] = tot_slog_s_over_C
                 self.efe_Anovelty[pi, self.current_tstep] = tot_AsW_As
                 self.efe_Bnovelty[pi, self.current_tstep] = tot_AsW_Bs
+                #### DEBUGGING ####
                 # print(f"--- Summary of planning at time step {self.current_tstep} ---")
                 # print(f"FE_{pi}: {F_pi}")
                 # print(f"EFE_{pi}: {G_pi}")
@@ -946,22 +955,22 @@ class Agent(object):
                 # print(f"Ambiguity {pi}: {tot_Hs}")
                 # print(f"A-novelty {pi}: {tot_AsW_As}")
                 # print(f"B-novelty {pi}: {tot_AsW_Bs}")
+                ##### END ####
 
-                # print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
-                # Save the sequence of B-novelties for policy pi at time step current_tstep
-                # print(f"sq_AsW_Bs shape: {sq_AsW_Bs.shape}")
-                # print(f"efe_Bnovelty_t shape {self.efe_Bnovelty_t.shape}")
-                self.efe_Bnovelty_t[self.current_tstep, pi, :] += sq_AsW_Bs
-                # print(
-                #     f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
-                # )
-                # if sq_AsW_Bs[2] > 2200:
-                #     raise Exception("B-novelty too high")
+                # if self.current_tstep == 0:
+                #     print(f"B-novelty sequence at t ZERO: {sq_AsW_Bs}")
+                #     self.efe_Bnovelty_t[pi] += sq_AsW_Bs
+                #     print(
+                #         f"B-novelty sequence by policy (stored): {self.efe_Bnovelty_t}"
+                #     )
+                # self.efe_Bnovelty_t[self.current_tstep, pi, :] += sq_AsW_Bs
 
         # Normalising the negative expected free energies stored as column in self.Qpi to get
         # the posterior over policies Q(pi) to be used for action selection
         print(f"Computing posterior over policy Q(pi)...")
-        self.Qpi[:, self.current_tstep] = sigma(-self.Qpi[:, self.current_tstep])
+        self.Qpi[:, self.current_tstep] = sigma(
+            -self.Qpi[:, self.current_tstep] + pi_prior_probs
+        )
         print("Policies Probs > 0.005")
         pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
         print(f"Policies indices: {pi_indices}")
@@ -979,19 +988,6 @@ class Agent(object):
         # )
         # self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
         # print(f"After adding noise - Q(pi): {self.Qpi}")
-
-        ### DEBUG ###
-        # max_pindex = np.argmax(self.Qpi[:, self.current_tstep], axis=0)
-        # print(f"Index of most probable policy: {max_pindex}")
-        # print(f"Most probable policy: {self.policies[max_pindex]}")
-        # print(f"Probability of the policy: {self.Qpi[max_pindex, self.current_tstep]}")
-        # print(f"{np.max(self.Qpi[:, self.current_tstep])}")
-
-        # optimal_index = np.where((self.policies == [0, 0, 1, 1]).all(axis=1))[0]
-        # print(f"Optimal index: {optimal_index}")
-        # print(f"Optimal policy: {self.policies[optimal_index]}")
-        # print(f"Prob of optimal policy: {self.Qpi[optimal_index, self.current_tstep]}")
-        ### END ###
 
         # Computing updated policy-independent state probabilities by marginalizing w.r.t to policies
         # NOTE (!!! IMPORTANT !!!): here we are computing two kinds of beliefs:
@@ -1018,6 +1014,22 @@ class Agent(object):
                 @ self.Qpi[:, self.current_tstep]
             )
 
+        ### DEBUGGING ###
+        # print(f"Time step {self.current_tstep}")
+        # index_most_pp = np.argmax(self.Qpi[:, self.current_tstep])
+        # print(f"Index of most probable policy: {index_most_pp}")
+        # print(f"Most probable policy: {self.policies[index_most_pp]}")
+        # if self.current_tstep != (self.steps - 1) and unfolding:
+        #     print(
+        #         f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
+        #     )
+        #     print("Current state beliefs:")
+        #     print(self.Qs_fe[:, self.current_tstep])
+
+        #     print("Next state beliefs:")
+        #     print(self.Qs[:, self.current_tstep + 1])
+        ### END ###
+
         # At the terminal/truncation point set new prior over initial states depending on task type
         if self.task_type == "continuing" and not unfolding:
             # Save the last policy-independent state probabilities as prior state probabilities for
@@ -1028,44 +1040,6 @@ class Agent(object):
             print(
                 f"Most probable state for next episode: {np.argmax(self.Qs_fe[:, self.current_tstep])}"
             )
-
-        ### DEBUGGING ###
-        print(f"Time step {self.current_tstep}")
-        index_most_pp = np.argmax(self.Qpi[:, self.current_tstep])
-        print(f"Index of most probable policy: {index_most_pp}")
-        print(f"Most probable policy: {self.policies[index_most_pp]}")
-        if self.current_tstep != (self.steps - 1) and unfolding:
-            print(
-                f"At next step agent believes to be in state: {np.argmax(self.Qs[:, self.current_tstep + 1])}"
-            )
-            print("Current state beliefs:")
-            print(self.Qs_fe[:, self.current_tstep])
-
-            print("Next state beliefs:")
-            print(self.Qs[:, self.current_tstep + 1])
-
-        # print("Number of policies that lead to state 2")
-        # print(f"{np.where(self.Qs_ps[:, 2, 0].T > 0.1)[0].shape}")
-        # print(f"Indices of policies to state 2:")
-        # indices_prob_2 = np.where(self.Qs_ps[:, 2, 0].T > 0.2)[0]
-        # print(indices_prob_2)
-        # print(self.Qs_ps[:, 2, 0].T)
-
-        # indices_prob_5 = np.where(self.Qs_ps[:, 5, 0].T > 0.2)[0]
-        # print(indices_prob_5)
-        # print(self.Qs_ps[:, 5, 0].T)
-
-        # print("Policies Probs > 0.005")
-        # pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
-        # print(f"Policies indices: {pi_indices}")
-        # print(f"Policies")
-        # print(self.policies[pi_indices])
-        # print(f"Probs: {self.Qpi[pi_indices, self.current_tstep]}")
-
-        # if self.current_tstep == 5:
-        #      print(f'Prob for policy {0}: {self.Qpi[0, self.current_tstep+1]}')
-        #      print(f'Prob for policy {1} {self.Qpi[1, self.current_tstep+1]}')
-        ### END ###
 
     def action_selection_KD(self):
         """Method for action selection based on the Kronecker delta, as described in Da Costa et. al. 2020,
@@ -1674,8 +1648,8 @@ def main():
         "--env_layout",
         "-el",
         type=str,
-        default="t-maze-2",
-        help="layout of the gridworld (choices: t-maze-2, t-maze-3)",
+        default="t-maze-3",
+        help="layout of the gridworld (choices: t-maze-3, t-maze-4, t-maze-5)",
     )
     parser.add_argument(
         "--num_runs",
@@ -1755,6 +1729,17 @@ def main():
         default="episodic",
         help="choices: episodic, continuing",
     )
+    # NOTE: this is just a label used to identify the experiment, make sure it corresponds
+    # to the attribute/property set in the agent Args class, see top of file
+    parser.add_argument(
+        "--pref_type",
+        "-pft",
+        type=str,
+        default="states",
+        help="choices: states, obs",
+    )
+    # Whether to use a policy prior when udapting the policies' probabilities
+    parser.add_argument("--policy_prior", "-ppr", action="store_true")
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1773,7 +1758,9 @@ def main():
     exp_info = (
         f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
         f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
-        f'_infsteps{cl_params["inf_steps"]}_AS{cl_params["action_selection"]}'
+        f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}'
+        f'_npol{cl_params["num_policies"]}_phor{cl_params["policy_horizon"]}_ppr{cl_params["policy_prior"]}'
+        f'_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.
@@ -1808,6 +1795,26 @@ def main():
     update_params(agent_params, cl_params)
     # print(agent_params)
 
+    # Create ordered array of policies indices
+    # !!!IMPORTANT!!!: if the agent is given a prior over policies, this is used to make sure that the
+    # policies are ordered in the same way across runs/agent *and* across time steps/episodes (otherwise
+    # adding a prior to a shuffled array would make no sense); if the agent is not given a prior, this is
+    # used to make sure that the order is the same at the first step of each episode, provided the task is
+    # episodic (not continuing).
+    # NOTE 1: having a consistent policies' order across agents/runs and steps/episodes is only crucial when
+    # we average policy related results and plot them
+
+    # Set rng for the experiment
+    rng = np.random.default_rng(seed=333777)
+    # Create array of policies indices, all possible policies are considered
+    policies_indices = np.arange(
+        agent_params["num_actions"] ** agent_params["efe_tsteps"]
+    )
+    # Shuffle the indices
+    rng.shuffle(policies_indices)
+    # Add the shuffled array of indices to params
+    agent_params["policies_indices"] = policies_indices
+
     ##########################
     ### 4. INIT ENV
     ##########################
@@ -1824,7 +1831,7 @@ def main():
     NUM_STEPS = agent_params["num_steps"]
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
-    if env_layout == "t-maze-2":
+    if env_layout == "t-maze-3":
         WALLS_LOC = [
             convert_state(3),
             convert_state(5),
@@ -1832,11 +1839,18 @@ def main():
             convert_state(7),
             convert_state(8),
         ]
-    elif env_layout == "t-maze-3":
+    elif env_layout == "t-maze-4":
+        WALLS_LOC = [
+            convert_state(3),
+            convert_state(5),
+            convert_state(6),
+            convert_state(8),
+        ]
+    elif env_layout == "y-maze-4":
         WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
     else:
         raise ValueError(
-            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-2, t-maze-3."
+            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-3, t-maze-4, t-maze-5."
         )
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])

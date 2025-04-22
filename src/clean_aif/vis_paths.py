@@ -52,6 +52,10 @@ def main():
     # Arguments for the lengths of the environment to plot the state visits
     parser.add_argument("--v_len", "-vl", type=int, required=True)
     parser.add_argument("--h_len", "-hl", type=int, required=True)
+    # Argument for length of a policy, i.e., policy horizon (only to plot action sequences)
+    parser.add_argument("--policy_horizon", "-ph", type=int)
+    # Argument to select one run/agent (e.g. used to plot one action sequence)
+    parser.add_argument("--select_run", "-selrun", type=int)
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -112,6 +116,8 @@ def main():
     plot_action_seq(
         file_dp,
         params["x_ticks_estep"],
+        params["policy_horizon"],
+        params["select_run"],
         result_dir,
     )
 
@@ -136,6 +142,7 @@ def main():
     # 2.a Plotting the total free energy, i.e. E_pi[F_pi]
     plot_total_fe(
         file_dp,
+        params["step_fe_pi"],
         params["x_ticks_estep"],
         params["x_ticks_tstep"],
         params["select_policy"],
