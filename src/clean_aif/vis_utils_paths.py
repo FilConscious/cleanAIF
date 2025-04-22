@@ -20,7 +20,9 @@ plt.rc("legend", fontsize=16)
 plt.rc("figure", titlesize=20)
 
 
-def plot_action_seq(file_data_path, x_ticks_estep, policy_horizon, run_index, save_dir):
+def plot_action_seq(
+    file_data_path, x_ticks_estep, policy_horizon, run_index, save_dir, env_layout
+):
     """
     Function to plot action sequences across episodes.
     """
@@ -64,7 +66,7 @@ def plot_action_seq(file_data_path, x_ticks_estep, policy_horizon, run_index, sa
     plt.legend(handles=legend_patches, title="Actions")
 
     plt.savefig(
-        save_dir + "/" + f"action_seqs_run{run_index}.jpg",
+        save_dir + "/" + f"{env_layout}_actions_run{run_index}.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -73,7 +75,7 @@ def plot_action_seq(file_data_path, x_ticks_estep, policy_horizon, run_index, sa
     plt.close()
 
 
-def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
+def plot_reward_counts(file_data_path, x_ticks_estep, save_dir, env_layout):
     """
     Function to plot the average number of agents reaching the goal state in each episode.
 
@@ -119,7 +121,7 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir):
     # )
 
     plt.savefig(
-        save_dir + "/" + f"avg_reward_counts.jpg",
+        save_dir + "/" + f"{env_layout}_path_agents_goal.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -238,7 +240,13 @@ def plot_pi_fe(
 
 
 def plot_pi_fe_compare(
-    file_data_path, step_fe_pi, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    select_policy,
+    save_dir,
+    env_layout,
 ):
     """Function similar to plot_pi_fe() with the only difference that all policy-conditioned free energies,
     F_pi are plotted on the same figure for comparison (ideal when there aren't many runs or policies).
@@ -315,7 +323,7 @@ def plot_pi_fe_compare(
 
     # Save figures and show
     fig.savefig(
-        save_dir + "/" + f"pi_fes_compare_every_step.jpg",
+        save_dir + "/" + f"{env_layout}_policies_fe_path_every_step.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -381,7 +389,7 @@ def plot_pi_fe_compare(
     ax.set_title(f"Policy-conditioned free energy at step {step_num}\n")
 
     fig.savefig(
-        save_dir + "/" + f"pi_fes_compare_step{step_num}.jpg",
+        save_dir + "/" + f"{env_layout}_policies_fe_path_step{step_num}.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -391,7 +399,13 @@ def plot_pi_fe_compare(
 
 
 def plot_total_fe(
-    file_data_path, step_fe, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+    file_data_path,
+    step_fe,
+    x_ticks_estep,
+    x_ticks_tstep,
+    select_policy,
+    save_dir,
+    env_layout,
 ):
     """Plotting the total free energy averaged over the runs.
 
@@ -474,7 +488,7 @@ def plot_total_fe(
     )
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + f"total_fe_step{step_num}.jpg",
+        save_dir + "/" + f"{env_layout}_total_fe_path_step{step_num}.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -483,7 +497,7 @@ def plot_total_fe(
     plt.close()
 
 
-def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
+def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir, env_layout):
     """Function to plot the probability over policies, Q(pi), averaged over the runs at every time step during
     the experiment.
 
@@ -551,7 +565,7 @@ def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
     plt.title("Probability over Policies\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + f"pi_probs.jpg",
+        save_dir + "/" + f"{env_layout}_pi_probs_path_every_step.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -559,8 +573,13 @@ def plot_pi_prob(file_data_path, x_ticks_tstep, select_policy, save_dir):
     plt.show()
 
 
-def plot_pi_prob_last(
-    file_data_path, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+def plot_pi_prob_first(
+    file_data_path,
+    x_ticks_estep,
+    x_ticks_tstep,
+    select_policy,
+    save_dir,
+    env_layout,
 ):
     """Function to plot the probability over policies, Q(pi), averaged over the runs at the first time
     step of each episode during the experiment.
@@ -640,7 +659,9 @@ def plot_pi_prob_last(
     plt.title("First-step policy probability\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + f"pi_probs_first_pi_offset{policy_index_offset}.jpg",
+        save_dir
+        + "/"
+        + f"{env_layout}_first_pi_probs_path_offset{policy_index_offset}.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -649,7 +670,7 @@ def plot_pi_prob_last(
     plt.close()
 
 
-def plot_efe(file_data_path, select_policy, save_dir, select_step=None):
+def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=None):
     """Function to plot the expected free energy, EFE, for a given policy over all the steps
     averaged over the runs.
 
@@ -726,13 +747,18 @@ def plot_efe(file_data_path, select_policy, save_dir, select_step=None):
     plt.title(f"{plot_title}\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "efe.jpg", format="jpg", bbox_inches="tight", pad_inches=0.1
+        save_dir + "/" + f"{env_layout}_efe_path.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
     )
     # plt.show()
     plt.close()
 
 
-def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
+def plot_efe_comps(
+    file_data_path, select_policy, save_dir, env_layout, num_tsteps=None
+):
     """Plotting the expected free energy components (ambiguity, risk and novelty) for a given policy over
     all the steps averaged over the runs.
 
@@ -901,7 +927,7 @@ def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
     axes_1[1].set_title(f"B-novelty at {title_label}\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "efe_risk_bnovelty.jpg",
+        save_dir + "/" + f"{env_layout}_efe_path_risk_bnov.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -976,7 +1002,7 @@ def plot_efe_comps(file_data_path, select_policy, save_dir, num_tsteps=None):
     axes_2[1].set_title(f"A-novelty at {title_label} across episodes\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "efe_ambiguity_anovelty.jpg",
+        save_dir + "/" + f"{env_layout}_efe_path_amb_anov.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -1087,7 +1113,13 @@ def plot_efe_Bcomps(file_data_path, select_policy, save_dir):
 
 
 def plot_Qs_pi_prob(
-    file_data_path, x_ticks_estep, index_Si, value_Si, select_policy, save_dir
+    file_data_path,
+    x_ticks_estep,
+    index_Si,
+    value_Si,
+    select_policy,
+    save_dir,
+    env_layout,
 ):
     """Plotting policies' beliefs over states at a certain time step, i.e. Q(S_t = s|pi),
     over the episodes (averaged over the runs).
@@ -1172,7 +1204,7 @@ def plot_Qs_pi_prob(
     plt.title("State Belief\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "Qs_pi_prob.jpg",
+        save_dir + "/" + f"{env_layout}_Qs_pi_prob_path.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -1182,7 +1214,13 @@ def plot_Qs_pi_prob(
 
 
 def plot_Qt_pi_prob(
-    file_data_path, x_ticks_tstep, index_tSi, value_tSi, select_policy, save_dir
+    file_data_path,
+    x_ticks_tstep,
+    index_tSi,
+    value_tSi,
+    select_policy,
+    save_dir,
+    env_layout,
 ):
     """Plotting beliefs over states at a certain time step for every policy, i.e. Q(s|pi), averaged over
     the runs *and* as a function of the experiment steps.
@@ -1283,7 +1321,7 @@ def plot_Qt_pi_prob(
 
         # Save figure and show
         plt.savefig(
-            save_dir + "/" + f"Qt_pi{p}_prob.jpg",
+            save_dir + "/" + f"{env_layout}_Qt_pi{p}_prob_path.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -1292,7 +1330,14 @@ def plot_Qt_pi_prob(
         plt.close()
 
 
-def plot_so_mapping(file_data_path, x_ticks_estep, state_A, select_policy, save_dir):
+def plot_so_mapping(
+    file_data_path,
+    x_ticks_estep,
+    state_A,
+    select_policy,
+    save_dir,
+    env_layout,
+):
     """Plotting state-observation mappings (emission probabilities), i.e., matrix A of size
     (num_states, num_states), averaged over the runs.
 
@@ -1391,7 +1436,7 @@ def plot_so_mapping(file_data_path, x_ticks_estep, state_A, select_policy, save_
     ax1.set_title(f"Emission Probabilities from State {s}\n")
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + f"emis_prob_state{s}.jpg",
+        save_dir + "/" + f"{env_layout}_emis_prob_state{s}_path.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -1423,14 +1468,23 @@ def plot_so_mapping(file_data_path, x_ticks_estep, state_A, select_policy, save_
 
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "so_map.jpg", format="jpg", bbox_inches="tight", pad_inches=0.1
+        save_dir + "/" + f"{env_layout}_so_map_path.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
     )
     # plt.show()
     plt.close()
 
 
 def plot_transitions(
-    file_data_path, x_ticks_estep, state_B, action_B, select_policy, save_dir
+    file_data_path,
+    x_ticks_estep,
+    state_B,
+    action_B,
+    select_policy,
+    save_dir,
+    env_layout,
 ):
     """Plotting transition probabilities, i.e., matrices B (one for each available action) of size
     (num_states, num_states), averaged over the runs.
@@ -1537,7 +1591,7 @@ def plot_transitions(
     ax1.legend(loc="upper right")
     ax1.set_title(f"Transition Probabilities from State {s} for Action {a}\n")
     plt.savefig(
-        save_dir + "/" + f"tr_probs_state{s}_action{a}.jpg",
+        save_dir + "/" + f"{env_layout}_tr_probs_state{s}_action{a}_path.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -1573,7 +1627,7 @@ def plot_transitions(
 
         # Save figure and show
         plt.savefig(
-            save_dir + "/" + f"transitions_probs_action_{a}.jpg",
+            save_dir + "/" + f"{env_layout}_transmap_path_a{a}.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -1582,7 +1636,7 @@ def plot_transitions(
         plt.close()
 
 
-def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
+def plot_Qs_pi_final(file_data_path, select_policy, save_dir, env_layout):
     """Visualising the Q(S_i|pi) for each policy at the end of the experiment, where i is in
     [0,...,num_steps-1] and indicates the time step during an episode. Note that the the Q(S_i|pi)
     are categorical distributions telling you the state beliefs the agent has for each episode's time step.
@@ -1675,7 +1729,7 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
 
         # Save figure and show
         plt.savefig(
-            save_dir + "/" + f"Qs_pi{p}_final.jpg",
+            save_dir + "/" + f"{env_layout}_Qs_pi{p}_final_path.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -1684,7 +1738,7 @@ def plot_Qs_pi_final(file_data_path, select_policy, save_dir):
         plt.close()
 
 
-def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
+def plot_Qs_pi_first(file_data_path, select_policy, save_dir, env_layout):
     """Visualising the Q(S_i|pi) for each policy at the first time time step of the last episode, where i
     is in [0,...,num_steps-1] and indicates the time step during an episode. Note that the the Q(S_i|pi)
     are categorical distributions telling you the state beliefs the agent has for each episode's time step.
@@ -1777,7 +1831,7 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir):
 
         # Save figure and show
         plt.savefig(
-            save_dir + "/" + f"Qs_pi{p}_start.jpg",
+            save_dir + "/" + f"{env_layout}_Qs_pi{p}_start_path.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -1812,7 +1866,7 @@ def plot_oa_sequence(file_data_path, num_episodes, num_steps):
     print(actions_sequence)
 
 
-def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir):
+def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layout):
     """Plotting the state visits heatmap showing the frequency with which the agent has visited the
     maze's tiles.
 
@@ -1908,7 +1962,7 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir):
 
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + "state_visits.jpg",
+        save_dir + "/" + f"{env_layout}_sv_path.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
