@@ -20,6 +20,8 @@ plt.rc("ytick", labelsize=16)
 plt.rc("legend", fontsize=16)
 plt.rc("figure", titlesize=20)
 
+POLICY_INDEX_OFFSET = 0
+
 
 def plot_action_seq(
     file_data_path,
@@ -37,6 +39,7 @@ def plot_action_seq(
     data = np.load(file_data_path, allow_pickle=True).item()
     num_runs = data["num_runs"]
     num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
     reward_counts = data["reward_counts"]
     action_seqs = data["actual_action_sequence"]
     # Data for a specific run/agent (use index according to desired run/agent)
@@ -51,7 +54,7 @@ def plot_action_seq(
     colors = [action_colors[a] for a in run_actions.flatten()]
 
     # Plotting action sequences for each episode for run/agent 3
-    plt.figure(figsize=(15, 3))
+    plt.figure(figsize=(20, 3))
     plt.scatter(episodes, timesteps, c=colors, s=100, edgecolors="black")
 
     # plt.scatter(episodes, action_seqs[3], alpha=0.7, marker="o")
@@ -61,7 +64,7 @@ def plot_action_seq(
     plt.title("Actions Sequences Per Episode")
 
     plt.xticks(np.arange(0, num_episodes, step=1))
-    plt.yticks([0, 1])  # Since we only have 2 time steps per episode
+    plt.yticks(np.arange(num_steps - 1))
     plt.grid(True, linestyle="--", alpha=0.5)
 
     # Create a legend
@@ -228,14 +231,13 @@ def plot_pi_fe(
     ) or step_fe_pi == -1, "Invalid step number."
 
     # Looping over the policies
-    policy_index_offset = 48
     for p in range(16):
 
         # Computing the mean (average) and std of one policy's free energies over the runs
         # TODO: handle rare case in which you train only for one episode, in that case squeeze()
         # will raise the exception
-        avg_pi_fe = np.mean(pi_fe[:, :, p + policy_index_offset, :], axis=0).squeeze()
-        std_pi_fe = np.std(pi_fe[:, :, p + policy_index_offset, :], axis=0).squeeze()
+        avg_pi_fe = np.mean(pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0).squeeze()
+        std_pi_fe = np.std(pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0).squeeze()
         # Making sure avg_pi_fe has the right dimensions
         assert avg_pi_fe.shape == (
             num_episodes,
@@ -246,14 +248,14 @@ def plot_pi_fe(
         y1 = avg_pi_fe.flatten()
 
         plt.figure()
-        plt.plot(x1, y1, ".-", label=f"Policy $\\pi_{p + policy_index_offset}$")
+        plt.plot(x1, y1, ".-", label=f"Policy $\\pi_{p + POLICY_INDEX_OFFSET}$")
         plt.xticks(np.arange(0, (num_episodes * num_steps) + 1, step=x_ticks_tstep))
         plt.xlabel("Step")
         # plt.ylabel('Free Energy', rotation=90)
         plt.legend(loc="upper right")
         plt.title("Free Energy at Every Step\n")
         plt.savefig(
-            save_dir + "/" + f"pi{p + policy_index_offset}_fes.jpg",
+            save_dir + "/" + f"pi{p + POLICY_INDEX_OFFSET}_fes.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -323,6 +325,7 @@ def plot_pi_fe_compare(
     num_runs = data["num_runs"]
     num_episodes = data["num_episodes"]
     num_policies = data["num_policies"]
+    ordered_policies = data["ordered_policies"][0, 0, 0, :, :]
     num_steps = data["num_steps"]
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
@@ -385,14 +388,13 @@ def plot_pi_fe_compare(
 
     fig, ax = plt.subplots()
     # Looping over the policies for Figure 2
-    policy_index_offset = 48
     for p in range(16):
 
         # Computing the mean (average) and std of one policy's free energies over the runs
         # TODO: handle rare case in which you train only for one episode, in that case squeeze()
         # will raise the exception
-        avg_pi_fe = np.mean(pi_fe[:, :, p + policy_index_offset, :], axis=0).squeeze()
-        std_pi_fe = np.std(pi_fe[:, :, p + policy_index_offset, :], axis=0).squeeze()
+        avg_pi_fe = np.mean(pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0).squeeze()
+        std_pi_fe = np.std(pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0).squeeze()
         # Making sure avg_pi_fe has the right dimensions
         assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
 
@@ -401,7 +403,17 @@ def plot_pi_fe_compare(
         x2 = np.arange(num_episodes)
         y2 = avg_pi_fe[:, step_fe_pi]
 
-        ax.plot(x2, y2, ".-", label=f"$\\pi_{{{p + policy_index_offset}}}$")
+        int_vals = ",".join(
+            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+        )
+
+        ax.plot(
+            x2,
+            y2,
+            ".-",
+            color=cmap(p),
+            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+        )
         # Confidence intervals (if needed, uncomment following lines)
         # ax.fill_between(
         #     x2,
@@ -420,6 +432,8 @@ def plot_pi_fe_compare(
         title="Policies",
         ncol=4,
         title_fontsize=16,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
@@ -517,7 +531,7 @@ def plot_total_fe(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free energy", rotation=90)
-    ax.set_ylim(0, 10)
+    ax.set_ylim(0, 7.5)
     # ax.legend(loc="upper right") # No need for legend
     #
     if step_fe != -1:
@@ -667,19 +681,19 @@ def plot_pi_prob_first(
     plt.figure()
     x = np.arange(num_episodes)
 
-    policy_index_offset = 0
     for p in range(num_policies):
-        y = avg_pi_prob[:, p + policy_index_offset].flatten()
-        std = std_pi_prob[:, p + policy_index_offset].flatten()
-        # plt.plot(
-        #     x, y, ".-", color=cmap(p), label=f"$\\pi_{{{p + policy_index_offset}}}$"
-        # )
+        y = avg_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
+        std = std_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
+        int_vals = ",".join(
+            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+        )
+        # int_list = [int(x) for x in ordered_policies[p + POLICY_INDEX_OFFSET]]
         plt.plot(
             x,
             y,
             ".-",
             color=cmap(p),
-            label=f"$\\pi_{{{p + policy_index_offset}}}$: {ordered_policies[p + policy_index_offset]}",
+            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
         )
 
         # plt.fill_between(
@@ -692,11 +706,13 @@ def plot_pi_prob_first(
     plt.xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     plt.xlabel("Episode")
     plt.ylabel("Probability mass", rotation=90)
-    # plt.ylim(0.02, 0.15)
+    plt.ylim(0.02, 0.3)
     plt.legend(
         title="Policies",
         ncol=4,
         title_fontsize=16,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
@@ -708,7 +724,7 @@ def plot_pi_prob_first(
     plt.savefig(
         save_dir
         + "/"
-        + f"{env_layout}_first_pi_probs_plan_offset{policy_index_offset}.jpg",
+        + f"{env_layout}_first_pi_probs_plan_offset{POLICY_INDEX_OFFSET}.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -736,6 +752,7 @@ def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=No
     data = np.load(file_data_path, allow_pickle=True).item()
     num_episodes = data["num_episodes"]
     num_policies = data["num_policies"]
+    ordered_policies = data["ordered_policies"][0, 0, 0, :, :]
     num_steps = data["num_steps"]
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
@@ -775,15 +792,27 @@ def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=No
         for p in range(num_policies):
             x = np.arange(num_episodes)
             y = avg_efe[:, p, select_step].flatten()
-            plt.plot(x, y, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+            int_vals = ",".join(
+                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            )
+
+            plt.plot(
+                x,
+                y,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+            )
 
     plt.xlabel(f"{x_label}")
     plt.ylabel("Expected free energy", rotation=90)
-    # plt.ylim(3, 6)
+    plt.ylim(3, 6)
     plt.legend(
         title="Policies",
-        title_fontsize=16,
         ncol=4,
+        title_fontsize=16,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
@@ -823,6 +852,7 @@ def plot_efe_comps(
     num_runs = data["num_runs"]
     num_episodes = data["num_episodes"]
     num_policies = data["num_policies"]
+    ordered_policies = data["ordered_policies"][0, 0, 0, :, :]
     num_steps = data["num_steps"]
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
@@ -921,9 +951,25 @@ def plot_efe_comps(
             y_efeB = avg_efe_Bnovelty[:, p, :].flatten()
             stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
+        # For the labels
+        int_vals = ",".join(
+            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+        )
         # Plot on figures
-        axes_1.plot(x, y_efer, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
-        axes_2.plot(x, y_efeB, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_1.plot(
+            x,
+            y_efer,
+            ".-",
+            color=cmap(p),
+            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+        )
+        axes_2.plot(
+            x,
+            y_efeB,
+            ".-",
+            color=cmap(p),
+            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+        )
         # Create confidence intervals for Risk and B-novelty (if needed, uncomment following lines)
         # axes_1[0].fill_between(
         #     x,
@@ -944,9 +990,9 @@ def plot_efe_comps(
     axes_1.set_xlabel(x_label)
     axes_2.set_xlabel(x_label)
     axes_1.set_ylabel("Risk", rotation=90)
-    # axes_1.set_ylim(3, 6)
     axes_2.set_ylabel("B-novelty", rotation=90)
-    # axes_2.set_ylim(0.3, 0.5)
+    axes_1.set_ylim(3, 6)
+    axes_2.set_ylim(0.3, 0.5)
 
     # Gather handles and labels from one of the axes to create common legend
     handles, labels = axes_1.get_legend_handles_labels()
@@ -957,6 +1003,8 @@ def plot_efe_comps(
         title="Polices",
         title_fontsize=16,
         ncol=4,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.05),
         fancybox=True,
@@ -971,6 +1019,8 @@ def plot_efe_comps(
         title="Polices",
         title_fontsize=16,
         ncol=4,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.05),
         fancybox=True,
@@ -980,13 +1030,13 @@ def plot_efe_comps(
     axes_2.set_title(f"B-novelty at {title_label}\n")
     # Save figures
     fig_1.savefig(
-        save_dir + "/" + f"{env_layout}_efe_path_risk.jpg",
+        save_dir + "/" + f"{env_layout}_efe_plan_risk.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
     )
     fig_2.savefig(
-        save_dir + "/" + f"{env_layout}_efe_path_bnov.jpg",
+        save_dir + "/" + f"{env_layout}_efe_plan_bnov.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -1022,9 +1072,25 @@ def plot_efe_comps(
             y_efeA = avg_efe_Anovelty[:, p, :].flatten()
             stdy_efeA = std_efe_Anovelty[:, p, :].flatten()
 
+        int_vals = ",".join(
+            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+        )
+
         # Plot subplots
-        axes_3.plot(x, y_efea, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
-        axes_4.plot(x, y_efeA, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_3.plot(
+            x,
+            y_efea,
+            ".-",
+            color=cmap(p),
+            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+        )
+        axes_4.plot(
+            x,
+            y_efeA,
+            ".-",
+            color=cmap(p),
+            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+        )
 
         # Confidence intervals for ambiguity and A-novelty
         # axes_2[0].fill_between(
@@ -1046,16 +1112,23 @@ def plot_efe_comps(
     axes_4.set_xlabel(x_label)
     axes_3.set_ylabel("Ambiguity", rotation=90)
     axes_4.set_ylabel("A-novelty", rotation=90)
-    axes_3.legend(
+    axes_3.set_ylim(3, 6)
+    axes_4.set_ylim(0.3, 0.5)
+
+    fig_3.legend(
         title="Policies",
         ncol=4,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
     )
-    axes_4.legend(
+    fig_4.legend(
         title="Policies",
         ncol=4,
+        handlelength=2,  # shrink the line handle
+        columnspacing=0.5,  # space between columns
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
@@ -1064,13 +1137,13 @@ def plot_efe_comps(
     axes_4.set_title(f"A-novelty at {title_label} across episodes\n")
     # Save figure
     fig_3.savefig(
-        save_dir + "/" + f"{env_layout}_efe_path_amb.jpg",
+        save_dir + "/" + f"{env_layout}_efe_plan_amb.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
     )
     fig_4.savefig(
-        save_dir + "/" + f"{env_layout}_efe_path_anov.jpg",
+        save_dir + "/" + f"{env_layout}_efe_plan_anov.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,

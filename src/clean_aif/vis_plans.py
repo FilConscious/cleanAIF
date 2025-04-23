@@ -31,7 +31,6 @@ def main():
         required=True,
         help="layout of the gridworld (choices: Tmaze3, Tmaze4, Ymaze4)",
     )
-    parser = argparse.ArgumentParser()
     # Argument for the timestep used to plot the free energy in  plot_pi_fe()
     # (default is the last time step of every episode)
     parser.add_argument("--step_fe_pi", "-fpi", type=int, default=-1)

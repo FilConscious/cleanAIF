@@ -1326,7 +1326,7 @@ def main():
     # Datetime object containing current date and time
     now = datetime.now()
     # Converting data-time in an appropriate string: '_dd.mm.YYYY_H.M.S'
-    dt_string = now.strftime("%d.%m.%Y_%H.%M.%S_")
+    dt_string = now.strftime("%Y.%m.%d_%H.%M.%S_")
     # Create string of experiment-specific info
     exp_info = (
         f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
