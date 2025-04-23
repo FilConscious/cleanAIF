@@ -1,15 +1,10 @@
 """
-
 Created at 18:00 on 21st July 2024
 @author: Filippo Torresan
-
 """
 
 # Standard libraries imports
-
-# Standard libraries imports
 import argparse
-import os
 import sys
 
 # import copy
@@ -28,255 +23,12 @@ from pathlib import Path
 import time
 
 # Custom imports
+from .ag_plans_cfg import *
 from .config import LOG_DIR
 from .utils_plans import *
 
 # Set the print options for NumPy
 np.set_printoptions(precision=3, suppress=True)
-
-
-@dataclass
-class Args:
-    """
-    Dataclass that defines and stores default parameters for the agent class.
-    """
-
-    ### General ###
-    """the name of this experiment"""
-    exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    ### Environment ###
-    """ Environment ID """
-    gym_id: str = "GridWorld-v1"
-    """ Max number of steps in an episode """
-    num_steps: int = 4
-    """ Number of environmental states (represented by indices 0,1,2,..,8) """
-    num_states: int = 9
-    ### Agent ###
-    """ the number of observation channels or modalities """
-    obs_channels: int = 1
-    """ dimensions of observations for each channel """
-    obs_dims: Tuple[int] = (1,)
-    """ the number of factors in the environment """
-    factors: int = 1
-    """ dimensions of each factor """
-    factors_dims: Tuple[int] = (1,)
-    """ index of starting state (agent knows start location) """
-    start_state: int = 7
-    """ index of goal state/location """
-    goal_state: int = 0
-    """ number of policies the agent consider at each planning step """
-    num_policies: int = 64
-    """ planning horizon, also the length of a policy """
-    """ NOTE: also MAX number of future steps for which expected free energy is computed """
-    plan_horizon: int = 3
-    """ number of actions (represented by indices 0,1,2,3)"""
-    num_actions: int = 4
-    """ init empty agent's policies arrays """
-    policies: np.ndarray = field(
-        default_factory=lambda: Args.init_policies(Args.plan_horizon)
-    )
-    """ preferences type """
-    pref_type: str = "states"
-    ### Agent's knowledge of the environment ###
-    """NOTE: using field() to generate a default value for the attribute when an instance is created,
-    by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
-    ``field(default_factory = custom_func)``) TODO: Clarify this note!!!!"""
-    """ C array: specifies agent's preferred state(s) in the environment """
-    C_params: np.ndarray = field(
-        default_factory=lambda: Args.init_C_array(
-            Args.num_states, Args.goal_state, Args.pref_type
-        )
-    )
-    """ B params: specifies Dirichlet parameters to compute transition probabilities """
-    B_params: np.ndarray = field(
-        default_factory=lambda: Args.init_B_params(Args.num_states, Args.num_actions)
-    )
-    """ A params: specifies Dirichlet parameters to compute observation probabilities """
-    A_params: np.ndarray = field(
-        default_factory=lambda: Args.init_A_params(Args.num_states)
-    )
-
-    # !!! ATTENTION !!!: probably not needed, check if it is OK removing
-    @staticmethod
-    def init_policies(policy_len: int) -> np.ndarray:
-        """
-        Create initial agent's policies array.
-
-        """
-
-        # Array to store policies crated at the planning stage
-        policies = np.empty((0, policy_len))
-
-        return policies
-
-    # def __post_init__(self):
-    #     """
-    #     Class method that runs at instance creation AFTER the dataclass is initialized, useful for additional
-    #     initialization logic that depends on the instance attributes.
-    #     """
-
-    #     # Create and set preference array for the agent
-    #     self.pref_array = self.create_pref_array(self.num_states, self.num_steps)
-
-    @staticmethod
-    def init_C_array(num_states: int, goal_state: int, pref_type: str) -> np.ndarray:
-        """
-        Initialize preference array, denoted by C in the active inference literature. The vector
-        stores the parameters of a categorical distribution with the probability mass concentrated on
-        the preferred/desired location of the agent in the maze environment.
-
-        NOTE 1: preferences can be either over states (default) or observations.
-
-        Input:
-        - num_states: number of states in the environment
-        - pref_type: preference type ("state" or "obs")
-
-        Ouput:
-
-        - pref_array: np.ndarray (matrix) of shape (num_states, 1)
-        """
-
-        # Initialize preference vector
-        pref_array = np.ones((num_states, 1)) * (1 / num_states)
-
-        if pref_type == "states":
-            print("Setting agent's preferences...")
-            # Assign probability to non-goal states...
-            pref_array[:, 0] = 0.1 / (num_states - 1)
-            # Assign probability to goal state
-            pref_array[goal_state, 0] = 0.9
-            print(pref_array)
-            # Checking all the probabilities sum to one
-            assert np.all(np.sum(pref_array, axis=0)) == 1, print(
-                "The preferences do not sum to one!"
-            )
-
-        elif pref_type == "obs":
-            # NOTE 1: we are assuming a 1-to-1 correspondence between states and observations, i.e. obs `1`
-            # indicates to the agent that it is in state `1`. Thus, the agent actually deals with an MDP as
-            # opposed to a POMDP, and selecting either type of preferences does not make a difference.
-            # NOTE 2; implement and use this kind of preferences with an actual POMDP (i.e., an observation
-            # `1` of the environment may or may not indicate state `1`).
-
-            # Assign probability to non-goal observation...
-            pref_array[:-1, 1] = 0.1 / (num_states - 1)
-            # Assign probability to goal observation
-            pref_array[-1, 1] = 0.9
-            # Checking all the probabilities sum to one
-            assert np.all(np.sum(pref_array, axis=0)) == 1, print(
-                "The preferences do not sum to one!"
-            )
-
-        return pref_array
-
-    @staticmethod
-    def init_B_params(num_states: int, num_actions: int) -> np.ndarray:
-        """
-        Initialize the Dirichlet parameters that specify the transition probabilities of the environment,
-        stored and denoted by B matrices in the active inference literature, when the agent does not have to
-        learn about them. The parameters are used in the agent's class to sample correct transition probabilities
-        when the 'learn_B' flag passed via the command line is False.
-
-        Input:
-        - num_state (integer): no. of states in environment
-        - num_actions (integer): no. of actions available to the agent
-
-        Output:
-        - B_params (np.ndarray): hard coded parmaters for the B matrices
-
-        """
-
-        B_params = np.zeros((num_actions, num_states, num_states))
-
-        # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
-        env_matrix_labels = np.reshape(np.arange(9), (3, 3))
-
-        # Assigning 1s to correct transitions for every action.
-        # IMPORTANT: The code below works for a maze of size (3, 3) only.
-        # Basically, we are looping over the 3 rows of the maze (indexed from 0 to 2)
-        # and assigning 1s to the correct transitions.
-        for r in range(3):
-
-            labels_ud = env_matrix_labels[r]
-            labels_rl = env_matrix_labels[:, r]
-
-            if r == 0:
-                # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
-                # Gymnasium grid coordinate system the negative and positive y axes are swapped
-                # Down action: 3
-                B_params[3, labels_ud, labels_ud] = 1
-                # Up action: 1
-                B_params[1, labels_ud[0], labels_ud[0]] = (
-                    1  # Hitting wall and stay at the same state
-                )
-                B_params[1, labels_ud[1] + 3, labels_ud[1]] = 1
-                B_params[1, labels_ud[2], labels_ud[2]] = (
-                    1  # Hitting wall and stay at the same state
-                )
-                # Right action: 0
-                B_params[0, labels_rl + 1, labels_rl] = 1
-                # Left action: 2
-                B_params[2, labels_rl, labels_rl] = 1
-
-            elif r == 1:
-                # Down action: 3
-                B_params[3, labels_ud - 3, labels_ud] = 1
-                # Up action: 1
-                B_params[1, labels_ud[0] + 3, labels_ud[0]] = 1
-                B_params[1, labels_ud[1], labels_ud[1]] = (
-                    1  # Hitting wall and stay at the same state
-                )
-                B_params[1, labels_ud[2] + 3, labels_ud[2]] = 1
-                # Right action: 0
-                B_params[0, labels_rl[0] + 1, labels_rl[0]] = 1
-                B_params[0, labels_rl[1], labels_rl[1]] = (
-                    1  # Hitting wall and stay at the same state
-                )
-                B_params[0, labels_rl[2] + 1, labels_rl[2]] = 1
-                # Left action: 2
-                B_params[2, labels_rl[0] - 1, labels_rl[0]] = 1
-                B_params[2, labels_rl[1], labels_rl[1]] = (
-                    1  # Hitting wall and stay at the same state
-                )
-                B_params[2, labels_rl[2] - 1, labels_rl[2]] = 1
-
-            elif r == 2:
-                # Down action: 3
-                B_params[3, labels_ud - 3, labels_ud] = 1
-                # Up action: 1
-                B_params[1, labels_ud, labels_ud] = 1
-                # Right action: 0
-                B_params[0, labels_rl, labels_rl] = 1
-                # Left action: 2
-                B_params[2, labels_rl - 1, labels_rl] = 1
-
-        # Increasing the magnitude of the Dirichlet parameters so that when the B matrices are sampled
-        # the correct transitions for every action will have a value close to 1.
-        B_params = B_params * 199 + 1
-
-        return B_params
-
-    @staticmethod
-    def init_A_params(num_states: int) -> np.ndarray:
-        """
-        Initialize the Dirichlet parameters that specify the state-observation mapping probabilities of the
-        environment, stored and denoted by A matrices in the active inference literature, when the agent does
-        not have to learn about them. The parameters are used in the agent's class to sample correct
-        observation probabilities when the 'learn_A' flag passed via the command line is False.
-
-        Input:
-        - num_state (integer): no. of states in environment
-
-        Output:
-        - A_params (np.ndarray): hard coded parmaters for the A matrix
-
-        """
-
-        # Create matrix of 1s with 200s on the diagonal
-        # NOTE: with these parameters there will be 1-to-1 correspondence between states and observations
-        A_params = np.identity(num_states) * 199 + 1
-
-        return A_params
 
 
 class params(TypedDict):
@@ -1759,7 +1511,7 @@ def main():
         f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
         f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
         f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}'
-        f'_npol{cl_params["num_policies"]}_phor{cl_params["policy_horizon"]}_ppr{cl_params["policy_prior"]}'
+        f'_npol{cl_params["num_policies"]}_phor{cl_params["plan_horizon"]}_ppr{cl_params["policy_prior"]}'
         f'_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
@@ -1808,7 +1560,7 @@ def main():
     rng = np.random.default_rng(seed=333777)
     # Create array of policies indices, all possible policies are considered
     policies_indices = np.arange(
-        agent_params["num_actions"] ** agent_params["efe_tsteps"]
+        agent_params["num_actions"] ** agent_params["plan_horizon"]
     )
     # Shuffle the indices
     rng.shuffle(policies_indices)
@@ -1831,7 +1583,7 @@ def main():
     NUM_STEPS = agent_params["num_steps"]
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
-    if env_layout == "t-maze-3":
+    if env_layout == "Tmaze3":
         WALLS_LOC = [
             convert_state(3),
             convert_state(5),
@@ -1839,18 +1591,18 @@ def main():
             convert_state(7),
             convert_state(8),
         ]
-    elif env_layout == "t-maze-4":
+    elif env_layout == "Tmaze4":
         WALLS_LOC = [
             convert_state(3),
             convert_state(5),
             convert_state(6),
             convert_state(8),
         ]
-    elif env_layout == "y-maze-4":
+    elif env_layout == "Ymaze4":
         WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
     else:
         raise ValueError(
-            "Value of 'env_layout' is not among the available ones. Choose from: t-maze-3, t-maze-4, t-maze-5."
+            "Value of 'env_layout' is not among the available ones. Choose from: Tmaze3, Tmaze4, Ymaze4."
         )
     # Fix target location in the environment (the same in every episode)
     TARGET_LOC = convert_state(agent_params["goal_state"])

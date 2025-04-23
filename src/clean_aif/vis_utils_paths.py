@@ -21,7 +21,12 @@ plt.rc("figure", titlesize=20)
 
 
 def plot_action_seq(
-    file_data_path, x_ticks_estep, policy_horizon, run_index, save_dir, env_layout
+    file_data_path,
+    x_ticks_estep,
+    policy_horizon,
+    run_index,
+    save_dir,
+    env_layout,
 ):
     """
     Function to plot action sequences across episodes.
@@ -66,7 +71,7 @@ def plot_action_seq(
     plt.legend(handles=legend_patches, title="Actions")
 
     plt.savefig(
-        save_dir + "/" + f"{env_layout}_actions_run{run_index}.jpg",
+        save_dir + "/" + f"{env_layout}_actions_path_run{run_index}.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
@@ -131,7 +136,12 @@ def plot_reward_counts(file_data_path, x_ticks_estep, save_dir, env_layout):
 
 
 def plot_pi_fe(
-    file_data_path, step_fe_pi, x_ticks_estep, x_ticks_tstep, select_policy, save_dir
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    select_policy,
+    save_dir,
 ):
     """Plotting the free energy conditioned on a specific policy, F_pi, averaged over the runs.
 
@@ -230,7 +240,7 @@ def plot_pi_fe(
         )
         # Save figure and show
         plt.savefig(
-            save_dir + "/" + f"pi{p}_fes_last_step.jpg",
+            save_dir + "/" + f"pi{p}_fes_path_last_step.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -834,13 +844,23 @@ def plot_efe_comps(
 
     # Pre-generate distinct colors
     cmap = plt.cm.get_cmap("tab20", num_policies)
-    # Plotting risk and B-novelty in separate subplots
+
+    ### Plotting risk and B-novelty in separate figures
+
+    # Figure for RISK
     fig_1, axes_1 = plt.subplots(
         1,
-        2,
-        figsize=(12, 5),
+        1,
+        figsize=(6, 5),
         gridspec_kw={"wspace": 0.4},  # Set figure size and horizontal spacing
-    )  # 1 row, 2 columns
+    )  # 1 row, 1 column
+    # Figure for B-novelty
+    fig_2, axes_2 = plt.subplots(
+        1,
+        1,
+        figsize=(6, 5),
+        gridspec_kw={"wspace": 0.4},  # Set figure size and horizontal spacing
+    )  # 1 row, 1 column
 
     for p in range(num_policies):
 
@@ -866,9 +886,9 @@ def plot_efe_comps(
             y_efeB = avg_efe_Bnovelty[:, p, :].flatten()
             stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
-        # Plot on subplots
-        axes_1[0].plot(x, y_efer, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
-        axes_1[1].plot(x, y_efeB, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        # Plot on figures
+        axes_1.plot(x, y_efer, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_2.plot(x, y_efeB, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
         # Create confidence intervals for Risk and B-novelty (if needed, uncomment following lines)
         # axes_1[0].fill_between(
         #     x,
@@ -886,15 +906,15 @@ def plot_efe_comps(
         #     alpha=0.3,
         # )
 
-    axes_1[0].set_xlabel(x_label)
-    axes_1[1].set_xlabel(x_label)
-    axes_1[0].set_ylabel("Risk", rotation=90)
-    # axes_1[0].set_ylim(3, 6)
-    axes_1[1].set_ylabel("B-novelty", rotation=90)
-    # axes_1[1].set_ylim(0.3, 0.5)
+    axes_1.set_xlabel(x_label)
+    axes_2.set_xlabel(x_label)
+    axes_1.set_ylabel("Risk", rotation=90)
+    # axes_1.set_ylim(3, 6)
+    axes_2.set_ylabel("B-novelty", rotation=90)
+    # axes_2.set_ylim(0.3, 0.5)
 
     # Gather handles and labels from one of the axes to create common legend
-    handles, labels = axes_1[0].get_legend_handles_labels()
+    handles, labels = axes_1.get_legend_handles_labels()
     # Put the legend at the bottom center
     fig_1.legend(
         handles,
@@ -907,36 +927,42 @@ def plot_efe_comps(
         fancybox=True,
     )
 
-    # axes_1[0].legend(
-    #     title="Polices",
-    #     title_fontsize=16,
-    #     ncol=4,
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, -0.2),
-    #     fancybox=True,
-    # )
-    # axes_1[1].legend(
-    #     title="Policies",
-    #     title_fontsize=16,
-    #     ncol=4,
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, -0.2),
-    #     fancybox=True,
-    # )
-    axes_1[0].set_title(f"Risk at {title_label}\n")
-    axes_1[1].set_title(f"B-novelty at {title_label}\n")
-    # Save figure and show
-    plt.savefig(
-        save_dir + "/" + f"{env_layout}_efe_path_risk_bnov.jpg",
+    # Gather handles and labels from one of the axes to create common legend
+    handles, labels = axes_2.get_legend_handles_labels()
+    # Put the legend at the bottom center
+    fig_2.legend(
+        handles,
+        labels,
+        title="Polices",
+        title_fontsize=16,
+        ncol=4,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.05),
+        fancybox=True,
+    )
+
+    axes_1.set_title(f"Risk at {title_label}\n")
+    axes_2.set_title(f"B-novelty at {title_label}\n")
+    # Save figures
+    fig_1.savefig(
+        save_dir + "/" + f"{env_layout}_efe_path_risk.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    fig_2.savefig(
+        save_dir + "/" + f"{env_layout}_efe_path_bnov.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
     )
     # plt.show()
-    plt.close()
+    plt.close(fig_1)
+    plt.close(fig_2)
 
-    # Plotting A-novelty and B-novelty in separate subplots
-    fig_2, axes_2 = plt.subplots(1, 2, figsize=(12, 5))  # 1 row, 2 columns
+    # Plotting ambiguity and A-novelty in separate figures
+    fig_3, axes_3 = plt.subplots(1, 1, figsize=(6, 5))  # 1 row, 1 column
+    fig_4, axes_4 = plt.subplots(1, 1, figsize=(6, 5))  # 1 row, 1 column
 
     for p in range(num_policies):
         # Plotting all time steps unless a specific time step is provided
@@ -962,8 +988,8 @@ def plot_efe_comps(
             stdy_efeA = std_efe_Anovelty[:, p, :].flatten()
 
         # Plot subplots
-        axes_2[0].plot(x, y_efea, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
-        axes_2[1].plot(x, y_efeA, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_3.plot(x, y_efea, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        axes_4.plot(x, y_efeA, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
         # Confidence intervals for ambiguity and A-novelty
         # axes_2[0].fill_between(
         #     x,
@@ -980,35 +1006,42 @@ def plot_efe_comps(
         #     alpha=0.3,
         # )
 
-    axes_2[0].set_xlabel(x_label)
-    axes_2[1].set_xlabel(x_label)
-    axes_2[0].set_ylabel("Ambiguity", rotation=90)
-    axes_2[1].set_ylabel("A-novelty", rotation=90)
-    axes_2[0].legend(
+    axes_3.set_xlabel(x_label)
+    axes_4.set_xlabel(x_label)
+    axes_3.set_ylabel("Ambiguity", rotation=90)
+    axes_4.set_ylabel("A-novelty", rotation=90)
+    axes_3.legend(
         title="Policies",
         ncol=4,
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
     )
-    axes_2[1].legend(
+    axes_4.legend(
         title="Policies",
         ncol=4,
         loc="upper center",
         bbox_to_anchor=(0.5, -0.2),
         fancybox=True,
     )
-    axes_2[0].set_title(f"Ambiguity at {title_label} across episodes\n")
-    axes_2[1].set_title(f"A-novelty at {title_label} across episodes\n")
-    # Save figure and show
-    plt.savefig(
-        save_dir + "/" + f"{env_layout}_efe_path_amb_anov.jpg",
+    axes_3.set_title(f"Ambiguity at {title_label} across episodes\n")
+    axes_4.set_title(f"A-novelty at {title_label} across episodes\n")
+    # Save figure
+    fig_3.savefig(
+        save_dir + "/" + f"{env_layout}_efe_path_amb.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    fig_4.savefig(
+        save_dir + "/" + f"{env_layout}_efe_path_anov.jpg",
         format="jpg",
         bbox_inches="tight",
         pad_inches=0.1,
     )
     # plt.show()
-    plt.close()
+    plt.close(fig_3)
+    plt.close(fig_4)
 
 
 def plot_efe_Bcomps(file_data_path, select_policy, save_dir):

@@ -23,6 +23,15 @@ def main():
     ### 1. PARSING COMMAND LINE
     ##################################
     parser = argparse.ArgumentParser()
+    # Name of the environment layout/task
+    parser.add_argument(
+        "--env_layout",
+        "-el",
+        type=str,
+        required=True,
+        help="layout of the gridworld (choices: Tmaze3, Tmaze4, Ymaze4)",
+    )
+    parser = argparse.ArgumentParser()
     # Argument for the timestep used to plot the free energy in  plot_pi_fe()
     # (default is the last time step of every episode)
     parser.add_argument("--step_fe_pi", "-fpi", type=int, default=-1)
@@ -111,6 +120,7 @@ def main():
         file_dp,
         params["x_ticks_estep"],
         result_dir,
+        params["env_layout"],
     )
 
     plot_action_seq(
@@ -119,6 +129,7 @@ def main():
         params["policy_horizon"],
         params["select_run"],
         result_dir,
+        params["env_layout"],
     )
 
     # 1.a Plotting the free energy conditioned on a policy, i.e. F_pi
@@ -138,6 +149,7 @@ def main():
         params["x_ticks_tstep"],
         params["select_policy"],
         result_dir,
+        params["env_layout"],
     )
     # 2.a Plotting the total free energy, i.e. E_pi[F_pi]
     plot_total_fe(
@@ -147,20 +159,40 @@ def main():
         params["x_ticks_tstep"],
         params["select_policy"],
         result_dir,
+        params["env_layout"],
     )
     # 2.b Plotting the expected free energy for each policy
-    plot_efe(file_dp, params["select_policy"], result_dir, select_step=0)
+    plot_efe(
+        file_dp,
+        params["select_policy"],
+        result_dir,
+        params["env_layout"],
+        select_step=0,
+    )
     # 2.c Plotting the expected free energy components for each policy
-    plot_efe_comps(file_dp, params["select_policy"], result_dir, num_tsteps=0)
+    plot_efe_comps(
+        file_dp,
+        params["select_policy"],
+        result_dir,
+        params["env_layout"],
+        num_tsteps=0,
+    )
     # plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)
     # 3.a Plotting the policies probabilities, i.e. Q(pi)
-    plot_pi_prob(file_dp, params["x_ticks_tstep"], params["select_policy"], result_dir)
-    plot_pi_prob_last(
+    plot_pi_prob(
+        file_dp,
+        params["x_ticks_tstep"],
+        params["select_policy"],
+        result_dir,
+        params["env_layout"],
+    )
+    plot_pi_prob_first(
         file_dp,
         params["x_ticks_estep"],
         params["x_ticks_tstep"],
         params["select_policy"],
         result_dir,
+        params["env_layout"],
     )
     # 3.b Plotting beliefs over states at a certain time step for every policy, i.e. Q(s|pi)
     # plot_Qs_pi_prob(
@@ -188,6 +220,7 @@ def main():
         params["state_A"],
         params["select_policy"],
         result_dir,
+        params["env_layout"],
     )
     # 5. Plotting related to matrix B, i.e., transitions probabilities
     plot_transitions(
@@ -197,7 +230,9 @@ def main():
         params["action_B"],
         params["select_policy"],
         result_dir,
+        params["env_layout"],
     )
+
     # 6. Plotting other heatmaps
     # Plotting categorical distributions Q(S|pi) from the last episode and *last* step (averaged over the runs)
     # plot_Qs_pi_final(file_dp, params["select_policy"], result_dir)
@@ -205,7 +240,12 @@ def main():
     # plot_Qs_pi_first(file_dp, params["select_policy"], result_dir)
     # Plotting state visits (averaged over the runs)
     plot_state_visits(
-        file_dp, params["v_len"], params["h_len"], params["select_policy"], result_dir
+        file_dp,
+        params["v_len"],
+        params["h_len"],
+        params["select_policy"],
+        result_dir,
+        params["env_layout"],
     )
 
     # 7. Plot number of time steps to termination/truncation of the environment
@@ -213,4 +253,5 @@ def main():
         file_dp,
         params["x_ticks_estep"],
         result_dir,
+        params["env_layout"],
     )
