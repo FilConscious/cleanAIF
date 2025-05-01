@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
+from clean_aif.vis_utils_paths import NUM_POLICIES_VIS
+
 
 plt.rc("axes", titlesize=20, labelsize=18)
 plt.rc("xtick", labelsize=16)
@@ -21,6 +23,7 @@ plt.rc("legend", fontsize=16)
 plt.rc("figure", titlesize=20)
 
 POLICY_INDEX_OFFSET = 0
+NUM_POLICIES_VIS = 16
 
 
 def plot_action_seq(
@@ -299,6 +302,7 @@ def plot_pi_fe_compare(
     select_policy,
     save_dir,
     env_layout,
+    policies_to_vis=[],
 ):
     """This function is almost the same as plot_pi_fe() (the previous plotting function) with the only
     difference that all policy-conditioned free energies, F_pi (potentially averaged over runs) are plotted
@@ -344,11 +348,11 @@ def plot_pi_fe_compare(
     ) or step_fe_pi == -1, "Invalid step number."
 
     # Pre-generate distinct colors
-    cmap = plt.cm.get_cmap("tab20", 16)
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(24, 8))
     # Looping over the policies for Figure 1
-    for p in range(num_policies):
+    for p in range(NUM_POLICIES_VIS):
 
         # Computing the mean (average) and std of one policy's free energies over the runs
         # TODO: handle rare case in which you train only for one episode, in that case squeeze()
@@ -387,33 +391,65 @@ def plot_pi_fe_compare(
     plt.close()
 
     fig, ax = plt.subplots()
-    # Looping over the policies for Figure 2
-    for p in range(16):
 
-        # Computing the mean (average) and std of one policy's free energies over the runs
-        # TODO: handle rare case in which you train only for one episode, in that case squeeze()
-        # will raise the exception
-        avg_pi_fe = np.mean(pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0).squeeze()
-        std_pi_fe = np.std(pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0).squeeze()
-        # Making sure avg_pi_fe has the right dimensions
-        assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+    if len(policies_to_vis) == 0:
+        # Looping over the policies for Figure 2
+        for p in range(NUM_POLICIES_VIS):
 
-        # Plotting the free energy at the last time step of every episode for all episodes
-        # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
-        x2 = np.arange(num_episodes)
-        y2 = avg_pi_fe[:, step_fe_pi]
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            ).squeeze()
+            std_pi_fe = np.std(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            ).squeeze()
+            # Making sure avg_pi_fe has the right dimensions
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
 
-        int_vals = ",".join(
-            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-        )
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(num_episodes)
+            y2 = avg_pi_fe[:, step_fe_pi]
 
-        ax.plot(
-            x2,
-            y2,
-            ".-",
-            color=cmap(p),
-            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
-        )
+            int_vals = ",".join(
+                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            )
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+            )
+    else:
+        # Looping over the policies for Figure 2
+        for i, p in enumerate(policies_to_vis):
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0).squeeze()
+            std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0).squeeze()
+            # Making sure avg_pi_fe has the right dimensions
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(num_episodes)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{p}}}$: {int_vals}",
+            )
+
         # Confidence intervals (if needed, uncomment following lines)
         # ax.fill_between(
         #     x2,
@@ -427,7 +463,7 @@ def plot_pi_fe_compare(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free Energy", rotation=90)
-    ax.set_ylim(0, 7)
+    # ax.set_ylim(0, 7) # Uncomment for Tmaze3 experiments, comment out for others
     ax.legend(
         title="Policies",
         ncol=4,
@@ -531,7 +567,7 @@ def plot_total_fe(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free energy", rotation=90)
-    ax.set_ylim(0, 7.5)
+    # ax.set_ylim(0, 7.5) # Uncomment for Tmaze3 experiments, comment out for others
     # ax.legend(loc="upper right") # No need for legend
     #
     if step_fe != -1:
@@ -633,6 +669,7 @@ def plot_pi_prob_first(
     select_policy,
     save_dir,
     env_layout,
+    policies_to_vis=[],
 ):
     """Function to plot the probability over policies, Q(pi), averaged over the runs at the first time
     step of each episode during the experiment.
@@ -676,25 +713,39 @@ def plot_pi_prob_first(
     # assert np.all(np.sum(avg_pi_prob_ls, axis=1)) == True, 'Probabilities do not sum to one!'
 
     # Pre-generate distinct colors
-    cmap = plt.cm.get_cmap("tab20", num_policies)
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
 
     plt.figure()
     x = np.arange(num_episodes)
 
-    for p in range(num_policies):
-        y = avg_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
-        std = std_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
-        int_vals = ",".join(
-            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-        )
-        # int_list = [int(x) for x in ordered_policies[p + POLICY_INDEX_OFFSET]]
-        plt.plot(
-            x,
-            y,
-            ".-",
-            color=cmap(p),
-            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
-        )
+    if len(policies_to_vis) == 0:
+
+        for p in range(NUM_POLICIES_VIS):
+            y = avg_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
+            std = std_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
+            int_vals = ",".join(
+                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            )
+            # int_list = [int(x) for x in ordered_policies[p + POLICY_INDEX_OFFSET]]
+            plt.plot(
+                x,
+                y,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+            )
+    else:
+        for i, p in enumerate(policies_to_vis):
+            y = avg_pi_prob[:, p].flatten()
+            std = std_pi_prob[:, p].flatten()
+            int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+            plt.plot(
+                x,
+                y,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{i}}}$: {int_vals}",
+            )
 
         # plt.fill_between(
         #     x,
@@ -706,7 +757,7 @@ def plot_pi_prob_first(
     plt.xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     plt.xlabel("Episode")
     plt.ylabel("Probability mass", rotation=90)
-    plt.ylim(0.02, 0.3)
+    # plt.ylim(0.02, 0.3) # Uncomment for Tmaze3 experiments, comment out for others
     plt.legend(
         title="Policies",
         ncol=4,
@@ -733,7 +784,14 @@ def plot_pi_prob_first(
     plt.close()
 
 
-def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=None):
+def plot_efe(
+    file_data_path,
+    select_policy,
+    save_dir,
+    env_layout,
+    select_step=None,
+    policies_to_vis=[],
+):
     """Function to plot the expected free energy, EFE, for a given policy over all the steps
     averaged over the runs.
 
@@ -772,7 +830,7 @@ def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=No
 
     plt.figure()
     # Pre-generate distinct colors
-    cmap = plt.cm.get_cmap("tab20", num_policies)
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
 
     if select_step == None:
         x_label = "Step"
@@ -788,25 +846,41 @@ def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=No
     else:
         x_label = "Episode"
         plot_title = f"Expected free energy at step {select_step}"
-        # Plotting EFE at single time step for each episode
-        for p in range(num_policies):
-            x = np.arange(num_episodes)
-            y = avg_efe[:, p, select_step].flatten()
-            int_vals = ",".join(
-                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-            )
 
-            plt.plot(
-                x,
-                y,
-                ".-",
-                color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
-            )
+        if len(policies_to_vis) == 0:
+            # Plotting EFE at single time step for each episode
+            for p in range(NUM_POLICIES_VIS):
+                x = np.arange(num_episodes)
+                y = avg_efe[:, p, select_step].flatten()
+                int_vals = ",".join(
+                    str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+                )
+
+                plt.plot(
+                    x,
+                    y,
+                    ".-",
+                    color=cmap(p),
+                    label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                )
+        else:
+            # Plotting EFE at single time step for each episode
+            for i, p in enumerate(policies_to_vis):
+                x = np.arange(num_episodes)
+                y = avg_efe[:, p, select_step].flatten()
+                int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+
+                plt.plot(
+                    x,
+                    y,
+                    ".-",
+                    color=cmap(i),
+                    label=f"$\\pi_{{{p}}}$: {int_vals}",
+                )
 
     plt.xlabel(f"{x_label}")
     plt.ylabel("Expected free energy", rotation=90)
-    plt.ylim(3, 6)
+    # plt.ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
     plt.legend(
         title="Policies",
         ncol=4,
@@ -831,7 +905,12 @@ def plot_efe(file_data_path, select_policy, save_dir, env_layout, select_step=No
 
 
 def plot_efe_comps(
-    file_data_path, select_policy, save_dir, env_layout, num_tsteps=None
+    file_data_path,
+    select_policy,
+    save_dir,
+    env_layout,
+    num_tsteps=None,
+    policies_to_vis=[],
 ):
     """Plotting the expected free energy components (ambiguity, risk and novelty) for a given policy over
     all the steps averaged over the runs.
@@ -908,7 +987,7 @@ def plot_efe_comps(
     ), "Wrong dimenions!"
 
     # Pre-generate distinct colors
-    cmap = plt.cm.get_cmap("tab20", num_policies)
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
 
     ### Plotting risk and B-novelty in separate figures
 
@@ -926,73 +1005,100 @@ def plot_efe_comps(
         figsize=(6, 5),
         gridspec_kw={"wspace": 0.4},  # Set figure size and horizontal spacing
     )  # 1 row, 1 column
+    #
 
-    for p in range(num_policies):
+    if len(policies_to_vis) == 0:
+        for p in range(NUM_POLICIES_VIS):
+            # Plotting all time steps unless a specific time step is provided
+            if num_tsteps != None:
+                x_label = "Episode"
+                title_label = f"step {num_tsteps}"
+                x = np.arange(num_episodes)
+                # Risk
+                y_efer = avg_efe_risk[:, p, num_tsteps].flatten()
+                stdy_efer = std_efe_risk[:, p, num_tsteps].flatten()
+                # B-novelty
+                y_efeB = avg_efe_Bnovelty[:, p, num_tsteps].flatten()
+                stdy_efeB = std_efe_Bnovelty[:, p, num_tsteps].flatten()
+            else:
+                x_label = "Step"
+                title_label = "all steps"
+                x = np.arange(num_episodes * num_steps)
+                # Risk
+                y_efer = avg_efe_risk[:, p, :].flatten()
+                stdy_efer = std_efe_risk[:, p, :].flatten()
+                # Ambiguity
+                y_efeB = avg_efe_Bnovelty[:, p, :].flatten()
+                stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
-        # Plotting all time steps unless a specific time step is provided
-        if num_tsteps != None:
-            x_label = "Episode"
-            title_label = f"step {num_tsteps}"
-            x = np.arange(num_episodes)
-            # Risk
-            y_efer = avg_efe_risk[:, p, num_tsteps].flatten()
-            stdy_efer = std_efe_risk[:, p, num_tsteps].flatten()
-            # B-novelty
-            y_efeB = avg_efe_Bnovelty[:, p, num_tsteps].flatten()
-            stdy_efeB = std_efe_Bnovelty[:, p, num_tsteps].flatten()
-        else:
-            x_label = "Step"
-            title_label = "all steps"
-            x = np.arange(num_episodes * num_steps)
-            # Risk
-            y_efer = avg_efe_risk[:, p, :].flatten()
-            stdy_efer = std_efe_risk[:, p, :].flatten()
-            # Ambiguity
-            y_efeB = avg_efe_Bnovelty[:, p, :].flatten()
-            stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
+            # For the labels
+            int_vals = ",".join(
+                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            )
+            # Plot on figures
+            axes_1.plot(
+                x,
+                y_efer,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+            )
+            axes_2.plot(
+                x,
+                y_efeB,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+            )
 
-        # For the labels
-        int_vals = ",".join(
-            str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-        )
-        # Plot on figures
-        axes_1.plot(
-            x,
-            y_efer,
-            ".-",
-            color=cmap(p),
-            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
-        )
-        axes_2.plot(
-            x,
-            y_efeB,
-            ".-",
-            color=cmap(p),
-            label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
-        )
-        # Create confidence intervals for Risk and B-novelty (if needed, uncomment following lines)
-        # axes_1[0].fill_between(
-        #     x,
-        #     y_efer - (1.96 * stdy_efer / np.sqrt(num_runs)),
-        #     y_efer + (1.96 * stdy_efer / np.sqrt(num_runs)),
-        #     color=cmap(p),
-        #     alpha=0.3,
-        # )
+    else:
+        for i, p in enumerate(policies_to_vis):
+            # Plotting all time steps unless a specific time step is provided
+            if num_tsteps != None:
+                x_label = "Episode"
+                title_label = f"step {num_tsteps}"
+                x = np.arange(num_episodes)
+                # Risk
+                y_efer = avg_efe_risk[:, p, num_tsteps].flatten()
+                stdy_efer = std_efe_risk[:, p, num_tsteps].flatten()
+                # B-novelty
+                y_efeB = avg_efe_Bnovelty[:, p, num_tsteps].flatten()
+                stdy_efeB = std_efe_Bnovelty[:, p, num_tsteps].flatten()
+            else:
+                x_label = "Step"
+                title_label = "all steps"
+                x = np.arange(num_episodes * num_steps)
+                # Risk
+                y_efer = avg_efe_risk[:, p, :].flatten()
+                stdy_efer = std_efe_risk[:, p, :].flatten()
+                # Ambiguity
+                y_efeB = avg_efe_Bnovelty[:, p, :].flatten()
+                stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
-        # axes_1[1].fill_between(
-        #     x,
-        #     y_efeB - (1.96 * stdy_efeB / np.sqrt(num_runs)),
-        #     y_efeB + (1.96 * stdy_efeB / np.sqrt(num_runs)),
-        #     color=cmap(p),
-        #     alpha=0.3,
-        # )
+            # For the labels
+            int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+            # Plot on figures
+            axes_1.plot(
+                x,
+                y_efer,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{p}}}$: {int_vals}",
+            )
+            axes_2.plot(
+                x,
+                y_efeB,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{p}}}$: {int_vals}",
+            )
 
     axes_1.set_xlabel(x_label)
     axes_2.set_xlabel(x_label)
     axes_1.set_ylabel("Risk", rotation=90)
     axes_2.set_ylabel("B-novelty", rotation=90)
-    axes_1.set_ylim(3, 6)
-    axes_2.set_ylim(0.3, 0.5)
+    # axes_1.set_ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
+    # axes_2.set_ylim(0.3, 0.5) # Uncomment for Tmaze3 experiments, comment out for others
 
     # Gather handles and labels from one of the axes to create common legend
     handles, labels = axes_1.get_legend_handles_labels()
@@ -1112,8 +1218,8 @@ def plot_efe_comps(
     axes_4.set_xlabel(x_label)
     axes_3.set_ylabel("Ambiguity", rotation=90)
     axes_4.set_ylabel("A-novelty", rotation=90)
-    axes_3.set_ylim(3, 6)
-    axes_4.set_ylim(0.3, 0.5)
+    # axes_3.set_ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
+    # axes_4.set_ylim(0.3, 0.5) # Uncomment for Tmaze3 experiments, comment out for others
 
     fig_3.legend(
         title="Policies",
@@ -1779,110 +1885,8 @@ def plot_transitions(
         plt.close()
 
 
-def plot_Qs_pi_final(file_data_path, select_policy, save_dir, env_layout):
-    """Visualising the Q(S_i|pi) for each policy at the end of the experiment, where i is in
-    [0,...,num_steps-1] and indicates the time step during an episode. Note that the the Q(S_i|pi)
-    are categorical distributions telling you the state beliefs the agent has for each episode's time step.
-
-    Inputs:
-
-    - file_data_path (string): file path where transition probabilities were stored
-      (i.e. where log_data was saved);
-    - save_dir (string): directory where to save the images;
-
-    Outputs:
-
-    - heatmap showing the Q(S_i|pi) for each policy at the end of the experiment.
-    """
-
-    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'policy_state_prob'
-    data = np.load(file_data_path, allow_pickle=True).item()
-    num_episodes = data["num_episodes"]
-    num_steps = data["num_steps"]
-    num_states = data["num_states"]
-    policies = data["policies"]
-
-    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
-    # was passed through the command line
-    if select_policy != -1:
-
-        pi_runs = data["pi_probabilities"][:, -1, select_policy, -1]
-        selected_runs = (pi_runs > 0.5).nonzero()[0]
-        Qs_pi_prob = data["policy_state_prob"][selected_runs]
-    else:
-        Qs_pi_prob = data["policy_state_prob"]
-
-    # Averaging the Q(S|pi) over the runs
-    avg_Qspi = np.mean(Qs_pi_prob, axis=0).squeeze()
-    # Selecting the probabilities for the last episode only
-    last_episode_Qspi = avg_Qspi[-1, :, :, :]
-
-    # Heatmap of the Q(s|pi) for every policy at the end of the experiment (after last episode)
-    for p in range(last_episode_Qspi.shape[0]):
-
-        # Creating figure and producing heatmap for policy p
-        fig, ax = plt.subplots()
-        fig.set_figwidth(5)
-        fig.set_figheight(6)
-        X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
-        im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :].squeeze(), shading="auto")
-
-        # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
-        qspi_labels = []
-        for s in range(num_steps):
-            # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
-            qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
-
-        ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
-        ax.set_xticklabels(qspi_labels, minor=True)
-        ax.tick_params(
-            which="minor", top=True, bottom=False, labeltop=True, labelbottom=False
-        )
-        ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
-
-        plt.setp(ax.get_xticklabels(minor=True), ha="left", rotation=30)
-
-        # Loop over data dimensions and create text annotations.
-        # Note 1: i, j are inverted in ax.text() because row-column coordinates in a matrix correspond
-        # to y-x Cartesian coordinates
-        for i in range(num_states):
-            for j in range(num_steps):
-                text = ax.text(
-                    j,
-                    i,
-                    f"{last_episode_Qspi[p, i, j]:.3f}",
-                    ha="center",
-                    va="center",
-                    color="m",
-                    fontsize="medium",
-                )
-
-        # Create colorbar
-        cbar = ax.figure.colorbar(im, ax=ax)
-        cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom")
-
-        ax.set_xticks(np.arange(num_steps))
-        ax.set_xlabel("Time Step")
-        ax.invert_yaxis()
-        ax.set_yticks(np.arange(num_states))
-        ax.set_ylabel("State", rotation=90)
-        ax.set_title(
-            f"Last-step State Beliefs for Policy $\\pi_{{{p}}}$: [{', '.join(map(str, policies[p]))}]"
-        )
-
-        # Save figure and show
-        plt.savefig(
-            save_dir + "/" + f"{env_layout}_Qs_pi{p}_final_plan.jpg",
-            format="jpg",
-            bbox_inches="tight",
-            pad_inches=0.1,
-        )
-        # plt.show()
-        plt.close()
-
-
-def plot_Qs_pi_first(file_data_path, select_policy, save_dir, env_layout):
-    """Visualising the Q(S_i|pi) for each policy at the first time time step of the last episode, where i
+def plot_Qs_pi_first(file_data_path, select_policy, episode, save_dir, env_layout):
+    """Visualising the Q(S_i|pi) for each policy at the first time time step of an episode, where i
     is in [0,...,num_steps-1] and indicates the time step during an episode. Note that the the Q(S_i|pi)
     are categorical distributions telling you the state beliefs the agent has for each episode's time step.
 
@@ -1902,7 +1906,19 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir, env_layout):
     num_episodes = data["num_episodes"]
     num_steps = data["num_steps"]
     num_states = data["num_states"]
-    policies = data["policies"]
+    num_policies = data["num_policies"]
+    # Note: policies are ordered at the first step of every episode, here we retrieve such order by looking
+    # at any run/episode; (num_runs, num_episodes, num_steps, num_policies, num_efe_steps)
+    policies = data["ordered_policies"][0, 0, 0, :, :]
+
+    # Retrieve the Qs to concatenate the first step of each episode to the remaining future steps
+    Qs = data["states_beliefs"]
+    # Averaging the Q(S) over the runs
+    avg_Qs = np.mean(Qs, axis=0)
+    # Selecting the probabilities for the last episode only
+    first_step_Qs = np.tile(
+        avg_Qs[episode, :, 0][np.newaxis, :, np.newaxis], (num_policies, 1, 1)
+    )
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -1916,21 +1932,24 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir, env_layout):
 
     # Averaging the Q(S|pi) over the runs
     avg_Qspi = np.mean(Qs_pi_prob, axis=0).squeeze()
-    # Selecting the probabilities for the last episode only
-    last_episode_Qspi = avg_Qspi[-1, :, :, :]
+    # Selecting the probabilities for one episode
+    last_episode_Qspi = avg_Qspi[episode, :, :, :]
+    # Concatenate with first step beliefs
+    last_episode_Qspi = np.concatenate((first_step_Qs, last_episode_Qspi), axis=2)
 
     # Heatmap of the Q(s|pi) for every policy at the end of the experiment (after last episode)
-    for p in range(last_episode_Qspi.shape[0]):
+    for p in range(num_policies):
 
         # Creating figure and producing heatmap for policy p
         fig, ax = plt.subplots()
         fig.set_figwidth(5)
         fig.set_figheight(6)
         X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
-        im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :].squeeze(), shading="auto")
+        im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :], shading="auto")
 
         # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
         qspi_labels = []
+
         for s in range(num_steps):
             # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
             qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
@@ -1968,19 +1987,110 @@ def plot_Qs_pi_first(file_data_path, select_policy, save_dir, env_layout):
         ax.invert_yaxis()
         ax.set_yticks(np.arange(num_states))
         ax.set_ylabel("State", rotation=90)
+        # Policy action sequence converted into string
+        policy_action_seq = f"{''.join(map(str, policies[p].astype(int)))}"
         ax.set_title(
-            f"First-step State Beliefs for Policy $\\pi_{{{p}}}$: [{', '.join(map(str, policies[p]))}]"
+            f"First-step state beliefs for $\\pi_{{{p}}}$: {policy_action_seq} in episode {episode}"
         )
 
         # Save figure and show
         plt.savefig(
-            save_dir + "/" + f"{env_layout}_Qs_pi{p}_start_plan.jpg",
+            save_dir
+            + "/"
+            + f"{env_layout}_Qs_pi{p}_a{policy_action_seq}_fs_ep{episode}_path.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
         )
         # plt.show()
         plt.close()
+
+
+def plot_Qs(file_data_path, episode, save_dir, env_layout):
+    """Visualising the Q(S_i) at the last time time step of an episode, where i is in [0,...,num_steps-1]
+    and indicates the time step during an episode. Note that the the Q(S_i|pi) are categorical
+    distributions telling you the state beliefs the agent has for each episode's time step.
+
+    Inputs:
+
+    - file_data_path (string): file path where transition probabilities were stored
+      (i.e. where log_data was saved);
+    - save_dir (string): directory where to save the images;
+
+    Outputs:
+
+    - heatmap showing the Q(S_i|pi) for each policy at the end of the experiment.
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'states_beliefs'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+    num_states = data["num_states"]
+    Qs = data["states_beliefs"]
+
+    # Averaging the Q(S) over the runs
+    avg_Qs = np.mean(Qs, axis=0).squeeze()
+    # Selecting the probabilities for the last episode only
+    last_episode_Qs = avg_Qs[episode, :, :]
+
+    # Heatmap of the Q(s) at the last time step of the episode
+    fig, ax = plt.subplots()
+    fig.set_figwidth(5)
+    fig.set_figheight(6)
+    X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
+    im = ax.pcolormesh(X, Y, last_episode_Qs[:, :].squeeze(), shading="auto")
+
+    # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
+    qspi_labels = []
+    for s in range(num_steps):
+        # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
+        qspi_labels.append(rf"$Q(s_{{{s}}})$")
+
+    ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
+    ax.set_xticklabels(qspi_labels, minor=True)
+    ax.tick_params(
+        which="minor", top=True, bottom=False, labeltop=True, labelbottom=False
+    )
+    ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+
+    plt.setp(ax.get_xticklabels(minor=True), ha="left", rotation=30)
+
+    # Loop over data dimensions and create text annotations.
+    # Note 1: i, j are inverted in ax.text() because row-column coordinates in a matrix correspond
+    # to y-x Cartesian coordinates
+    for i in range(num_states):
+        for j in range(num_steps):
+            text = ax.text(
+                j,
+                i,
+                f"{last_episode_Qs[i, j]:.3f}",
+                ha="center",
+                va="center",
+                color="m",
+                fontsize="medium",
+            )
+
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom")
+
+    ax.set_xticks(np.arange(num_steps))
+    ax.set_xlabel("Time Step")
+    ax.invert_yaxis()
+    ax.set_yticks(np.arange(num_states))
+    ax.set_ylabel("State", rotation=90)
+    ax.set_title(f"Last-step state beliefs in episode {episode}")
+
+    # Save figure and show
+    plt.savefig(
+        save_dir + "/" + f"{env_layout}_Qs_ls_ep{episode}_plan.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
 
 
 def plot_oa_sequence(file_data_path, num_episodes, num_steps):

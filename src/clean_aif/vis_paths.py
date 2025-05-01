@@ -64,6 +64,17 @@ def main():
     parser.add_argument("--policy_horizon", "-ph", type=int)
     # Argument to select one run/agent (e.g. used to plot one action sequence)
     parser.add_argument("--select_run", "-selrun", type=int)
+    # Argument to select one specific episode ( used to plot policy-conditioned state beliefs)
+    parser.add_argument("--select_episode", "-selep", type=int, default=-1)
+    # Argument to select a group of policies to plot
+    parser.add_argument(
+        "--policies_to_vis",
+        "-polvis",
+        nargs="*",
+        type=int,
+        default=[],
+        help="A list of policies indices",
+    )
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -149,6 +160,7 @@ def main():
         params["select_policy"],
         result_dir,
         params["env_layout"],
+        policies_to_vis=params["policies_to_vis"],
     )
     # 2.a Plotting the total free energy, i.e. E_pi[F_pi]
     plot_total_fe(
@@ -167,6 +179,7 @@ def main():
         result_dir,
         params["env_layout"],
         select_step=0,
+        policies_to_vis=params["policies_to_vis"],
     )
     # 2.c Plotting the expected free energy components for each policy
     plot_efe_comps(
@@ -175,6 +188,7 @@ def main():
         result_dir,
         params["env_layout"],
         num_tsteps=0,
+        policies_to_vis=params["policies_to_vis"],
     )
     # plot_efe_Bcomps(file_dp, params["select_policy"], result_dir)
     # 3.a Plotting the policies probabilities, i.e. Q(pi)
@@ -192,6 +206,7 @@ def main():
         params["select_policy"],
         result_dir,
         params["env_layout"],
+        policies_to_vis=params["policies_to_vis"],
     )
     # 3.b Plotting beliefs over states at a certain time step for every policy, i.e. Q(s|pi)
     # plot_Qs_pi_prob(
@@ -232,17 +247,19 @@ def main():
         params["env_layout"],
     )
     # 6. Plotting other heatmaps
-    # Plotting categorical distributions Q(S|pi) from the last episode and *last* step (averaged over the runs)
-    plot_Qs_pi_final(
-        file_dp,
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-    )
     # Plotting categorical distributions Q(S|pi) from the last episode and *first* step (averaged over the runs)
     plot_Qs_pi_first(
         file_dp,
         params["select_policy"],
+        params["select_episode"],
+        result_dir,
+        params["env_layout"],
+    )
+    # Plotting categorical distributions Q(S|pi) from the last episode and *last* step (averaged over the runs)
+    plot_Qs_pi_final(
+        file_dp,
+        params["select_policy"],
+        params["select_episode"],
         result_dir,
         params["env_layout"],
     )
