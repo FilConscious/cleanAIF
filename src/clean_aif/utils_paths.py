@@ -992,7 +992,7 @@ def cat_KL(Q, P, axis=0):
     return kl_div
 
 
-def process_obs(obs: np.ndarray) -> int:
+def process_obs(obs: np.ndarray, env_layout: str) -> int:
     """
     Function to convert a (x, y) representation of a state in the gridworld to an index representation
     that numbers each state from 0 to 8 starting from the top left corner and moving from left to right,
@@ -1004,18 +1004,69 @@ def process_obs(obs: np.ndarray) -> int:
     - index: int
     """
 
-    index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+    if env_layout == "Tmaze3":
 
-    state_index = index_repr[obs[1], obs[0]].item()
+        index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, -1, -1]])
+        state_index = index_repr[obs[1], obs[0]].item()
+
+        assert state_index != -1, print(f"Value of state index is invalid.")
+
+    elif env_layout == "Tmaze4":
+
+        index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, 4, -1]])
+        state_index = index_repr[obs[1], obs[0]].item()
+
+        assert state_index != -1, print(f"Value of state index is invalid.")
+
+    elif env_layout == "Ymaze4":
+
+        index_repr = np.array([[0, -1, 1], [2, 3, 4], [-1, 5, -1]])
+        state_index = index_repr[obs[1], obs[0]].item()
+
+        assert state_index != -1, print(f"Value of state index is invalid.")
+
+    else:
+        raise ValueError(
+            "Value of 'env_layout' is not among the available ones. Choose from: Tmaze3, Tmaze4, Ymaze4."
+        )
 
     return state_index
 
 
-def convert_state(state: int) -> np.ndarray:
+def convert_state(state: int, env_layout: str) -> np.ndarray:
     """"""
 
-    index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+    assert state != -1, print(f"Value of state is invalid.")
 
+    if env_layout == "Tmaze3":
+
+        index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, -1, -1]])
+        y, x = np.where(index_repr == state)
+
+    elif env_layout == "Tmaze4":
+
+        index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, 4, -1]])
+        y, x = np.where(index_repr == state)
+
+    elif env_layout == "Ymaze4":
+
+        index_repr = np.array([[0, -1, 1], [2, 3, 4], [-1, 5, -1]])
+        y, x = np.where(index_repr == state)
+
+    else:
+        raise ValueError(
+            "Value of 'env_layout' is not among the available ones. Choose from: Tmaze3, Tmaze4, Ymaze4."
+        )
+
+    return np.array([x[0], y[0]])
+
+
+def set_wall_xy(state: int) -> np.ndarray:
+    """"""
+
+    assert state != -1, print(f"Value of state is invalid.")
+
+    index_repr = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
     y, x = np.where(index_repr == state)
 
     return np.array([x[0], y[0]])
