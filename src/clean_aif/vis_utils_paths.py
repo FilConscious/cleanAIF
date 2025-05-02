@@ -1942,7 +1942,7 @@ def plot_Qs_pi_final(file_data_path, select_policy, episode, save_dir, env_layou
         policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
         policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
         ax.set_title(
-            f"Last-step state beliefs for $\\pi_{{{p}}}$: {policy_action_seq_figtitle} in episode {episode}",
+            f"Last-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
             pad=20,
         )
 
@@ -2051,7 +2051,7 @@ def plot_Qs_pi_first(file_data_path, select_policy, episode, save_dir, env_layou
         policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
         policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
         ax.set_title(
-            f"First-step state beliefs for $\\pi_{{{p}}}$: {policy_action_seq_figtitle} in episode {episode}",
+            f"First-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
             pad=20,
         )
 

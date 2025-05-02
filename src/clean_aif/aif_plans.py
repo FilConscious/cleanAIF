@@ -1585,27 +1585,27 @@ def main():
     env_layout = agent_params["env_layout"]
     if env_layout == "Tmaze3":
         WALLS_LOC = [
-            convert_state(3),
-            convert_state(5),
-            convert_state(6),
-            convert_state(7),
-            convert_state(8),
+            set_wall_xy(3),
+            set_wall_xy(5),
+            set_wall_xy(6),
+            set_wall_xy(7),
+            set_wall_xy(8),
         ]
     elif env_layout == "Tmaze4":
         WALLS_LOC = [
-            convert_state(3),
-            convert_state(5),
-            convert_state(6),
-            convert_state(8),
+            set_wall_xy(3),
+            set_wall_xy(5),
+            set_wall_xy(6),
+            set_wall_xy(8),
         ]
     elif env_layout == "Ymaze4":
-        WALLS_LOC = [convert_state(1), convert_state(6), convert_state(8)]
+        WALLS_LOC = [set_wall_xy(1), set_wall_xy(6), set_wall_xy(8)]
     else:
         raise ValueError(
             "Value of 'env_layout' is not among the available ones. Choose from: Tmaze3, Tmaze4, Ymaze4."
         )
     # Fix target location in the environment (the same in every episode)
-    TARGET_LOC = convert_state(agent_params["goal_state"])
+    TARGET_LOC = convert_state(agent_params["goal_state"], env_layout)
 
     # Create the environment
     env = gymnasium.make(
@@ -1640,7 +1640,7 @@ def main():
         # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
         # what the Gymnasium environment requires.
         AGENT_LOC = convert_state(
-            agent_params["start_state"]
+            agent_params["start_state"], env_layout
         )  # output: np.array([0, 0])
         # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
         agent = Agent(cast(params, agent_params))
@@ -1674,7 +1674,7 @@ def main():
             # print(f"Observation: {obs}; type {type(obs)}")
             obs = obs["agent"]
             # Convert obs into index representation
-            start_state = process_obs(obs)
+            start_state = process_obs(obs, env_layout)
             # Adding a unit to the state_visits counter for the start_state
             logs_writer.log_step(run, e, start_state)
             # Current state (updated at every step and passed to the agent)
@@ -1703,7 +1703,7 @@ def main():
                 # Retrieve observation of the agent's location
                 next_obs = next_obs["agent"]
                 # Convert observation into index representation
-                next_state = process_obs(next_obs)
+                next_state = process_obs(next_obs, env_layout)
                 # Update total_reward
                 total_reward += reward
 
@@ -1754,7 +1754,7 @@ def main():
             # In a continuing task update AGENT_LOC with the last computed policy-independent state probabilities
             # NOTE: this is done so that the environment receives the correct option at the next episode
             if task_type == "continuing":
-                AGENT_LOC = convert_state(int(np.argmax(agent.D)))
+                AGENT_LOC = convert_state(int(np.argmax(agent.D)), env_layout)
 
             # Reset the agent before starting a new episode
             agent.reset()

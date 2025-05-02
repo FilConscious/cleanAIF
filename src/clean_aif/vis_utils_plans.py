@@ -25,6 +25,14 @@ plt.rc("figure", titlesize=20)
 POLICY_INDEX_OFFSET = 0
 NUM_POLICIES_VIS = 16
 
+# Actions in the maze for observer
+actions_map = {
+    0: "$\\rightarrow$",
+    1: "$\\downarrow$",
+    2: "$\\leftarrow$",
+    3: "$\\uparrow$",
+}
+
 
 def plot_action_seq(
     file_data_path,
@@ -1872,7 +1880,7 @@ def plot_transitions(
 
         ax2.set_xlabel("States")
         ax2.set_ylabel("States", rotation=90)
-        ax2.set_title(f"Transition Matrix for Action {a}")
+        ax2.set_title(f"Transition matrix for action {actions_map[a]}", pad=20)
 
         # Save figure and show
         plt.savefig(
@@ -1988,16 +1996,20 @@ def plot_Qs_pi_first(file_data_path, select_policy, episode, save_dir, env_layou
         ax.set_yticks(np.arange(num_states))
         ax.set_ylabel("State", rotation=90)
         # Policy action sequence converted into string
-        policy_action_seq = f"{''.join(map(str, policies[p].astype(int)))}"
+        policy_action_seq_filetitle = f"{''.join(map(str, policies[p].astype(int)))}"
+        policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
+        policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
+
         ax.set_title(
-            f"First-step state beliefs for $\\pi_{{{p}}}$: {policy_action_seq} in episode {episode}"
+            f"First-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
+            pad=20,
         )
 
         # Save figure and show
         plt.savefig(
             save_dir
             + "/"
-            + f"{env_layout}_Qs_pi{p}_a{policy_action_seq}_fs_ep{episode}_path.jpg",
+            + f"{env_layout}_Qs_pi{p}_a{policy_action_seq_filetitle}_fs_ep{episode}_path.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -2080,7 +2092,7 @@ def plot_Qs(file_data_path, episode, save_dir, env_layout):
     ax.invert_yaxis()
     ax.set_yticks(np.arange(num_states))
     ax.set_ylabel("State", rotation=90)
-    ax.set_title(f"Last-step state beliefs in episode {episode}")
+    ax.set_title(f"Last-step state beliefs in episode {episode}", pad=20)
 
     # Save figure and show
     plt.savefig(
@@ -2173,12 +2185,18 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
     # Total number of steps
     total_steps = np.sum(tot_sv)
 
-    # Reshaping the state counts vector into a matrix so as to visualise the maze
-    env_matrix = np.reshape(tot_sv, (v_len, h_len))
+    if env_layout == "Tmaze3":
+        env_matrix = np.zeros((v_len, h_len))
+        env_matrix[0, :] = tot_sv[:-1]
+        env_matrix[1, 1] = tot_sv[-1]
+
+    else:
+        # Reshaping the state counts vector into a matrix so as to visualise the maze
+        env_matrix = np.reshape(tot_sv, (v_len, h_len))
 
     # Heatmap of the state counts over all the experiment's episodes
     percentage_sv = env_matrix / total_steps * 100
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6, 5))
     im = ax.imshow(percentage_sv, vmin=0, vmax=100)
 
     # Setting x and y ticks to display grid correctly, then removing all ticks and labels.
@@ -2211,7 +2229,7 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
     # Format color bar as percentages
     cbar.ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
 
-    ax.set_title(f"State-access frequency in the experiment", pad=20)
+    ax.set_title(f"State-access frequency in the experiment", pad=80)
 
     # Save figure and show
     plt.savefig(
