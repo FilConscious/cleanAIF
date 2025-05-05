@@ -65,7 +65,7 @@ def main():
     # Argument to select one run/agent (e.g. used to plot one action sequence)
     parser.add_argument("--select_run", "-selrun", type=int)
     # Argument to select one specific episode ( used to plot policy-conditioned state beliefs)
-    parser.add_argument("--select_episode", "-selep", type=int, default=-1)
+    parser.add_argument("--select_episode", "-selep", nargs="*", type=int, default=[-1])
     # Argument to select a group of policies to plot
     parser.add_argument(
         "--policies_to_vis",

@@ -381,14 +381,21 @@ def plot_pi_fe_compare(
             x2 = np.arange(num_episodes)
             y2 = avg_pi_fe[:, step_fe_pi]
 
-            int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
             ax.plot(
                 x2,
                 y2,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
 
     else:
@@ -407,14 +414,20 @@ def plot_pi_fe_compare(
             x2 = np.arange(num_episodes)
             y2 = avg_pi_fe[:, step_fe_pi]
 
-            int_vals = ",".join(str(int(x)) for x in policies[p])
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
             ax.plot(
                 x2,
                 y2,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{p}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
 
         # Confidence intervals (if needed, uncomment following lines)
@@ -430,7 +443,8 @@ def plot_pi_fe_compare(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free energy", rotation=90)
-    # ax.set_ylim(0, 7) # Uncomment for Tmaze3 experiments, comment out for others
+    # ax.set_ylim(0, 5)  # Uncomment for Tmaze3 experiments, comment out for others
+    ax.set_ylim(0, 10)  # Uncomment for Tmaze4 experiments, comment out for others
     ax.legend(
         title="Policies",
         ncol=4,
@@ -538,7 +552,8 @@ def plot_total_fe(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free energy", rotation=90)
-    # ax.set_ylim(0, 7) # Uncomment for Tmaze3 experiments, comment out for others
+    # ax.set_ylim(0, 5.5)  # Uncomment for Tmaze3 experiments, comment out for others
+    ax.set_ylim(0, 10)  # Uncomment for Tmaze4 experiments, comment out for others
     # ax.legend(loc="upper right") # No need for legend
     ax.set_title(f"Free energy at step {step_num}\n")
     ax.fill_between(
@@ -695,26 +710,42 @@ def plot_pi_prob_first(
         for p in range(NUM_POLICIES_VIS):
             y = avg_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
             std = std_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
-            int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             plt.plot(
                 x,
                 y,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
 
     else:
         for i, p in enumerate(policies_to_vis):
             y = avg_pi_prob[:, p].flatten()
             std = std_pi_prob[:, p].flatten()
-            int_vals = ",".join(str(int(x)) for x in policies[p])
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             plt.plot(
                 x,
                 y,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{i}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
 
         # plt.fill_between(
@@ -727,7 +758,8 @@ def plot_pi_prob_first(
     plt.xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     plt.xlabel("Episode")
     plt.ylabel("Probability mass", rotation=90)
-    # plt.ylim(0.02, 0.3) # Uncomment for Tmaze3 experiments, comment out for others
+    # plt.ylim(0, 0.45)  # Uncomment for Tmaze3 experiments, comment out for others
+    plt.ylim(0, 0.09)  # Uncomment for Tmaze4 experiments, comment out for others
     plt.legend(
         title="Policies",
         ncol=4,
@@ -824,35 +856,49 @@ def plot_efe(
             for p in range(NUM_POLICIES_VIS):
                 x = np.arange(num_episodes)
                 y = avg_efe[:, p, select_step].flatten()
-                int_vals = ",".join(
-                    str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET]
-                )
+                # int_vals = ",".join(
+                #     str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET]
+                # )
+
+                # Policy action sequence converted into string
+                policy_action_arrows = [
+                    actions_map[i]
+                    for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+                ]
+                policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
                 plt.plot(
                     x,
                     y,
                     ".-",
                     color=cmap(p),
-                    label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                    label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
                 )
         else:
             # Plotting EFE at single time step for each episode
             for i, p in enumerate(policies_to_vis):
                 x = np.arange(num_episodes)
                 y = avg_efe[:, p, select_step].flatten()
-                int_vals = ",".join(str(int(x)) for x in policies[p])
+                # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+                # Policy action sequence converted into string
+                policy_action_arrows = [
+                    actions_map[i] for i in list(policies[p].astype(int))
+                ]
+                policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
                 plt.plot(
                     x,
                     y,
                     ".-",
                     color=cmap(i),
-                    label=f"$\\pi_{{{p}}}$: {int_vals}",
+                    label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
                 )
 
     plt.xlabel(f"{x_label}")
     plt.ylabel("Expected free energy", rotation=90)
-    # plt.ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
+    # plt.ylim(2, 6)  # Uncomment for Tmaze3 experiments, comment out for others
+    plt.ylim(3, 11)  # Uncomment for Tmaze4 experiments, comment out for others
     plt.legend(
         title="Policies",
         title_fontsize=16,
@@ -1003,21 +1049,29 @@ def plot_efe_comps(
                 stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
             # For the labels
-            int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             # Plot on figures
             axes_1.plot(
                 x,
                 y_efer,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
             axes_2.plot(
                 x,
                 y_efeB,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
 
     else:
@@ -1045,29 +1099,38 @@ def plot_efe_comps(
                 stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
             # For the labels
-            int_vals = ",".join(str(int(x)) for x in policies[p])
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             # Plot on figures
             axes_1.plot(
                 x,
                 y_efer,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{p}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
             axes_2.plot(
                 x,
                 y_efeB,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{p}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
 
     axes_1.set_xlabel(x_label)
     axes_2.set_xlabel(x_label)
     axes_1.set_ylabel("Risk", rotation=90)
     axes_2.set_ylabel("B-novelty", rotation=90)
-    # axes_1.set_ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
-    # axes_2.set_ylim(0.3, 0.5) # Uncomment for Tmaze3 experiments, comment out for others
+    # axes_1.set_ylim(2, 6)  # Uncomment for Tmaze3 experiments, comment out for others
+    # axes_2.set_ylim(0.1, 0.5)  # Uncomment for Tmaze3 experiments, comment out for others
+    axes_1.set_ylim(4, 11)  # Uncomment for Tmaze4 experiments, comment out for others
+    axes_2.set_ylim(0, 0.9)  # Uncomment for Tmaze4 experiments, comment out for others
 
     # Gather handles and labels from one of the axes to create common legend
     handles, labels = axes_1.get_legend_handles_labels()
@@ -1885,66 +1948,174 @@ def plot_Qs_pi_final(file_data_path, select_policy, episode, save_dir, env_layou
 
     # Averaging the Q(S|pi) over the runs
     avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
+
+    # # Selecting the probabilities for the last episode only
+    # last_episode_Qspi = avg_Qspi[episode, :, :, :]
+
+    # # Heatmap of the Q(s|pi) for every policy at the end of the experiment (after last episode)
+    # for p in range(last_episode_Qspi.shape[0]):
+
+    #     # Creating figure and producing heatmap for policy p
+    #     fig, ax = plt.subplots()
+    #     fig.set_figwidth(5)
+    #     fig.set_figheight(6)
+    #     X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
+    #     im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :].squeeze(), shading="auto")
+
+    #     # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
+    #     qspi_labels = []
+    #     for s in range(num_steps):
+    #         # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
+    #         qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
+
+    #     ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
+    #     ax.set_xticklabels(qspi_labels, minor=True)
+    #     ax.tick_params(
+    #         which="minor",
+    #         top=True,
+    #         bottom=False,
+    #         labeltop=True,
+    #         labelbottom=False,
+    #         labelsize=20,
+    #     )
+    #     ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+
+    #     plt.setp(ax.get_xticklabels(minor=True), ha="left", rotation=30)
+
+    #     # Loop over data dimensions and create text annotations.
+    #     # Note 1: i, j are inverted in ax.text() because row-column coordinates in a matrix correspond
+    #     # to y-x Cartesian coordinates
+    #     for i in range(num_states):
+    #         for j in range(num_steps):
+    #             text = ax.text(
+    #                 j,
+    #                 i,
+    #                 f"{last_episode_Qspi[p, i, j]:.2f}",
+    #                 ha="center",
+    #                 va="center",
+    #                 color="m",
+    #                 fontsize="18",
+    #             )
+
+    #     # Create colorbar
+    #     cbar = ax.figure.colorbar(im, ax=ax)
+    #     # cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom", fontsize=20)
+    #     cbar.ax.tick_params(labelsize=20)
+
+    #     ax.set_xticks(np.arange(num_steps))
+    #     ax.set_xlabel("Time Step", fontsize=20)
+    #     ax.invert_yaxis()
+    #     ax.set_yticks(np.arange(num_states))
+    #     ax.set_ylabel("State", rotation=90, fontsize=20)
+    #     # Policy action sequence converted into string
+    #     policy_action_seq_filetitle = f"{''.join(map(str, policies[p].astype(int)))}"
+    #     policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
+    #     policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
+    #     # ax.set_title(
+    #     #     f"Last-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
+    #     #     pad=20,
+    #     # )
+    #     ax.set_title(
+    #         f"Episode {episode}",
+    #         pad=20,
+    #     )
+
+    #     # Save figure and show
+    #     plt.savefig(
+    #         save_dir
+    #         + "/"
+    #         + f"{env_layout}_Qs_pi{p}_a{policy_action_seq_filetitle}_ls_ep{episode}_path.jpg",
+    #         format="jpg",
+    #         bbox_inches="tight",
+    #         pad_inches=0.1,
+    #     )
+    #     # plt.show()
+    #     plt.close()
+
     # Selecting the probabilities for the last episode only
     last_episode_Qspi = avg_Qspi[episode, :, :, :]
+    print(last_episode_Qspi.shape)
 
     # Heatmap of the Q(s|pi) for every policy at the end of the experiment (after last episode)
-    for p in range(last_episode_Qspi.shape[0]):
+    for p in range(last_episode_Qspi.shape[1]):
 
         # Creating figure and producing heatmap for policy p
-        fig, ax = plt.subplots()
-        fig.set_figwidth(5)
-        fig.set_figheight(6)
-        X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
-        im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :].squeeze(), shading="auto")
+        fig, ax = plt.subplots(1, 4, figsize=(22, 6))  # constrained_layout=True)
+        plt.subplots_adjust(wspace=0.3)  # Increase horizontal spacing
 
-        # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
-        qspi_labels = []
-        for s in range(num_steps):
-            # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
-            qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
+        # fig.set_figwidth(20)
+        # fig.set_figheight(6)
+        ims = []
 
-        ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
-        ax.set_xticklabels(qspi_labels, minor=True)
-        ax.tick_params(
-            which="minor", top=True, bottom=False, labeltop=True, labelbottom=False
-        )
-        ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+        for e in range(last_episode_Qspi.shape[0]):
 
-        plt.setp(ax.get_xticklabels(minor=True), ha="left", rotation=30)
+            X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
+            im = ax[e].pcolormesh(
+                X, Y, last_episode_Qspi[e, p, :, :].squeeze(), shading="auto"
+            )
+            ims.append(im)
 
-        # Loop over data dimensions and create text annotations.
-        # Note 1: i, j are inverted in ax.text() because row-column coordinates in a matrix correspond
-        # to y-x Cartesian coordinates
-        for i in range(num_states):
-            for j in range(num_steps):
-                text = ax.text(
-                    j,
-                    i,
-                    f"{last_episode_Qspi[p, i, j]:.3f}",
-                    ha="center",
-                    va="center",
-                    color="m",
-                    fontsize="medium",
-                )
+            # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
+            qspi_labels = []
+            for s in range(num_steps):
+                # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
+                qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
 
-        # Create colorbar
-        cbar = ax.figure.colorbar(im, ax=ax)
-        cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom")
+            ax[e].set_xticks(np.arange(num_steps) - 0.5, minor=True)
+            ax[e].set_xticklabels(qspi_labels, minor=True)
+            ax[e].tick_params(
+                which="minor",
+                top=True,
+                bottom=False,
+                labeltop=True,
+                labelbottom=False,
+                labelsize=20,
+            )
+            ax[e].grid(which="minor", color="w", linestyle="-", linewidth=3)
 
-        ax.set_xticks(np.arange(num_steps))
-        ax.set_xlabel("Time Step")
-        ax.invert_yaxis()
-        ax.set_yticks(np.arange(num_states))
-        ax.set_ylabel("State", rotation=90)
+            plt.setp(ax[e].get_xticklabels(minor=True), ha="left", rotation=30)
+
+            # Loop over data dimensions and create text annotations.
+            # Note 1: i, j are inverted in ax[e].text() because row-column coordinates in a matrix correspond
+            # to y-x Cartesian coordinates
+            for i in range(num_states):
+                for j in range(num_steps):
+                    text = ax[e].text(
+                        j,
+                        i,
+                        f"{last_episode_Qspi[e, p, i, j]:.2f}",
+                        ha="center",
+                        va="center",
+                        color="m",
+                        fontsize="18",
+                    )
+
+            ax[e].set_xticks(np.arange(num_steps))
+            ax[e].set_xlabel("Time Step", fontsize=20)
+            ax[e].invert_yaxis()
+            ax[e].set_yticks(np.arange(num_states))
+            ax[e].set_ylabel("State", rotation=90, fontsize=20)
+
+            # ax[e].set_title(
+            #     f"First-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
+            #     pad=20,
+            # )
+            ax[e].set_title(
+                f"Episode {episode[e]}",
+                pad=20,
+            )
+
         # Policy action sequence converted into string
         policy_action_seq_filetitle = f"{''.join(map(str, policies[p].astype(int)))}"
         policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
         policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
-        ax.set_title(
-            f"Last-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
-            pad=20,
+
+        # Create a colorbar using the last image, shared across all axes
+        cbar = fig.colorbar(
+            ims[-1], ax=ax.ravel().tolist(), orientation="vertical", pad=0.03
         )
+        cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom", fontsize=20)
+        cbar.ax.tick_params(labelsize=20)
 
         # Save figure and show
         plt.savefig(
@@ -1994,66 +2165,175 @@ def plot_Qs_pi_first(file_data_path, select_policy, episode, save_dir, env_layou
 
     # Averaging the Q(S|pi) over the runs
     avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
+
+    # # Selecting the probabilities for the last episode only
+    # last_episode_Qspi = avg_Qspi[episode, :, :, :]
+
+    # # Heatmap of the Q(s|pi) for every policy at the end of the experiment (after last episode)
+    # for p in range(last_episode_Qspi.shape[0]):
+
+    #     # Creating figure and producing heatmap for policy p
+    #     fig, ax = plt.subplots()
+    #     fig.set_figwidth(5)
+    #     fig.set_figheight(6)
+    #     X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
+    #     im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :].squeeze(), shading="auto")
+
+    #     # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
+    #     qspi_labels = []
+    #     for s in range(num_steps):
+    #         # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
+    #         qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
+
+    #     ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
+    #     ax.set_xticklabels(qspi_labels, minor=True)
+    #     ax.tick_params(
+    #         which="minor",
+    #         top=True,
+    #         bottom=False,
+    #         labeltop=True,
+    #         labelbottom=False,
+    #         labelsize=20,
+    #     )
+    #     ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+
+    #     plt.setp(ax.get_xticklabels(minor=True), ha="left", rotation=30)
+
+    #     # Loop over data dimensions and create text annotations.
+    #     # Note 1: i, j are inverted in ax.text() because row-column coordinates in a matrix correspond
+    #     # to y-x Cartesian coordinates
+    #     for i in range(num_states):
+    #         for j in range(num_steps):
+    #             text = ax.text(
+    #                 j,
+    #                 i,
+    #                 f"{last_episode_Qspi[p, i, j]:.2f}",
+    #                 ha="center",
+    #                 va="center",
+    #                 color="m",
+    #                 fontsize="18",
+    #             )
+
+    #     # Create colorbar
+    #     cbar = ax.figure.colorbar(im, ax=ax)
+    #     #  cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom", fontsize=20)
+    #     cbar.ax.tick_params(labelsize=20)
+
+    #     ax.set_xticks(np.arange(num_steps))
+    #     ax.set_xlabel("Time Step", fontsize=20)
+    #     ax.invert_yaxis()
+    #     ax.set_yticks(np.arange(num_states))
+    #     ax.set_ylabel("State", rotation=90, fontsize=20)
+    #     # Policy action sequence converted into string
+    #     policy_action_seq_filetitle = f"{''.join(map(str, policies[p].astype(int)))}"
+    #     policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
+    #     policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
+    #     # ax.set_title(
+    #     #     f"First-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
+    #     #     pad=20,
+    #     # )
+    #     ax.set_title(
+    #         f"Episode {episode}",
+    #         pad=20,
+    #     )
+
+    #     # Save figure and show
+    #     plt.savefig(
+    #         save_dir
+    #         + "/"
+    #         + f"{env_layout}_Qs_pi{p}_a{policy_action_seq_filetitle}_fs_ep{episode}_path.jpg",
+    #         format="jpg",
+    #         bbox_inches="tight",
+    #         pad_inches=0.1,
+    #     )
+    #     # plt.show()
+    #     plt.close()
+    #
+
     # Selecting the probabilities for the last episode only
     last_episode_Qspi = avg_Qspi[episode, :, :, :]
+    print(last_episode_Qspi.shape)
 
     # Heatmap of the Q(s|pi) for every policy at the end of the experiment (after last episode)
-    for p in range(last_episode_Qspi.shape[0]):
+    for p in range(last_episode_Qspi.shape[1]):
 
         # Creating figure and producing heatmap for policy p
-        fig, ax = plt.subplots()
-        fig.set_figwidth(5)
-        fig.set_figheight(6)
-        X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
-        im = ax.pcolormesh(X, Y, last_episode_Qspi[p, :, :].squeeze(), shading="auto")
+        fig, ax = plt.subplots(1, 4, figsize=(22, 6))  # constrained_layout=True)
+        plt.subplots_adjust(wspace=0.3)  # Increase horizontal spacing
 
-        # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
-        qspi_labels = []
-        for s in range(num_steps):
-            # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
-            qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
+        # fig.set_figwidth(20)
+        # fig.set_figheight(6)
+        ims = []
 
-        ax.set_xticks(np.arange(num_steps) - 0.5, minor=True)
-        ax.set_xticklabels(qspi_labels, minor=True)
-        ax.tick_params(
-            which="minor", top=True, bottom=False, labeltop=True, labelbottom=False
-        )
-        ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+        for e in range(last_episode_Qspi.shape[0]):
 
-        plt.setp(ax.get_xticklabels(minor=True), ha="left", rotation=30)
+            X, Y = np.meshgrid(np.arange(num_steps), np.arange(num_states))
+            im = ax[e].pcolormesh(
+                X, Y, last_episode_Qspi[e, p, :, :].squeeze(), shading="auto"
+            )
+            ims.append(im)
 
-        # Loop over data dimensions and create text annotations.
-        # Note 1: i, j are inverted in ax.text() because row-column coordinates in a matrix correspond
-        # to y-x Cartesian coordinates
-        for i in range(num_states):
-            for j in range(num_steps):
-                text = ax.text(
-                    j,
-                    i,
-                    f"{last_episode_Qspi[p, i, j]:.3f}",
-                    ha="center",
-                    va="center",
-                    color="m",
-                    fontsize="medium",
-                )
+            # Setting top minor ticks to separate the different Q(s|pi) and adding corresponding labels
+            qspi_labels = []
+            for s in range(num_steps):
+                # qspi_labels = [r'$Q(s_{0}|\pi)$', r'$Q(s_{1}|\pi)$', r'$Q(s_{2}|\pi)$', r'$Q(s_{3}|\pi)$', r'$Q(s_{4}|\pi)$', r'$Q(s_{5}|\pi)$', r'$Q(s_{6}|\pi)$']
+                qspi_labels.append(rf"$Q(s_{{{s}}}|\pi_{{{p}}})$")
 
-        # Create colorbar
-        cbar = ax.figure.colorbar(im, ax=ax)
-        cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom")
+            ax[e].set_xticks(np.arange(num_steps) - 0.5, minor=True)
+            ax[e].set_xticklabels(qspi_labels, minor=True)
+            ax[e].tick_params(
+                which="minor",
+                top=True,
+                bottom=False,
+                labeltop=True,
+                labelbottom=False,
+                labelsize=20,
+            )
+            ax[e].grid(which="minor", color="w", linestyle="-", linewidth=3)
 
-        ax.set_xticks(np.arange(num_steps))
-        ax.set_xlabel("Time Step")
-        ax.invert_yaxis()
-        ax.set_yticks(np.arange(num_states))
-        ax.set_ylabel("State", rotation=90)
+            plt.setp(ax[e].get_xticklabels(minor=True), ha="left", rotation=30)
+
+            # Loop over data dimensions and create text annotations.
+            # Note 1: i, j are inverted in ax[e].text() because row-column coordinates in a matrix correspond
+            # to y-x Cartesian coordinates
+            for i in range(num_states):
+                for j in range(num_steps):
+                    text = ax[e].text(
+                        j,
+                        i,
+                        f"{last_episode_Qspi[e, p, i, j]:.2f}",
+                        ha="center",
+                        va="center",
+                        color="m",
+                        fontsize="18",
+                    )
+
+            ax[e].set_xticks(np.arange(num_steps))
+            ax[e].set_xlabel("Time Step", fontsize=20)
+            ax[e].invert_yaxis()
+            ax[e].set_yticks(np.arange(num_states))
+            ax[e].set_ylabel("State", rotation=90, fontsize=20)
+
+            # ax[e].set_title(
+            #     f"First-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
+            #     pad=20,
+            # )
+            ax[e].set_title(
+                f"Episode {episode[e]}",
+                pad=20,
+            )
+
         # Policy action sequence converted into string
         policy_action_seq_filetitle = f"{''.join(map(str, policies[p].astype(int)))}"
         policy_action_arrows = [actions_map[i] for i in list(policies[p].astype(int))]
         policy_action_seq_figtitle = f"{', '.join(map(str, policy_action_arrows))}"
-        ax.set_title(
-            f"First-step state beliefs for $\\pi_{{{p}}}$: [{policy_action_seq_figtitle}] in episode {episode}",
-            pad=20,
+
+        # Create a colorbar using the last image, shared across all axes
+        cbar = fig.colorbar(
+            ims[-1], ax=ax.ravel().tolist(), orientation="vertical", pad=0.03
         )
+        cbar.ax.set_ylabel("Probability", rotation=-90, va="bottom", fontsize=20)
+        cbar.ax.tick_params(labelsize=20)
 
         # Save figure and show
         plt.savefig(
@@ -2153,6 +2433,11 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
         env_matrix[0, :] = tot_sv[:-1]
         env_matrix[1, 1] = tot_sv[-1]
 
+    elif env_layout == "Tmaze4":
+        env_matrix = np.zeros((v_len, h_len))
+        env_matrix[0, :] = tot_sv[:-2]
+        env_matrix[1, 1] = tot_sv[-2]
+        env_matrix[2, 1] = tot_sv[-1]
     else:
         # Reshaping the state counts vector into a matrix so as to visualise the maze
         env_matrix = np.reshape(tot_sv, (v_len, h_len))
