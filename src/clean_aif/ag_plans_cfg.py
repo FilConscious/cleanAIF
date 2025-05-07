@@ -24,11 +24,11 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Environment layout """
-    env_layout: str = "Tmaze3"  # choice: Tmaze3, Tmaze4, Ymaze4
+    env_layout: str = "Tmaze4"  # choice: Tmaze3, Tmaze4, Ymaze4
     """ Max number of steps in an episode """
-    num_steps: int = 3
+    num_steps: int = 4
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
-    num_states: int = 4
+    num_states: int = 5
     ### Agent ###
     """ the number of observation channels or modalities """
     obs_channels: int = 1
@@ -39,14 +39,14 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 3
+    start_state: int = 4
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent consider at each planning step """
-    num_policies: int = 16
+    num_policies: int = 64
     """ planning horizon, also the length of a policy """
     """ NOTE: also MAX number of future steps for which expected free energy is computed """
-    plan_horizon: int = 2
+    plan_horizon: int = 3
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ init empty agent's policies arrays """
@@ -168,10 +168,6 @@ class Args:
 
         B_params = np.zeros((num_actions, num_states, num_states))
 
-        # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
-        n = int(np.sqrt(num_states))
-        env_matrix_labels = np.reshape(np.arange(num_states), (n, n))
-
         # Assigning 1s to correct transitions for every action.
         if env_layout == "Tmaze3":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze3'
@@ -273,6 +269,10 @@ class Args:
             )
 
         elif env_layout == "TmazeXall":
+            # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
+            n = int(np.sqrt(num_states))
+            env_matrix_labels = np.reshape(np.arange(num_states), (n, n))
+
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'TmazeXall'
             # all transitions are considered/modelled, also towards not accessible states (walls)
             # TODO: Implement an automatic way to load these B-matrices depending on layout

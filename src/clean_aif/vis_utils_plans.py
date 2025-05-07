@@ -421,16 +421,23 @@ def plot_pi_fe_compare(
             x2 = np.arange(num_episodes)
             y2 = avg_pi_fe[:, step_fe_pi]
 
-            int_vals = ",".join(
-                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-            )
+            # int_vals = ",".join(
+            #     str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            # )
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(ordered_policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
             ax.plot(
                 x2,
                 y2,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
     else:
         # Looping over the policies for Figure 2
@@ -448,14 +455,20 @@ def plot_pi_fe_compare(
             x2 = np.arange(num_episodes)
             y2 = avg_pi_fe[:, step_fe_pi]
 
-            int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+            # int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(ordered_policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
             ax.plot(
                 x2,
                 y2,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{p}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
 
         # Confidence intervals (if needed, uncomment following lines)
@@ -471,7 +484,8 @@ def plot_pi_fe_compare(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free Energy", rotation=90)
-    # ax.set_ylim(0, 7) # Uncomment for Tmaze3 experiments, comment out for others
+    # ax.set_ylim(0, 5)  # Uncomment for Tmaze3 experiments, comment out for others
+    ax.set_ylim(0, 10)  # Uncomment for Tmaze4 experiments, comment out for others
     ax.legend(
         title="Policies",
         ncol=4,
@@ -575,7 +589,8 @@ def plot_total_fe(
     ax.set_xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     ax.set_xlabel("Episode")
     ax.set_ylabel("Free energy", rotation=90)
-    # ax.set_ylim(0, 7.5) # Uncomment for Tmaze3 experiments, comment out for others
+    # ax.set_ylim(0, 5.5)  # Uncomment for Tmaze3 experiments, comment out for others
+    ax.set_ylim(0, 10)  # Uncomment for Tmaze4 experiments, comment out for others
     # ax.legend(loc="upper right") # No need for legend
     #
     if step_fe != -1:
@@ -731,28 +746,43 @@ def plot_pi_prob_first(
         for p in range(NUM_POLICIES_VIS):
             y = avg_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
             std = std_pi_prob[:, p + POLICY_INDEX_OFFSET].flatten()
-            int_vals = ",".join(
-                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-            )
-            # int_list = [int(x) for x in ordered_policies[p + POLICY_INDEX_OFFSET]]
+
+            # int_vals = ",".join(
+            #     str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            # )
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(ordered_policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             plt.plot(
                 x,
                 y,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
     else:
         for i, p in enumerate(policies_to_vis):
             y = avg_pi_prob[:, p].flatten()
             std = std_pi_prob[:, p].flatten()
-            int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+            # int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(ordered_policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             plt.plot(
                 x,
                 y,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{i}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
 
         # plt.fill_between(
@@ -765,7 +795,8 @@ def plot_pi_prob_first(
     plt.xticks(np.arange(0, num_episodes + 1, step=x_ticks_estep))
     plt.xlabel("Episode")
     plt.ylabel("Probability mass", rotation=90)
-    # plt.ylim(0.02, 0.3) # Uncomment for Tmaze3 experiments, comment out for others
+    # plt.ylim(0, 0.45)  # Uncomment for Tmaze3 experiments, comment out for others
+    plt.ylim(0, 0.09)  # Uncomment for Tmaze4 experiments, comment out for others
     plt.legend(
         title="Policies",
         ncol=4,
@@ -860,35 +891,49 @@ def plot_efe(
             for p in range(NUM_POLICIES_VIS):
                 x = np.arange(num_episodes)
                 y = avg_efe[:, p, select_step].flatten()
-                int_vals = ",".join(
-                    str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-                )
+                # int_vals = ",".join(
+                #     str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+                # )\
+
+                # Policy action sequence converted into string
+                policy_action_arrows = [
+                    actions_map[i]
+                    for i in list(ordered_policies[p + POLICY_INDEX_OFFSET].astype(int))
+                ]
+                policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
                 plt.plot(
                     x,
                     y,
                     ".-",
                     color=cmap(p),
-                    label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                    label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
                 )
         else:
             # Plotting EFE at single time step for each episode
             for i, p in enumerate(policies_to_vis):
                 x = np.arange(num_episodes)
                 y = avg_efe[:, p, select_step].flatten()
-                int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+                # int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+
+                # Policy action sequence converted into string
+                policy_action_arrows = [
+                    actions_map[i] for i in list(ordered_policies[p].astype(int))
+                ]
+                policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
 
                 plt.plot(
                     x,
                     y,
                     ".-",
                     color=cmap(i),
-                    label=f"$\\pi_{{{p}}}$: {int_vals}",
+                    label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
                 )
 
     plt.xlabel(f"{x_label}")
     plt.ylabel("Expected free energy", rotation=90)
-    # plt.ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
+    # plt.ylim(2, 6)  # Uncomment for Tmaze3 experiments, comment out for others
+    plt.ylim(3, 11)  # Uncomment for Tmaze4 experiments, comment out for others
     plt.legend(
         title="Policies",
         ncol=4,
@@ -1040,23 +1085,31 @@ def plot_efe_comps(
                 stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
             # For the labels
-            int_vals = ",".join(
-                str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
-            )
+            # int_vals = ",".join(
+            #     str(int(x)) for x in ordered_policies[p + POLICY_INDEX_OFFSET]
+            # )
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(ordered_policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             # Plot on figures
             axes_1.plot(
                 x,
                 y_efer,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
             axes_2.plot(
                 x,
                 y_efeB,
                 ".-",
                 color=cmap(p),
-                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {int_vals}",
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
             )
 
     else:
@@ -1084,29 +1137,38 @@ def plot_efe_comps(
                 stdy_efeB = std_efe_Bnovelty[:, p, :].flatten()
 
             # For the labels
-            int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+            # int_vals = ",".join(str(int(x)) for x in ordered_policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(ordered_policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
             # Plot on figures
             axes_1.plot(
                 x,
                 y_efer,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{p}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
             axes_2.plot(
                 x,
                 y_efeB,
                 ".-",
                 color=cmap(i),
-                label=f"$\\pi_{{{p}}}$: {int_vals}",
+                label=f"$\\pi_{{{p}}}$: {policy_action_seq_leg}",
             )
 
     axes_1.set_xlabel(x_label)
     axes_2.set_xlabel(x_label)
     axes_1.set_ylabel("Risk", rotation=90)
     axes_2.set_ylabel("B-novelty", rotation=90)
-    # axes_1.set_ylim(3, 6) # Uncomment for Tmaze3 experiments, comment out for others
-    # axes_2.set_ylim(0.3, 0.5) # Uncomment for Tmaze3 experiments, comment out for others
+    # axes_1.set_ylim(2, 6)  # Uncomment for Tmaze3 experiments, comment out for others
+    # axes_2.set_ylim(0.1, 0.5)  # Uncomment for Tmaze3 experiments, comment out for others
+    axes_1.set_ylim(4, 11)  # Uncomment for Tmaze4 experiments, comment out for others
+    axes_2.set_ylim(0, 0.9)  # Uncomment for Tmaze4 experiments, comment out for others
 
     # Gather handles and labels from one of the axes to create common legend
     handles, labels = axes_1.get_legend_handles_labels()
@@ -2009,7 +2071,7 @@ def plot_Qs_pi_first(file_data_path, select_policy, episode, save_dir, env_layou
         plt.savefig(
             save_dir
             + "/"
-            + f"{env_layout}_Qs_pi{p}_a{policy_action_seq_filetitle}_fs_ep{episode}_path.jpg",
+            + f"{env_layout}_Qs_pi{p}_a{policy_action_seq_filetitle}_fs_ep{episode}_plan.jpg",
             format="jpg",
             bbox_inches="tight",
             pad_inches=0.1,
@@ -2189,6 +2251,12 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
         env_matrix = np.zeros((v_len, h_len))
         env_matrix[0, :] = tot_sv[:-1]
         env_matrix[1, 1] = tot_sv[-1]
+
+    elif env_layout == "Tmaze4":
+        env_matrix = np.zeros((v_len, h_len))
+        env_matrix[0, :] = tot_sv[:-2]
+        env_matrix[1, 1] = tot_sv[-2]
+        env_matrix[2, 1] = tot_sv[-1]
 
     else:
         # Reshaping the state counts vector into a matrix so as to visualise the maze
