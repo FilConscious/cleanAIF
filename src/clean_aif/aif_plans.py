@@ -369,36 +369,46 @@ class Agent(object):
         # Number of all the sequences
         num_all_pol = num_actions**policy_len
         # Don't shuffle policies (FALSE) when the agent has a policy prior (TRUE)
-        shuffle_policies = not self.policy_prior
+        # shuffle_policies = not self.policy_prior
 
-        if shuffle_policies:
-            if self.task_type == "episodic" and self.current_tstep == 0:
-                # Set policy order using list of indices passed to agent at init
-                # NOTE 1: this makes sure that the array of policies is ordered the same way across
-                # runs/agents at the first step of each episode.
-                print(
-                    f"Policies indices at first step of each episode: {self.policies_indices}"
-                )
-                sel_policies = policies_array[self.policies_indices[:num_policies], :]
-            else:
-                # All the row indices of policies_array
-                indices = np.arange(num_all_pol)
-                # Shuffle the indices
-                self.rng.shuffle(indices)
-                # Randomly select num_policies from the array with all the policies
-                # NOTE 1: if num_policies equals the number of all sequences, the end result is just
-                # policies_array with its rows shuffled
-                # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
-                # the selected policies may not include the optimal policy in this implementation
-                sel_policies = policies_array[indices[:num_policies], :]
+        if num_policies == 1:
+            sel_policies = np.array([[3, 3, 2]])
+
+        elif num_policies == 2:
+
+            sel_policies = np.array([[3, 3, 2], [0, 3, 1]])
 
         else:
-            # Set policy order using list of indices passed to agent at init
-            # NOTE 1: this makes sure that the array of policies is ordered the same way across runs/agents
-            # *and* across time steps/episodes.
-            # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
-            # the selected policies may not include the optimal policy in this implementation
-            sel_policies = policies_array[self.policies_indices[:num_policies], :]
+            if shuffle_policies:
+                if self.task_type == "episodic" and self.current_tstep == 0:
+                    # Set policy order using list of indices passed to agent at init
+                    # NOTE 1: this makes sure that the array of policies is ordered the same way across
+                    # runs/agents at the first step of each episode.
+                    print(
+                        f"Policies indices at first step of each episode: {self.policies_indices}"
+                    )
+                    sel_policies = policies_array[
+                        self.policies_indices[:num_policies], :
+                    ]
+                else:
+                    # All the row indices of policies_array
+                    indices = np.arange(num_all_pol)
+                    # Shuffle the indices
+                    self.rng.shuffle(indices)
+                    # Randomly select num_policies from the array with all the policies
+                    # NOTE 1: if num_policies equals the number of all sequences, the end result is just
+                    # policies_array with its rows shuffled
+                    # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+                    # the selected policies may not include the optimal policy in this implementation
+                    sel_policies = policies_array[indices[:num_policies], :]
+
+            else:
+                # Set policy order using list of indices passed to agent at init
+                # NOTE 1: this makes sure that the array of policies is ordered the same way across runs/agents
+                # *and* across time steps/episodes.
+                # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+                # the selected policies may not include the optimal policy in this implementation
+                sel_policies = policies_array[self.policies_indices[:num_policies], :]
 
         return sel_policies
 
@@ -1339,6 +1349,7 @@ class LogData(object):
         # Dictionary to store the data
         data = {}
         # Populate dictionary with corresponding key
+        data["exp_name"] = "aif_plans"
         data["num_runs"] = self.num_runs
         data["num_episodes"] = self.num_episodes
         data["num_states"] = self.num_states
@@ -1492,6 +1503,8 @@ def main():
     )
     # Whether to use a policy prior when udapting the policies' probabilities
     parser.add_argument("--policy_prior", "-ppr", action="store_true")
+    # Whether to shuffle policies at each times step in an episode
+    parser.add_argument("--shuffle_policies", "-shpol", action="store_true")
 
     # Creating object holding the attributes from the command line
     args = parser.parse_args()
@@ -1512,7 +1525,7 @@ def main():
         f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
         f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}'
         f'_npol{cl_params["num_policies"]}_phor{cl_params["plan_horizon"]}_ppr{cl_params["policy_prior"]}'
-        f'_AS{cl_params["action_selection"]}'
+        f'_pshuffle{cl_params["shuffle_policies"]}_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
     )
     # Create folder (with dt_string as unique identifier) where to store data from current experiment.

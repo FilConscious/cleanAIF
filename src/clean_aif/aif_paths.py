@@ -476,6 +476,7 @@ class Agent(object):
 
         for pi, pi_actions in enumerate(self.policies):
 
+            print(self.policies)
             # At the last time step only update Q(pi) with the computed free energy
             # (because there is no expected free energy then). for all the other steps
             # compute the total expected free energy over the remaining time steps.
@@ -976,6 +977,12 @@ class Agent(object):
         self.Qs = np.zeros((self.num_states, self.steps))
         # Resetting sequence of B-novelty values at t = 0
         self.efe_Bnovelty_t = np.zeros((self.policies.shape[0], self.steps))
+        # Reset the policy-conditioned beliefs as flat priors
+        self.Qs_pi = (
+            np.ones((self.policies.shape[0], self.num_states, self.steps))
+            * 1
+            / self.num_states
+        )
         # Initializing self.Qpi so that the prior over policies is equal to the last probability distribution
         # computed.
         # Note 1: this is done at all episodes except for the very first. To single out the first episode
@@ -998,6 +1005,7 @@ class LogData(object):
 
     def __init__(self, params: params) -> None:
         ### Retrieve relevant experiment/agent parameters ###
+        self.exp_name: str = params.get("exp_name")
         self.num_runs: int = params.get("num_runs")
         self.num_episodes: int = params.get("num_episodes")
         self.num_states: int = params.get("num_states")
@@ -1150,6 +1158,7 @@ class LogData(object):
         # Dictionary to store the data
         data = {}
         # Populate dictionary with corresponding key
+        data["exp_name"] = self.exp_name
         data["num_runs"] = self.num_runs
         data["num_episodes"] = self.num_episodes
         data["num_states"] = self.num_states
@@ -1372,7 +1381,7 @@ def main():
                 default_params[key] = value
 
     update_params(agent_params, cl_params)
-    # print(agent_params["policy_prior"])
+    # print(agent_params["exp_name"])
 
     ##########################
     ### 4. INIT ENV
@@ -1519,6 +1528,23 @@ def main():
 
                 # Update step count
                 steps_count += 1
+
+            #### DEBUG ####
+            # if e == 40:
+
+            #     def softmax(x, axis=0):
+            #         e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
+            #         return e_x / np.sum(e_x, axis=axis, keepdims=True)
+
+            #     # Add noise to the B matrices
+            #     # Define the noise parameters
+            #     mean = 0.0
+            #     std_dev = 0.5  # standard deviation of the noise
+            #     # Generate Gaussian noise
+            #     noise = np.random.normal(loc=mean, scale=std_dev, size=agent.B.shape)
+            #     agent.B = softmax(agent.B + noise, axis=0)
+            # print(agent.B)
+            ### END ###
 
             # Retrieve all agent's attributes, including episodic metrics we want to save
             all_metrics = agent.__dict__

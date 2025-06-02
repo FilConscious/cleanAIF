@@ -23,11 +23,11 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Environment layout """
-    env_layout: str = "Tmaze4"  # choice: Tmaze3, Tmaze4, Ymaze4
+    env_layout: str = "Ymaze4"  # choice: Tmaze3, Tmaze4, Ymaze4
     """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
     num_steps: int = 4
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
-    num_states: int = 5
+    num_states: int = 6
     ### Agent ###
     """ the number of observation channels or modalities """
     obs_channels: int = 1
@@ -38,7 +38,7 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 4
+    start_state: int = 5
     """ index of goal state/location """
     goal_state: int = 0
     """ number of policies the agent considers for planning """
@@ -120,28 +120,37 @@ class Args:
         - policy_array: array of shape (num_policies, policy_len), all the policies stored as rows
         """
 
-        # Init RNG for shuffling list of policies below
-        rng = np.random.default_rng()
-        # Set of actions
-        actions = np.arange(num_actions, dtype=np.int64)
-        # Create all the policies
-        policies_list = [p for p in product(actions, repeat=policy_len)]
-        # Convert list into array
-        policies_array = np.array(policies_list, dtype=np.int64)
-        # Number of all the sequences
-        num_all_pol = num_actions**policy_len
-        # All the row indices of policies_array
-        indices = np.arange(num_all_pol)
-        # Shuffle the indices
-        rng.shuffle(indices)
-        # Randomly select num_policies from the array with all the policies
-        # NOTE 1: if num_policies equals the number of all sequences, the end result is just
-        # policies_array with its rows shuffled
-        # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
-        # the selected policies may not include the optimal policy in this implementation
-        sel_policies = policies_array[indices[:num_policies], :]
-        # print("Policies")
-        # print(sel_policies)
+        if num_policies == 1:
+
+            sel_policies = np.array([[3, 3, 2]])
+
+        elif num_policies == 2:
+
+            sel_policies = np.array([[3, 3, 2], [0, 3, 1]])
+
+        else:
+            # Init RNG for shuffling list of policies below
+            rng = np.random.default_rng()
+            # Set of actions
+            actions = np.arange(num_actions, dtype=np.int64)
+            # Create all the policies
+            policies_list = [p for p in product(actions, repeat=policy_len)]
+            # Convert list into array
+            policies_array = np.array(policies_list, dtype=np.int64)
+            # Number of all the sequences
+            num_all_pol = num_actions**policy_len
+            # All the row indices of policies_array
+            indices = np.arange(num_all_pol)
+            # Shuffle the indices
+            rng.shuffle(indices)
+            # Randomly select num_policies from the array with all the policies
+            # NOTE 1: if num_policies equals the number of all sequences, the end result is just
+            # policies_array with its rows shuffled
+            # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+            # the selected policies may not include the optimal policy in this implementation
+            sel_policies = policies_array[indices[:num_policies], :]
+            # print("Policies")
+            # print(sel_policies)
 
         return sel_policies
 
@@ -340,11 +349,11 @@ class Args:
             # Up action: 1
             B_params[1, :, :] = np.array(
                 [
-                    [1, 0, 1, 1, 0],
+                    [1, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0],
+                    [0, 0, 1, 0, 0],
                     [0, 1, 0, 0, 0],
-                    [0, 0, 0, 0, 1],
+                    [0, 0, 0, 1, 1],
                 ],
                 dtype=np.float64,
             )
