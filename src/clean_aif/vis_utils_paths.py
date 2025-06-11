@@ -315,19 +315,8 @@ def plot_pi_fes(
     ax.set_ylabel("Free energy", rotation=90)
     ax.set_ylim(y_limits[0], y_limits[1])
 
-    # ax.legend(
-    #     title="Policies",
-    #     ncol=4,
-    #     title_fontsize=16,
-    #     handlelength=2,  # shrink the line handle
-    #     columnspacing=0.5,  # space between columns
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, -0.2),
-    #     fancybox=True,
-    # )
-
     # Create a separate figure for the legend
-    fig_legend = plt.figure(figsize=(2, 1))
+    fig_legend = plt.figure(figsize=(8, 2))
     # Use the same handles and labels
     handles, labels = ax.get_legend_handles_labels()
     fig_legend.legend(
@@ -338,8 +327,8 @@ def plot_pi_fes(
         title_fontsize=12,
         handlelength=2,  # shrink the line handle
         columnspacing=1.5,  # space between columns
-        # loc="upper center",
-        # bbox_to_anchor=(0.5, -0.2),
+        loc="center",
+        bbox_to_anchor=(0.5, 0.5),
         fancybox=True,
     )
     # Save the legend figure separately
@@ -347,8 +336,9 @@ def plot_pi_fes(
         save_dir + "/" + f"{env_layout}_aif_policies_legend.pdf",
         format="pdf",
         dpi=200,
-        bbox_inches="tight",
+        bbox_inches=None,
     )
+
     plt.close(fig_legend)
 
     if step_fe_pi != -1:
@@ -356,7 +346,9 @@ def plot_pi_fes(
     else:
         step_num = f"{num_steps}"
 
-    ax.set_title(f"Policy-conditioned free energy at step {step_num}", pad=15)
+    title = f"Policy-conditioned free energy at step {step_num}"
+    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    ax.set_title(title, pad=15)
 
     fig.savefig(
         save_dir + "/" + f"{env_layout}_{exp_name}_policies_fe_step{step_num}.pdf",
@@ -3635,32 +3627,53 @@ def plot_matrix_B(
             alpha=0.3,
         )
 
-    ax1.set_xticks(np.arange(x_ticks_estep, num_episodes + 1, step=x_ticks_estep))
-    ax1.set_xlabel("Episode")
-    ax1.set_ylabel("Probability Mass", rotation=90)
-    # ax1.legend([f'$P(S_{{t+1}}={i}|S_t={s}, \\pi_t={a})$' for i in range(num_states)], loc='upper right')
-    # ax1.legend(loc="upper right")
-    ax1.set_title(
-        f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}\n",
-        pad=20,
+    ax1.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
     )
+    ax1.set_xlabel("Episode")
+    ax1.set_ylim(0, 1)
+    ax1.set_ylabel("Probability Mass", rotation=90)
 
-    ax1.legend(
+    # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
+    # title += "\n(open loop)" if "paths" in exp_name else " (closed loop)"
+    title = (
+        f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}\n"
+        f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+    )
+    ax1.set_title(title, pad=15)
+
+    # Create a separate figure for the legend
+    fig_legend = plt.figure(figsize=(8, 2))
+    # Use the same handles and labels
+    handles, labels = ax1.get_legend_handles_labels()
+    fig_legend.legend(
+        handles,
+        labels,
         title="Transition probabilities",
         ncol=1,
-        title_fontsize=16,
+        title_fontsize=12,
         handlelength=2,  # shrink the line handle
-        columnspacing=0.5,  # space between columns
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.2),
+        # columnspacing=1.5,  # space between columns
+        loc="center",
+        bbox_to_anchor=(0.5, 0.5),
         fancybox=True,
     )
+    # Save the legend figure separately
+    fig_legend.savefig(
+        save_dir + "/" + f"{env_layout}_transition_probs_s{s + 1}_a{a}_legend.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+    )
+
+    plt.close(fig_legend)
 
     plt.savefig(
-        save_dir + "/" + f"{env_layout}_{exp_name}_matrix_B_state{s}_action{a}.jpg",
-        format="jpg",
-        bbox_inches="tight",
-        pad_inches=0.1,
+        save_dir + "/" + f"{env_layout}_{exp_name}_matrix_B_state{s}_action{a}.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
     )
     # plt.show()
     plt.close()
@@ -3672,10 +3685,11 @@ def plot_matrix_B(
         im = ax2.imshow(avg_transitions_prob[-1, a, :, :].squeeze(), vmin=0, vmax=1)
 
         # Major Ticks for states
+        state_labels = np.arange(1, num_states + 1)
         ax2.set_yticks(np.arange(num_states))
-        ax2.set_yticklabels(np.arange(num_states))
+        ax2.set_yticklabels(state_labels)
         ax2.set_xticks(np.arange(num_states))
-        ax2.set_xticklabels(np.arange(num_states))
+        ax2.set_xticklabels(state_labels)
         # Minor ticks for grid lines
         ax2.set_yticks(np.arange(0.5, num_states - 0.5), minor=True)
         ax2.set_xticks(np.arange(0.5, num_states - 0.5), minor=True)
