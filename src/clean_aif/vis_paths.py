@@ -68,7 +68,7 @@ def main():
     # Arguments for plotting the transitions probabilities for a specific state and action
     # (i.e. a column of a B matrix) over the entire experiment
     parser.add_argument("--state_B", "-sb", type=int, default=0)
-    parser.add_argument("--action_B", "-ab", type=int, default=0)
+    parser.add_argument("--action_B", "-ab", nargs="*", type=int, default=[0])
 
     # Argument to select a subset of the runs to plot depending on the probability of a policy being > 0.5
     parser.add_argument("--select_policy", "-selp", type=int, default=-1)
@@ -185,6 +185,17 @@ def main():
         policies_to_vis = params["policies_to_vis"][
             i * num_policies_vis : (i * num_policies_vis) + num_policies_vis
         ]
+        # Plot matrices B (transitions probabilities)
+        plot_matrix_B_kl(
+            data_path,
+            params["x_ticks_estep"],
+            [0, 22],
+            params["state_B"],
+            params["action_B"],
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+        )
         # Plot percentage of successful agents across episodes
         plot_avg_good_agents(
             data_path,
@@ -288,7 +299,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 10],
+            [0, 12],
             select_step=0,
             policies_to_vis=policies_to_vis,
         )
@@ -321,6 +332,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
+            [0, 10],
             num_tsteps=0,
             policies_to_vis=policies_to_vis,
         )
@@ -331,6 +343,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
+            [0, 1],
             num_tsteps=0,
             policies_to_vis=policies_to_vis,
         )
@@ -355,7 +368,7 @@ def main():
         plot_pi_prob_first(
             data_path,
             params["x_ticks_estep"],
-            [0, 0.09],  # Tmaze3: [0, 0.45]; Tmaze4: [0, 0.09]
+            [0, 0.10],  # Tmaze3: [0, 0.45]; Tmaze4: [0, 0.09]
             params["select_policy"],
             result_dir,
             params["env_layout"],

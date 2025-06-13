@@ -17,6 +17,8 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 import seaborn as sns
 
+from .utils_paths import cat_KL
+
 sns.set_style("whitegrid")  # setting style
 sns.set_context("paper")  # setting context
 sns.set_palette("colorblind")  # setting palette
@@ -969,6 +971,7 @@ def plot_efe_risk(
     save_dir,
     env_layout,
     x_ticks_estep,
+    y_lims,
     num_tsteps=None,
     policies_to_vis=[],
 ):
@@ -1111,26 +1114,11 @@ def plot_efe_risk(
                 label=f"$\\pi_{{{i}}}$: {policy_action_seq_leg}",
             )
     axes_1.set_xlabel(x_label)
-    axes_1.set_ylabel("Risk", rotation=90)
     axes_1.set_xticks(
         [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
     )
-
-    # Gather handles and labels from one of the axes to create common legend
-    handles, labels = axes_1.get_legend_handles_labels()
-    # Put the legend at the bottom center
-    # fig_1.legend(
-    #     handles,
-    #     labels,
-    #     title="Polices",
-    #     title_fontsize=16,
-    #     ncol=4,
-    #     handlelength=2,  # shrink the line handle
-    #     columnspacing=0.5,  # space between columns
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, -0.05),
-    #     fancybox=True,
-    # )
+    axes_1.set_ylabel("Risk", rotation=90)
+    axes_1.set_ylim(y_lims[0], y_lims[1])
 
     title_label += " (open loop)" if "paths" in exp_name else " (closed loop)"
     axes_1.set_title(f"Risk at {title_label}", pad=15)
@@ -1151,6 +1139,7 @@ def plot_efe_bnov(
     save_dir,
     env_layout,
     x_ticks_estep,
+    y_lims,
     num_tsteps=None,
     policies_to_vis=[],
 ):
@@ -1291,26 +1280,12 @@ def plot_efe_bnov(
             )
 
     axes_2.set_xlabel(x_label)
-    axes_2.set_ylabel("B-novelty", rotation=90)
     axes_2.set_xticks(
         [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
     )
 
-    # Gather handles and labels from one of the axes to create common legend
-    # handles, labels = axes_2.get_legend_handles_labels()
-    # Put the legend at the bottom center
-    # fig_2.legend(
-    #     handles,
-    #     labels,
-    #     title="Polices",
-    #     title_fontsize=16,
-    #     ncol=4,
-    #     handlelength=2,  # shrink the line handle
-    #     columnspacing=0.5,  # space between columns
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, -0.05),
-    #     fancybox=True,
-    # )
+    axes_2.set_ylabel("B-novelty", rotation=90)
+    axes_2.set_ylim(y_lims[0], y_lims[1])
 
     title_label += " (open loop)" if "paths" in exp_name else " (closed loop)"
     axes_2.set_title(f"B-novelty at {title_label}", pad=15)
@@ -2546,13 +2521,13 @@ def plot_pi_prob_first(
     else:
 
         # Create inset if needed
-        axins = None
-        if "paths" in exp_name:
-            # Get current axes
-            axins = inset_axes(ax, width="40%", height="40%", loc="upper right")
-            axins.set_ylim(0.0152, 0.0162)
-            axins.set_xlim(0, 100)
-            axins.tick_params(labelleft=True, labelbottom=True)
+        # axins = None
+        # if "paths" in exp_name:
+        #     # Get current axes
+        #     axins = inset_axes(ax, width="40%", height="40%", loc="upper right")
+        #     axins.set_ylim(0.0152, 0.0162)
+        #     axins.set_xlim(0, 100)
+        #     axins.tick_params(labelleft=True, labelbottom=True)
 
         for i, p in enumerate(policies_to_vis):
             y = avg_pi_prob[:, p].flatten()
@@ -2573,17 +2548,17 @@ def plot_pi_prob_first(
                 label=f"$\\pi_{{{i}}}$: {policy_action_seq_leg}",
             )
 
-            if axins:
-                axins.plot(
-                    x,
-                    y,
-                    ".-",
-                    color=cmap(i),
-                    label=f"$\\pi_{{{i}}}$: {policy_action_seq_leg}",
-                )
-        # Add inset connection after all lines are drawn
-        if axins:
-            mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+        #     if axins:
+        #         axins.plot(
+        #             x,
+        #             y,
+        #             ".-",
+        #             color=cmap(i),
+        #             label=f"$\\pi_{{{i}}}$: {policy_action_seq_leg}",
+        #         )
+        # # Add inset connection after all lines are drawn
+        # if axins:
+        #     mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
 
     ax.set_xticks(
         [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
@@ -2709,14 +2684,14 @@ def plot_pi_prob_first_subplots(
             ax[num_data].set_title(title + "\n")
 
             # Create inset if needed
-            axins = None
-            if "paths" in exp_name:
-                axins = inset_axes(
-                    ax[num_data], width="40%", height="40%", loc="upper right"
-                )
-                axins.set_ylim(0.015, 0.016)
-                axins.set_xlim(0, 100)
-                axins.tick_params(labelleft=True, labelbottom=True)
+            # axins = None
+            # if "paths" in exp_name:
+            #     axins = inset_axes(
+            #         ax[num_data], width="40%", height="40%", loc="upper right"
+            #     )
+            #     axins.set_ylim(0.015, 0.016)
+            #     axins.set_xlim(0, 100)
+            #     axins.tick_params(labelleft=True, labelbottom=True)
 
             for i, p in enumerate(curr_policies_to_vis):
                 y = avg_pi_prob[:, p].flatten()
@@ -2736,18 +2711,18 @@ def plot_pi_prob_first_subplots(
                     label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
                 )
 
-                if axins:
-                    axins.plot(
-                        x,
-                        y,
-                        ".-",
-                        color=cmap(i),
-                        label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
-                    )
+            #     if axins:
+            #         axins.plot(
+            #             x,
+            #             y,
+            #             ".-",
+            #             color=cmap(i),
+            #             label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
+            #         )
 
-            # Add inset connection after all lines are drawn
-            if axins:
-                mark_inset(ax[num_data], axins, loc1=2, loc2=4, fc="none", ec="0.5")
+            # # Add inset connection after all lines are drawn
+            # if axins:
+            #     mark_inset(ax[num_data], axins, loc1=2, loc2=4, fc="none", ec="0.5")
 
         ax[num_data].set_xticks(
             np.arange(x_ticks_estep, num_episodes + 1, step=x_ticks_estep)
@@ -3516,6 +3491,305 @@ def plot_matrix_A(
     plt.close()
 
 
+def plot_matrix_B_kl(
+    file_data_path,
+    x_ticks_estep,
+    y_lims,
+    state_B,
+    action_B,
+    select_run,
+    save_dir,
+    env_layout,
+):
+    """
+    Function to plot the sum of KL divergences of transition probabilities for each action across the episodes.
+    Inputs:
+
+    - file_data_path (str): file path to the saved data
+    - x_ticks_estep (int): step for the ticks in the x axis when plotting as a function of episode number
+    - state_B (int): index i to slice a certain column of B to represent the evolution of P(S_j|S_i, a)
+    - action_B (int): index to select the action for which to represent the transition probabilities
+    - select_run (int): exclude some runs from visualization based on policies probabilities
+    - save_dir (str): directory where to save the images
+    - env_layout (str): layout of the environment
+
+    Outputs:
+    - plot showing the evolution of the sum of KL divergences
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'transition_prob'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    exp_name = data["exp_name"]
+    num_runs = data["num_runs"]
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+    num_states = data["num_states"]
+
+    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
+    # was passed through the command line
+    if select_run != -1:
+
+        pi_runs = data["pi_probabilities"][:, -1, select_run, -1]
+        selected_runs = (pi_runs > 0.5).nonzero()[0]
+        transitions_prob = data["transition_prob"][selected_runs]
+    else:
+        transitions_prob = data["transition_prob"]
+
+    # Computing the mean (avg) and std of the transition probabilities over the runs
+    avg_transitions_prob = np.mean(transitions_prob, axis=0)  # .squeeze()
+    std_transitions_prob = np.std(transitions_prob, axis=0)  # .squeeze()
+
+    # Making sure state_B is a valid value to select a matrix B and slice it
+    assert state_B >= 0 and state_B <= num_states - 1, "Invalid state index."
+
+    # Conmpute ground-truth B matrices for Tmaze4
+    # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
+    # Gymnasium grid coordinate system the negative and positive y axes are swapped
+    B_params = np.zeros((4, num_states, num_states))
+
+    if "Tmaze4" in env_layout:
+        # Down action: 3
+        B_params[3, :, :] = np.array(
+            [
+                [1, 0, 0, 0, 0],
+                [0, 1, 0, 1, 0],
+                [0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1],
+                [0, 0, 0, 0, 0],
+            ],
+            dtype=np.float64,
+        )
+        # Left action: 2
+        B_params[2, :, :] = np.array(
+            [
+                [1, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Up action: 1
+        B_params[1, :, :] = np.array(
+            [
+                [1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [0, 1, 0, 0, 0],
+                [0, 0, 0, 1, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Right action: 0
+        B_params[0, :, :] = np.array(
+            [
+                [0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0],
+                [0, 1, 1, 0, 0],
+                [0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+    elif "Ymaze4" in env_layout:
+
+        B_params[3, :, :] = np.array(
+            [
+                [1, 0, 1, 0, 0, 0],
+                [0, 1, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0, 1],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0],
+            ],
+            dtype=np.float64,
+        )
+        # Left action: 2
+        B_params[2, :, :] = np.array(
+            [
+                [1, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Up action: 1
+        B_params[1, :, :] = np.array(
+            [
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0],
+                [1, 0, 1, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 1, 0],
+                [0, 0, 0, 1, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Right action: 0
+        B_params[0, :, :] = np.array(
+            [
+                [1, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0],
+                [0, 0, 0, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+
+    rng = np.random.default_rng(seed=33)
+    B = np.zeros((4, num_states, num_states))
+    B_params = (B_params * 200) + 1
+
+    for a in range(4):
+        for s in range(num_states):
+            B[a, :, s] = rng.dirichlet(B_params[a, :, s], size=1)
+
+    x = np.arange(1, num_episodes + 1)
+    action_errors = {}
+
+    # Plotting sum of KL divergences for B matrices
+    fig1, ax1 = plt.subplots(figsize=(5, 4), tight_layout=True)
+    # Selecting the avg and std transition probabilities for a specific action (a=0, a=1, a=2, a=3)
+    # throughout the experiment, i.e. for B_a
+    for a in action_B:
+        # Making sure action_B is a valid value to select a matrix B and slice it
+        assert a >= 0 and a <= 3, "Invalid action index."
+        transition_prob_action = avg_transitions_prob[:, a, :, :]  # .squeeze()
+        y = []
+        # std_tpa = std_transitions_prob[:, a, :, :]  # .squeeze()
+        for t in range(transition_prob_action.shape[0]):
+            kls = cat_KL(transition_prob_action[t], B[a])
+            y.append(np.sum(kls))
+
+        action_errors[a] = np.array(y)
+
+        ax1.plot(
+            x,
+            y,
+            linestyle="-",
+            label=f"{actions_map[a]}",
+        )
+
+    ax1.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
+    )
+    ax1.set_xlabel("Episodes")
+    ax1.set_ylabel("Nats", rotation=90)
+
+    if "Tmaze4" in env_layout:
+        ax1.set_ylim(0, 18)
+    elif "Ymaze4" in env_layout:
+        ax1.set_ylim(y_lims[0], y_lims[1])
+    else:
+        ax1.set_ylim(0, 20)
+
+    # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
+    # title += "\n(open loop)" if "paths" in exp_name else " (closed loop)"
+    title = (
+        f"Sum of KL divergences for each action\n"
+        f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+    )
+    ax1.set_title(title, pad=15)
+
+    # Create a separate figure for the legend
+    fig_legend = plt.figure(figsize=(8, 2))
+    # Use the same handles and labels
+    handles, labels = ax1.get_legend_handles_labels()
+    fig_legend.legend(
+        handles,
+        labels,
+        title="Actions",
+        ncol=4,
+        title_fontsize=12,
+        handlelength=2,  # shrink the line handle
+        columnspacing=1.5,  # space between columns
+        loc="center",
+        bbox_to_anchor=(0.5, 0.5),
+        fancybox=True,
+    )
+    # Save the legend figure separately
+    fig_legend.savefig(
+        save_dir + "/" + f"{env_layout}_actions_legend.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+    )
+
+    plt.close(fig_legend)
+
+    plt.savefig(
+        save_dir + "/" + f"{env_layout}_{exp_name}_matrix_B_kl.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+    # Plotting sum of KL divergences for B matrices
+    fig2, ax2 = plt.subplots(figsize=(5, 4), tight_layout=True)
+    # Select specific episodes
+    selected = [0, 24, 49, 74, 99]  # Python indices for episodes 1, 25, 50, 75, 100
+    x_labels = [1, 25, 50, 75, 100]
+    # Data for inset
+    a0 = action_errors[0][selected]
+    a1 = action_errors[1][selected]
+    a2 = action_errors[2][selected]
+    a3 = action_errors[3][selected]
+    # Plot stacked bars
+    width = 15
+    bars1 = ax2.bar(x_labels, a0, width=width)
+    bars2 = ax2.bar(x_labels, a1, width=width, bottom=a0)
+    bars3 = ax2.bar(x_labels, a2, width=width, bottom=a0 + a1)
+    bars4 = ax2.bar(x_labels, a3, width=width, bottom=a0 + a1 + a2)
+
+    # Formatting
+    title = (
+        f"Total KL divergence in selected episodes\n"
+        f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+    )
+    ax2.set_title(title, pad=15)
+    ax2.set_xticks(x_labels)
+    ax2.set_ylabel("Nats")
+    ax2.set_xlabel("Episodes")
+
+    # Function to label bars
+    def annotate_bars(bars, heights):
+        for bar, h in zip(bars, heights):
+            if h > 0.5:  # avoid cluttering small segments
+                ax2.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_y() + h / 2,
+                    f"{h:.1f}",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    color="white",
+                )
+
+    annotate_bars(bars1, action_errors[0][selected])
+    annotate_bars(bars2, action_errors[1][selected])
+    annotate_bars(bars3, action_errors[2][selected])
+    annotate_bars(bars4, action_errors[3][selected])
+
+    plt.savefig(
+        save_dir + "/" + f"{env_layout}_{exp_name}_matrix_B_kl_selep.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+
 def plot_matrix_B(
     file_data_path,
     x_ticks_estep,
@@ -3574,109 +3848,112 @@ def plot_matrix_B(
     avg_transitions_prob = np.mean(transitions_prob, axis=0)  # .squeeze()
     std_transitions_prob = np.std(transitions_prob, axis=0)  # .squeeze()
 
-    # Making sure state_B and action_B are valid values to select a matrix B and slice it
-    assert action_B >= 0 and action_B <= 3, "Invalid action index."
+    # Making sure state_B is a valid value to select a matrix B and slice it
     assert state_B >= 0 and state_B <= num_states - 1, "Invalid state index."
+
     # Selecting the avg and std transition probabilities for a specific action (a=0, a=1, a=2, a=3)
     # throughout the experiment, i.e. for B_a
-    a = action_B
-    transition_prob_action = avg_transitions_prob[:, a, :, :]  # .squeeze()
-    std_tpa = std_transitions_prob[:, a, :, :]  # .squeeze()
-    # Selecting a specific state transition throughout the experiment
-    s = state_B
-    transition_state = transition_prob_action[:, :, s]  # .squeeze()
-    std_transition_state = std_tpa[:, :, s]  # .squeeze()
-    # Plotting the transition probabilites from state s for action a throughout the experiment.
-    # For example, we could plot the transition probability from the state just before the goal for
-    # the action that would bring the agent there to see if the agent learned the way to get to the
-    # goal state.
-    x = np.arange(1, num_episodes + 1)
-    y_data = transition_state[:, :]
+    for a in action_B:
+        # Making sure action_B is a valid value to select a matrix B and slice it
+        assert a >= 0 and a <= 3, "Invalid action index."
+        transition_prob_action = avg_transitions_prob[:, a, :, :]  # .squeeze()
+        std_tpa = std_transitions_prob[:, a, :, :]  # .squeeze()
+        # Selecting a specific state transition throughout the experiment
+        s = state_B
+        transition_state = transition_prob_action[:, :, s]  # .squeeze()
+        std_transition_state = std_tpa[:, :, s]  # .squeeze()
 
-    fig1, ax1 = plt.subplots(figsize=(5, 4), tight_layout=True)
-    # Setting up plotting markers and a counter to cycle through them
-    markers = [".", "+", "x"]
-    counter = 0
-    # Looping over every element of the selected column of B to plot how that value (probability) changes
-    # episode after episode
-    # Note 1: we are plotting how every single transition probability from state s changes during the
-    # experiment. The number of those probabilities is given by transition_state.shape[1] (the second
-    # dimension of transition_state).
-    for c in range(transition_state.shape[1]):
-        counter += 1
-        m = None
-        if counter <= 10:
-            m = 0
-        elif counter > 10 and counter <= 20:
-            m = 1
-        else:
-            m = 2
-        y = y_data[:, c]
-        ax1.plot(
-            x,
-            y,
-            marker=markers[m],
-            linestyle="-",
-            label=f"$P(S_{{t+1}}={c+1}|S_t={s+1}, \\pi_t=${actions_map[a]}$)$",
+        # Plotting the transition probabilites from state s for action a throughout the experiment.
+        # For example, we could plot the transition probability from the state just before the goal for
+        # the action that would bring the agent there to see if the agent learned the way to get to the
+        # goal state.
+        x = np.arange(1, num_episodes + 1)
+        y_data = transition_state[:, :]
+
+        fig1, ax1 = plt.subplots(figsize=(5, 4), tight_layout=True)
+        # Setting up plotting markers and a counter to cycle through them
+        markers = [".", "+", "x"]
+        counter = 0
+        # Looping over every element of the selected column of B to plot how that value (probability) changes
+        # episode after episode
+        # Note 1: we are plotting how every single transition probability from state s changes during the
+        # experiment. The number of those probabilities is given by transition_state.shape[1] (the second
+        # dimension of transition_state).
+        for c in range(transition_state.shape[1]):
+            counter += 1
+            m = None
+            if counter <= 10:
+                m = 0
+            elif counter > 10 and counter <= 20:
+                m = 1
+            else:
+                m = 2
+            y = y_data[:, c]
+            ax1.plot(
+                x,
+                y,
+                marker=markers[m],
+                linestyle="-",
+                label=f"$P(S_{{t+1}}={c+1}|S_t={s+1}, \\pi_t=${actions_map[a]}$)$",
+            )
+            # ax1.fill_between(x, y-std_transition_state[:, c], y+std_transition_state[:, c], alpha=0.3)
+            ax1.fill_between(
+                x,
+                y - (1.96 * std_transition_state[:, c] / np.sqrt(num_runs)),
+                y + (1.96 * std_transition_state[:, c] / np.sqrt(num_runs)),
+                alpha=0.3,
+            )
+
+        ax1.set_xticks(
+            [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
         )
-        # ax1.fill_between(x, y-std_transition_state[:, c], y+std_transition_state[:, c], alpha=0.3)
-        ax1.fill_between(
-            x,
-            y - (1.96 * std_transition_state[:, c] / np.sqrt(num_runs)),
-            y + (1.96 * std_transition_state[:, c] / np.sqrt(num_runs)),
-            alpha=0.3,
+        ax1.set_xlabel("Episode")
+        ax1.set_ylim(0, 1)
+        ax1.set_ylabel("Probability mass", rotation=90)
+
+        # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
+        # title += "\n(open loop)" if "paths" in exp_name else " (closed loop)"
+        title = (
+            f"Transition probabilities from state {s + 1} for action {actions_map[a]}\n"
+            f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+        )
+        ax1.set_title(title, pad=15)
+
+        # Create a separate figure for the legend
+        fig_legend = plt.figure(figsize=(8, 2))
+        # Use the same handles and labels
+        handles, labels = ax1.get_legend_handles_labels()
+        fig_legend.legend(
+            handles,
+            labels,
+            title="Transition probabilities",
+            ncol=1,
+            title_fontsize=12,
+            handlelength=2,  # shrink the line handle
+            # columnspacing=1.5,  # space between columns
+            loc="center",
+            bbox_to_anchor=(0.5, 0.5),
+            fancybox=True,
+        )
+        # Save the legend figure separately
+        fig_legend.savefig(
+            save_dir + "/" + f"{env_layout}_transition_probs_s{s + 1}_a{a}_legend.pdf",
+            format="pdf",
+            dpi=200,
+            bbox_inches=None,
         )
 
-    ax1.set_xticks(
-        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
-    )
-    ax1.set_xlabel("Episode")
-    ax1.set_ylim(0, 1)
-    ax1.set_ylabel("Probability Mass", rotation=90)
+        plt.close(fig_legend)
 
-    # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
-    # title += "\n(open loop)" if "paths" in exp_name else " (closed loop)"
-    title = (
-        f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}\n"
-        f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
-    )
-    ax1.set_title(title, pad=15)
-
-    # Create a separate figure for the legend
-    fig_legend = plt.figure(figsize=(8, 2))
-    # Use the same handles and labels
-    handles, labels = ax1.get_legend_handles_labels()
-    fig_legend.legend(
-        handles,
-        labels,
-        title="Transition probabilities",
-        ncol=1,
-        title_fontsize=12,
-        handlelength=2,  # shrink the line handle
-        # columnspacing=1.5,  # space between columns
-        loc="center",
-        bbox_to_anchor=(0.5, 0.5),
-        fancybox=True,
-    )
-    # Save the legend figure separately
-    fig_legend.savefig(
-        save_dir + "/" + f"{env_layout}_transition_probs_s{s + 1}_a{a}_legend.pdf",
-        format="pdf",
-        dpi=200,
-        bbox_inches=None,
-    )
-
-    plt.close(fig_legend)
-
-    plt.savefig(
-        save_dir + "/" + f"{env_layout}_{exp_name}_matrix_B_state{s}_action{a}.pdf",
-        format="pdf",
-        dpi=200,
-        bbox_inches=None,
-        # pad_inches=0.1,
-    )
-    # plt.show()
-    plt.close()
+        plt.savefig(
+            save_dir + "/" + f"{env_layout}_{exp_name}_matrix_B_state{s}_action{a}.pdf",
+            format="pdf",
+            dpi=200,
+            bbox_inches=None,
+            # pad_inches=0.1,
+        )
+        # plt.show()
+        plt.close()
 
     # Heatmap of the transition probabilites from all states for action all the actions at the end
     # of the experiment; the actions range from 0 to 3 (included)

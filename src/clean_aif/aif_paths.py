@@ -559,15 +559,15 @@ class Agent(object):
         # Replacing zeroes with 0.0001, to avoid the creation of nan values and multiplying by 5 to make sure
         # the concentration of probabilities is preserved when reapplying the softmax
         # TODO: re-check if this is still necessary
-        self.Qpi[:, self.current_tstep] = np.where(
-            self.Qpi[:, self.current_tstep] == 1, 5, self.Qpi[:, self.current_tstep]
-        )
-        self.Qpi[:, self.current_tstep] = np.where(
-            self.Qpi[:, self.current_tstep] == 0,
-            np.amax(self.Qpi[:, self.current_tstep]) / 1000,  # 0.0001,
-            self.Qpi[:, self.current_tstep],
-        )
-        self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
+        # self.Qpi[:, self.current_tstep] = np.where(
+        #     self.Qpi[:, self.current_tstep] == 1, 5, self.Qpi[:, self.current_tstep]
+        # )
+        # self.Qpi[:, self.current_tstep] = np.where(
+        #     self.Qpi[:, self.current_tstep] == 0,
+        #     np.amax(self.Qpi[:, self.current_tstep]) / 1000,  # 0.0001,
+        #     self.Qpi[:, self.current_tstep],
+        # )
+        # self.Qpi[:, self.current_tstep] = sigma(self.Qpi[:, self.current_tstep])
 
         # Computing the policy-independent state probability at self.current_tstep and storing it in self.Qs
         for pi, _ in enumerate(self.policies):
