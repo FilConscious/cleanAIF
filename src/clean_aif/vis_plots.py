@@ -13,7 +13,7 @@ from pathlib import Path
 from glob import glob
 
 # Custom packages/modules imports
-from .vis_utils_paths import *
+from .vis_utils import *
 from .config import LOG_DIR, RESULTS_DIR
 
 
