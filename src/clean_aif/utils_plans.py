@@ -112,6 +112,7 @@ def compute_future_beliefs(
 
 
 def vfe(
+    iteration,
     trajectory_len,
     num_states,
     current_tstep,
@@ -305,7 +306,7 @@ def vfe(
 
     # assert type(F_pi)==float, 'Free energy is not of type float; it is of type: ' + str(type(F_pi))
 
-    return logA_pi, logB_pi, logD_pi, F_pi
+    return st_log_st, ot_logA_st, s1_logD, st_logB_stp, logA_pi, logB_pi, logD_pi, F_pi
 
 
 def grad_vfe(

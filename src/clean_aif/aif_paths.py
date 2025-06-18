@@ -216,7 +216,7 @@ class Agent(object):
         self.actions = list(range(self.num_actions))
         self.policies = params.get("policies")
         self.Qpi = np.zeros((self.num_policies, self.steps))
-        self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.policies.shape[0]
+        self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
 
         # State probabilities given a policy for every time step, the multidimensional array
         # contains self.steps distributions for each policy (i.e. policies*states*timesteps parameters).
@@ -224,7 +224,7 @@ class Agent(object):
         # Note 1: a simple way to initialise these probability values is to make every categorical
         # distribution a uniform distribution.
         self.Qs_pi = (
-            np.ones((self.policies.shape[0], self.num_states, self.steps))
+            np.ones((self.num_policies, self.num_states, self.steps))
             * 1
             / self.num_states
         )
@@ -232,14 +232,14 @@ class Agent(object):
         # the state probabilities given a policy for the first step of the episode (while the previous array
         # is overwritten at every step and ends up logging the last step state beliefs for the episode)
         self.Qsf_pi = (
-            np.ones((self.policies.shape[0], self.num_states, self.steps))
+            np.ones((self.num_policies, self.num_states, self.steps))
             * 1
             / self.num_states
         )
         # Policy conditioned state-beliefs throughout an episode, i.e. these matrices show how
         # all the Q(S_i|pi) change step after step by doing perceptual inference.
         self.Qt_pi = (
-            np.ones((self.steps, self.policies.shape[0], self.num_states, self.steps))
+            np.ones((self.steps, self.num_policies, self.num_states, self.steps))
             * 1
             / self.num_states
         )
@@ -251,13 +251,20 @@ class Agent(object):
         # Numpy arrays where at every time step the computed free energies and expected free energies
         # for each policy and the total free energy are stored. For how these are calculated see the
         # methods below. We also stored separately the various EFE components.
-        self.free_energies = np.zeros((self.policies.shape[0], self.steps))
-        self.expected_free_energies = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_ambiguity = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_risk = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Anovelty = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Bnovelty = np.zeros((self.policies.shape[0], self.steps))
-        self.efe_Bnovelty_t = np.zeros((self.policies.shape[0], self.steps))
+        # Policy-conditioned free energy and its components
+        self.free_energies = np.zeros((self.num_policies, self.steps))
+        self.state_logprob = np.zeros((self.num_policies, self.steps))
+        self.state_logprob_first = np.zeros((self.num_policies, self.steps))
+        self.obs_loglik = np.zeros((self.num_policies, self.steps))
+        self.transit_loglik = np.zeros((self.num_policies, self.steps))
+        # EFE and its components
+        self.expected_free_energies = np.zeros((self.num_policies, self.steps))
+        self.efe_ambiguity = np.zeros((self.num_policies, self.steps))
+        self.efe_risk = np.zeros((self.num_policies, self.steps))
+        self.efe_Anovelty = np.zeros((self.num_policies, self.steps))
+        self.efe_Bnovelty = np.zeros((self.num_policies, self.steps))
+        self.efe_Bnovelty_t = np.zeros((self.num_policies, self.steps))
+        # Total free energy
         self.total_free_energies = np.zeros((self.steps))
 
         # Where the agent believes it is at each time step
@@ -332,34 +339,110 @@ class Agent(object):
 
         print("---------------------")
         print("--- 1. PERCEPTION ---")
-        # Retrieving the softmax function needed to normalise the updated values of the Q(S_t|pi)
-        # after performing gradient descent.
-        sigma = special.softmax
 
-        # Looping over the policies to calculate the respective free energies and their gradients
-        # to perform gradient descent on the Q(S_t|pi).
+        # Loop over policies to calculate the policy-conditioned free energies and their gradients.
         for pi, pi_actions in enumerate(self.policies):
+            # Compute variational free energy with prior distributions Q(S_t|pi)
+            # NOTE: if B parameters are learned then you need to pass in self.B_params and
+            # self.learning_B (the same applies for A)
+            i = 0
+            (
+                st_log_st,
+                ot_logA_st,
+                s1_logD,
+                st_logB_stp,
+                logA_pi,
+                logB_pi,
+                logD_pi,
+                F_pi_old,
+            ) = vfe(
+                i,
+                self.num_states,
+                self.steps,
+                self.current_tstep,
+                self.current_obs,
+                pi,
+                pi_actions,
+                self.A,
+                self.B,
+                self.D,
+                self.Qs_pi,
+                A_params=self.A_params,
+                learning_A=self.learning_A,
+                B_params=self.B_params,
+                learning_B=self.learning_B,
+            )
 
-            ### DEBUGGING ###
-            # print(f"FE Minimization for Policy {pi}")
-            # print(f'Policy actions {pi_actions}')
-            # print(f"Time Step {self.current_tstep}")
-            # print(f"Pi actions {pi_actions}")
-            # print(f"First action {pi_actions[0]}")
-            ### END ###
-
-            ########### Update the Q(S_t|pi) by setting gradient to zero ##############
-
-            for _ in range(self.inf_iters):
-
+            # Inference loop
+            while True:
+                i += 1
                 # IMPORTANT: here we are replacing zero probabilities with the value 0.0001
                 # to avoid zeroes in logs.
-                self.Qs_pi = np.where(self.Qs_pi == 0, 0.0001, self.Qs_pi)
+                # self.Qs_pi = np.where(self.Qs_pi == 0, 0.0001, self.Qs_pi)
 
-                # Computing the variational free energy for the current policy
-                # Note 1: if B parameters are learned then you need to pass in self.B_params and
-                # self.learning_B (the same applies for A)
-                logA_pi, logB_pi, logD_pi, F_pi = vfe(
+                ### DEBUG ###
+                # print(f"Policy {pi} -----------------")
+                # print(f"Iteration {i}")
+                # np.set_printoptions(precision=4)
+                # self.Qs_pi = np.where(self.Qs_pi == 1, 0.99, self.Qs_pi)
+                # assert np.all(self.Qs_pi < 1), "Array contains value greater than 1"
+                # assert np.all(self.Qs_pi != 0), "Array contains zero(s)"
+                # assert not np.isnan(self.Qs_pi).any(), "Array contains NaN value(s)"
+                # print(self.Qs_pi)
+                ###### END ######
+
+                # Compute the free energy gradient for the current policy
+                grad_F_pi = grad_vfe(
+                    self.num_states,
+                    self.steps,
+                    self.current_tstep,
+                    self.current_obs,
+                    pi,
+                    self.Qs_pi,
+                    logA_pi,
+                    logB_pi,
+                    logD_pi,
+                )
+
+                # Update Q(S_t|pi), for all t in [1, T], by setting gradients to zero
+                # NOTE: the update equation below is based on the computations of Da Costa, 2020, p. 9,
+                # by setting the gradient to zero one can solve for the parameters that minimize the gradient,
+                # here we are recovering those solutions *from* the gradient (by subtraction) before applying
+                # a softmax to make sure we get valid probabilities.
+                self.Qs_pi[pi, :, :] = special.softmax(
+                    (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1,
+                    axis=0,
+                )
+
+                # Storing the state beliefs at the first step of the episode
+                if self.current_tstep == 0:
+                    self.Qsf_pi[pi, :, :] = self.Qs_pi[pi, :, :]
+
+                ### DEBUG ###
+                # if self.current_tstep == 0:
+                #     if np.array_equal(pi_actions, [2, 3, 3]):
+                #         if i == 6:
+                #             print(f"Perceptual Iteration {i}")
+                #             print(f"Policy {pi_actions} | st_logB_stp: {st_logB_stp}")
+                #             print("Policy Q(s|pi)")
+                #             print(self.Qs_pi[pi, :, :])
+                #             assert -st_logB_stp < 6.5, print(
+                #                 f"Expected log-likelihhod exploded. st_logB_stp = {st_logB_stp}"
+                #             )
+
+                # Compute value of policy-conditioned free energy with updated Q(S_t|pi)
+                # NOTE: at convergence this value will be the free energy minimum
+                (
+                    st_log_st,
+                    ot_logA_st,
+                    s1_logD,
+                    st_logB_stp,
+                    logA_pi,
+                    logB_pi,
+                    logD_pi,
+                    F_pi,
+                ) = vfe(
+                    i,
                     self.num_states,
                     self.steps,
                     self.current_tstep,
@@ -376,76 +459,24 @@ class Agent(object):
                     learning_B=self.learning_B,
                 )
 
-                # Computing the free energy gradient for the current policy
-                grad_F_pi = grad_vfe(
-                    self.num_states,
-                    self.steps,
-                    self.current_tstep,
-                    self.current_obs,
-                    pi,
-                    self.Qs_pi,
-                    logA_pi,
-                    logB_pi,
-                    logD_pi,
-                )
+                # Stop at convergence or when hit the max number of iterations
+                if abs(F_pi - F_pi_old) < 0.001 or i >= self.inf_iters:
+                    break
 
-                # Simultaneous beliefs updates
-                # Note: the update equation below is based on the computations of Da Costa, 2020, p. 9,
-                # by setting the gradient to zero one can solve for the parameters that minimize that gradient,
-                # here we are recovering those solutions *from* the gradient (by subtraction) before applying
-                # a softmax to make sure we get valid probabilities.
-                # IMPORTANT: when using a mean-field approx. in variational inference (like it is commonly
-                # done in vanilla active inference) the various factors, e.g., the Q(S_t|pi), are updated
-                # one at time by keeping all the others fixed. Here, we are instead using a simultaneous
-                # update of all the factors, possibly repeating this operation a few times. However,
-                # results seem OK even if the for loop iterates just for one step.
+                F_pi_old = F_pi
 
-                # print("Gradient for update:")
-                # print(f"{grad_F_pi}")
-                self.Qs_pi[pi, :, :] = sigma(
-                    (-1) * (grad_F_pi - np.log(self.Qs_pi[pi, :, :]) - 1) - 1,
-                    axis=0,
-                )
-
-                # print("Qs_pi after update:")
-                # print(f"{self.Qs_pi}")
-
-                # Storing the state beliefs at the first step of the episode
-                if self.current_tstep == 0:
-                    self.Qsf_pi[pi, :, :] = self.Qs_pi[pi, :, :]
-                # self.Qs_pi[pi, :, :] = sigma(-self.Qpi[pi, -1] * grad_F_pi, axis=0)
-            ######### END ###########
-
-            # Printing the free energy value for current policy at current time step
-            # print(f"Time Step: {self.current_tstep}")
-            # print(f" FE_pi_{pi}: {F_pi}")
-            # Storing the last computed free energy in self.free_energies
+            # Storing the last computed free energy and components
             self.free_energies[pi, self.current_tstep] = F_pi
-            # Computing the policy-independent state probability at self.current_tstep and storing
-            # it in self.Qs. This is commented out because it might make more sense to do it after
-            # updating the probabilities over policies (in the planning method, see below), however
-            # it could be also done here using the updated Q(S_t|pi) and the old Q(pi).
-            # self.Qs[:, self.current_tstep] += (
-            #     self.Qs_pi[pi, :, self.current_tstep] * self.Qpi[pi, self.current_tstep]
-            # )
+            self.state_logprob[pi, self.current_tstep] = st_log_st
+            self.state_logprob_first[pi, self.current_tstep] = s1_logD
+            self.obs_loglik[pi, self.current_tstep] = ot_logA_st
+            self.transit_loglik[pi, self.current_tstep] = st_logB_stp
 
             # Storing S_i probabilities for a certain index i, e.g., the index that corresponds to the
             # final step to see whether the agent ends up believing that it will reach the goal state
             # at the end of the episode by following the corresponding policy.
             for t in range(self.steps):
                 self.Qt_pi[t, pi, :, self.current_tstep] = self.Qs_pi[pi, :, t]
-
-        ### DEBUGGING ###
-        # assert np.sum(self.Qs[:, self.current_tstep], axis=0) == 1, "The values of the policy-independent state probability distribution at time " + str(self.current_tstep) + " don't sum to one!"
-        ### END ###
-
-        # Identifying and storing the state the agents believes to be in at the current time step.
-        # There might be no point in doing this here if the state-independent probabilities are not
-        # computed above, i.e., one is getting the most probable state the agent believes to be in
-        # based on Q(S_t|pi) and the old Q(pi) updated *at the previous time step*.
-        # TODO: check that commenting this out does not cause any error
-        # state_belief = np.argmax(self.Qs[:, self.current_tstep], axis=0)
-        # self.states_beliefs[self.current_tstep] = state_belief
 
     def planning(self):
         """Method for planning, which involves computing the expected free energy for all the policies
@@ -476,7 +507,6 @@ class Agent(object):
 
         for pi, pi_actions in enumerate(self.policies):
 
-            print(self.policies)
             # At the last time step only update Q(pi) with the computed free energy
             # (because there is no expected free energy then). for all the other steps
             # compute the total expected free energy over the remaining time steps.
@@ -630,7 +660,7 @@ class Agent(object):
         # Matrix of shape (num_actions, num_policies) with each row being populated by the same integer,
         # i.e. the index for an action, e.g. np.array([[0,0,0,0,0],[1,1,1,1,1],..]) if there are
         # five policies.
-        actions_matrix = np.array([self.actions] * self.policies.shape[0]).T
+        actions_matrix = np.array([self.actions] * self.num_policies).T
 
         # By using '==' inside the np.matmul(), we get a boolean matrix in which each row tells us
         # how many policies dictate a certain action at the current time step. Then, these counts are
@@ -976,10 +1006,10 @@ class Agent(object):
         # Setting self.Qs to a zero array before starting a new episode
         self.Qs = np.zeros((self.num_states, self.steps))
         # Resetting sequence of B-novelty values at t = 0
-        self.efe_Bnovelty_t = np.zeros((self.policies.shape[0], self.steps))
+        self.efe_Bnovelty_t = np.zeros((self.num_policies, self.steps))
         # Reset the policy-conditioned beliefs as flat priors
         self.Qs_pi = (
-            np.ones((self.policies.shape[0], self.num_states, self.steps))
+            np.ones((self.num_policies, self.num_states, self.steps))
             * 1
             / self.num_states
         )
@@ -1024,8 +1054,20 @@ class LogData(object):
         )
         """Counts of how many times the goal state is reached"""
         self.reward_counts: np.ndarray = np.zeros((self.num_runs, self.num_episodes))
-        """Policy dependent free energies at each step during every episode"""
+        """Policy dependent free energies at each step during every episode and components"""
         self.pi_free_energies: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        self.state_logprob: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        self.state_logprob_first: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        self.obs_loglik: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
+        )
+        self.transit_loglik: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
         )
         """Total free energies at each step during every episode"""
@@ -1131,6 +1173,10 @@ class LogData(object):
         # (this is done for every episode and for every run).
         self.reward_counts[run][episode] = kwargs["total_reward"]
         self.pi_free_energies[run, episode, :, :] = kwargs["free_energies"]
+        self.state_logprob[run, episode, :, :] = kwargs["state_logprob"]
+        self.state_logprob_first[run, episode, :, :] = kwargs["state_logprob_first"]
+        self.obs_loglik[run, episode, :, :] = kwargs["obs_loglik"]
+        self.transit_loglik[run, episode, :, :] = kwargs["transit_loglik"]
         self.total_free_energies[run, episode, :] = kwargs["total_free_energies"]
         self.expected_free_energies[run, episode, :, :] = kwargs[
             "expected_free_energies"
@@ -1170,6 +1216,10 @@ class LogData(object):
         data["state_visits"] = self.state_visits
         data["reward_counts"] = self.reward_counts
         data["pi_free_energies"] = self.pi_free_energies
+        data["state_logprob"] = self.state_logprob
+        data["state_logprob_first"] = self.state_logprob_first
+        data["obs_loglik"] = self.obs_loglik
+        data["transit_loglik"] = self.transit_loglik
         data["total_free_energies"] = self.total_free_energies
         data["expected_free_energies"] = self.expected_free_energies
         data["efe_ambiguity"] = self.efe_ambiguity

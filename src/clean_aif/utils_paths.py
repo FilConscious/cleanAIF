@@ -11,6 +11,7 @@ from scipy import special
 
 
 def vfe(
+    i,
     num_states,
     steps,
     current_tstep,
@@ -72,7 +73,7 @@ def vfe(
     #  # Fourth term: sum of dot products from t=2 to T.
     #  - S_2T(Q(s_t|pi) @ log(B_t-1) @ Q(s_t-1|pi)).
 
-    print("Computing FE...")
+    # print("Computing FE...")
 
     # Digamma function used to compute the expectations of matrices A and B if their respective
     # parameters are learned by the agent. Those expectations turn up in the computation of the
@@ -141,7 +142,11 @@ def vfe(
     # is no action therefore no transition probabilities.
     logB_pi = np.zeros((steps - 1, num_states, num_states))
 
-    # For every step in the episode retrieve the action that the policy pi dictates at
+    if current_tstep == 0:
+        if np.array_equal(pi_actions, [2, 3, 3]):
+            print(f"All beliefs:")
+            print(f"{Qs_pi[pi,:,:]}")
+    # For every step in the episod``e retrieve the action that the policy pi dictates at
     # time step t-1,
     for t in range(steps):
 
@@ -156,6 +161,13 @@ def vfe(
                 ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
                 logB_pi[t, :, :] = ExplogB
 
+                ### DEBUG ###
+                if current_tstep == 0:
+                    if np.array_equal(pi_actions, [2, 3, 3]):
+                        if i == 6:
+                            print(f"Time step: {t} | Action {action}")
+                            print(B_params[action])
+                ### END ###
         else:
             # There is no action at the last time step (i.e. steps-1 because in Python
             # we start counting from 0) so we retrieve B matrices as long as t is not
@@ -178,6 +190,15 @@ def vfe(
         # Adding the computed value to st_logB_stp (because we are computing expectations
         # of categorical distributions).
         if t != 0:
+            ### DEBUG ###
+            if current_tstep == 0:
+                if np.array_equal(pi_actions, [2, 3, 3]):
+                    if i == 6:
+                        print("Policy Q(s|pi):")
+                        print(f"all: {Qs_pi[pi,:,:]}")
+                        print(f"at t: {Qs_pi[pi,:,t]}")
+                        print(f"at t - 1: {Qs_pi[pi,:,t-1]}")
+            ### END ###
             st_logB_stp += np.dot(
                 Qs_pi[pi, :, t], np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
             )
@@ -187,6 +208,17 @@ def vfe(
     assert math.isnan(ot_logA_st) != True, "Non computable value!"
     assert math.isnan(s1_logD) != True, "Non computable value!"
     assert math.isnan(st_logB_stp) != True, "Non computable value!"
+
+    ### DEBUG ###
+    if current_tstep == 0:
+        if np.array_equal(pi_actions, [2, 3, 3]):
+            if i == 6:
+                print(f"Perceptual Iteration {i}")
+                print(f"Policy {pi_actions} | st_logB_stp: {st_logB_stp}")
+                # assert -st_logB_stp < 6.5, print(
+                #     f"Expected log-likelihhod exploded. st_logB_stp = {st_logB_stp}"
+                # )
+    ### END ####
     ##### END #####
 
     # Summing the four terms to get the free energy for the current policy pi
@@ -194,7 +226,7 @@ def vfe(
 
     # assert type(F_pi)==float, 'Free energy is not of type float; it is of type: ' + str(type(F_pi))
 
-    return logA_pi, logB_pi, logD_pi, F_pi
+    return st_log_st, ot_logA_st, s1_logD, st_logB_stp, logA_pi, logB_pi, logD_pi, F_pi
 
 
 def grad_vfe(
@@ -239,7 +271,7 @@ def grad_vfe(
     # print("- logD_pi: ")
     # print(f"{logD_pi}")
 
-    print("Computing FE gradients...")
+    # print("Computing FE gradients...")
     # Initialising the gradient vectors for each Q(s_t|pi)
     grad_F_pi = np.zeros((num_states, steps))
 
@@ -319,7 +351,17 @@ def grad_vfe(
                         + np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
                     )
                 )
-
+                ### DEBUG ###
+            #                 print(
+            #                     f"Gradient - matmul 1: {np.matmul(Qs_pi[pi, :, t + 1], logB_pi[t, :, :])}"
+            #                 )
+            #                 print(
+            #                     f"Gradient - matmul 2: {np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])}"
+            #                 )
+            #                 print(
+            #                     f"Sum of matmul: {np.matmul(Qs_pi[pi, :, t + 1], logB_pi[t, :, :]) + np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
+            # }"
+            #                 )
             # Case when t is the terminal state
             elif t == (steps - 1):
 
@@ -513,7 +555,7 @@ def efe(
     - G_pi (float): the sum of pi's expected free energies, one for each of future time step considered.
     """
 
-    print("Computing EFE...")
+    # print("Computing EFE...")
     # Initialising the expected free energy variable and its components
     G_pi = 0
     # Ambiguity
@@ -754,7 +796,10 @@ def dirichlet_update(
         print(f"Old B params {B_params[2,:]}")
         # print(f"Dirichlet update: {Dirichlet_update_B}")
         Q_B_params = B_params + Dirichlet_update_B
-        print(f"New B params {B_params[2,:]}")
+        print("New B params for action 2:")
+        print(f"{B_params[2,:]}")
+        print("New B params for action 3:")
+        print(f"{B_params[3,:]}")
         # Returning the approximate posterior for the learned parameters (Q_A_params is equal to
         # A_params because A is not learned)
         return Q_A_params, Q_B_params
