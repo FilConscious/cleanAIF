@@ -420,7 +420,9 @@ class Agent(object):
         # NOTE: current_tstep is the index for the current time step; since we start counting from 0, an index
         # of 2 implies that *three* times teps have passed. Therefore we add 1 below for computing the total
         # number of time steps in a trajectory.
-        trajectory_len = self.current_tstep + 1 + self.efe_tsteps
+        efe_tsteps = self.steps - self.current_tstep - 1
+        # trajectory_len = self.current_tstep + 1 + self.efe_tsteps
+        trajectory_len = self.current_tstep + 1 + efe_tsteps
 
         # Initialize empty arrays to store policy-dependent state probabilities over full trajectories
         # NOTE: these values are saved for the planning step involving expected free energy minimization,
@@ -453,7 +455,7 @@ class Agent(object):
             # )
 
             Qs_p_future_traj = (
-                np.ones((self.num_states, self.efe_tsteps)) * 1 / self.num_states
+                np.ones((self.num_states, efe_tsteps)) * 1 / self.num_states
             )
 
             # Concatenate past, present and future state beliefs for CURRENT policy
@@ -592,12 +594,17 @@ class Agent(object):
                 F_pi_old = F_pi
 
             # Save the policy-conditioned future beliefs to be used in the planning method (EFE)
-            self.Qs_ps[pi][:, -self.efe_tsteps :] = Qs_p_traj[:, -self.efe_tsteps :]
+            # print(efe_tsteps)
+            # print(self.Qs_ps[pi][:, -efe_tsteps:].shape)
+            # print(Qs_p_traj[:, -efe_tsteps:].shape)
+            if efe_tsteps != 0:
+                self.Qs_ps[pi][:, -efe_tsteps:] = Qs_p_traj[:, -efe_tsteps:]
             # Save in a separate array the policy-dependent future state beliefs the agent computes
             # at EACH time step in every episode
             # TODO: this does not seem to be used, likely to be REMOVED
             self.Qs_all_ps[self.current_tstep, pi, :, :] = np.copy(self.Qs_ps[pi])
             # Store the last update of Qs_p_traj for the current policy
+            # NB: this is then sliced at the current step to compute an updated self.Qs
             self.Qs_ps_traj[pi] = Qs_p_traj
             # Storing the last computed free energy and components
             self.free_energies[pi, self.current_tstep] = F_pi
@@ -658,9 +665,11 @@ class Agent(object):
                 #     f"The B params for action 2 (frist column): {self.B_params[2,:,3]}"
                 # )
                 ### END ###
+                efe_tsteps = self.steps - self.current_tstep - 1
                 G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs = (
                     efe(
-                        self.efe_tsteps,
+                        efe_tsteps,
+                        self.current_tstep,
                         pi,
                         pi_actions,
                         self.A,
@@ -1616,9 +1625,6 @@ def main():
         WALLS_LOC = [set_wall_xy(1), set_wall_xy(6), set_wall_xy(8)]
 
     elif env_layout == "gridw9":
-        WALLS_LOC = []
-
-    elif env_layout == "gridw16":
         WALLS_LOC = []
     else:
         raise ValueError(

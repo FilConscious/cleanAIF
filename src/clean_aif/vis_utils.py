@@ -30,7 +30,7 @@ plt.rc("legend", fontsize=12)
 plt.rc("figure", titlesize=14)
 
 POLICY_INDEX_OFFSET = 0
-NUM_POLICIES_VIS = 16
+NUM_POLICIES_VIS = 64
 
 # Actions in the maze for observer
 actions_map = {
@@ -354,6 +354,718 @@ def plot_pi_fes(
 
     fig.savefig(
         save_dir + "/" + f"{env_layout}_{exp_name}_policies_fe_step{step_num}.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+
+def plot_pi_state_logprob(
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    y_limits,
+    select_run,
+    save_dir,
+    env_layout,
+    policies_to_vis=[],
+):
+    """Function to visualize all policy-conditioned free energies across time steps and episodes
+    (all on the same axis).
+
+    Inputs:
+    - file_data_path (str): path to the .npy file where the data was stored
+    - step_fe_pi (int): timestep from which to plot the free energy
+    - x_ticks_estep (int): step for the ticks in the x axis when plotting as a function of episode number
+    - x_ticks_tstep (int): step for the ticks in the x axis when plotting as a function of total timesteps
+    - y_limits (list): list with lower and upper value for the y axis
+    - select_run (int): index to select data from only a subset of the runs (depending on policy probs)
+    - save_dir (str): string with the directory path where to save the figure
+    - env_layout (str): layout of the training evironment (e.g., Tmaze3)
+    - policies_to_vis (list): list of policies' indices to visualize a subset of the policies for each run/agent
+
+    Outputs:
+    - scatter plot of policy-conditioned free energies at EACH time step in the experiment
+    - scatter plot of policy-conditioned free energies across episodes
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'pi_free_energies'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    # num_runs = data["num_runs"]
+    # num_policies = data["num_policies"]
+    exp_name = data["exp_name"]
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+
+    # Take care of the fact that policies are created and saved differently in the two types of agents
+    if "paths" in exp_name:
+        policies = data["policies"]
+    elif "plans" in exp_name:
+        policies = data["ordered_policies"][0, 0, 0, :, :]
+    else:
+        raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
+    # was passed through the command line
+    if select_run != -1:
+
+        pi_runs = data["pi_probabilities"][:, -1, select_run, -1]
+        selected_runs = (pi_runs > 0.5).nonzero()[0]
+        pi_fe = data["state_logprob"][selected_runs]
+    else:
+        pi_fe = data["state_logprob"]
+
+    # Checking that the step_fe_pi is within an episode
+    assert (
+        step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
+    ) or step_fe_pi == -1, "Invalid step number."
+
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
+
+    ### Figure with policy-conditioned free energies across episodes
+    fig, ax = plt.subplots(figsize=(5, 4), tight_layout=True)
+
+    if len(policies_to_vis) == 0:
+        # Looping over the policies for Figure 2
+        for p in range(NUM_POLICIES_VIS):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            std_pi_fe = np.std(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            # Making sure avg_pi_fe has the right dimensions
+            # print(avg_pi_fe.shape)
+            # print((num_episodes, num_steps))
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
+            )
+
+    else:
+        # Looping over the policies for Figure 2
+        for i, p in enumerate(policies_to_vis):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
+            )
+
+        # Confidence intervals (if needed, uncomment following lines)
+        # ax.fill_between(
+        #     x2,
+        #     y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
+
+    # Completing drawing axes for Figure 2
+    ax.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
+    )
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Log-probabilities", rotation=90)
+    ax.set_ylim(y_limits[0], y_limits[1])
+
+    if step_fe_pi != -1:
+        step_num = f"{step_fe_pi + 1}"
+    else:
+        step_num = f"{num_steps}"
+
+    title = f"Expected state log-probability at step {step_num}"
+    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    ax.set_title(title, pad=15)
+
+    fig.savefig(
+        save_dir
+        + "/"
+        + f"{env_layout}_{exp_name}_policies_state_logprob_step{step_num}.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+
+def plot_pi_state_logprob_first(
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    y_limits,
+    select_run,
+    save_dir,
+    env_layout,
+    policies_to_vis=[],
+):
+    """Function to visualize all policy-conditioned free energies across time steps and episodes
+    (all on the same axis).
+
+    Inputs:
+    - file_data_path (str): path to the .npy file where the data was stored
+    - step_fe_pi (int): timestep from which to plot the free energy
+    - x_ticks_estep (int): step for the ticks in the x axis when plotting as a function of episode number
+    - x_ticks_tstep (int): step for the ticks in the x axis when plotting as a function of total timesteps
+    - y_limits (list): list with lower and upper value for the y axis
+    - select_run (int): index to select data from only a subset of the runs (depending on policy probs)
+    - save_dir (str): string with the directory path where to save the figure
+    - env_layout (str): layout of the training evironment (e.g., Tmaze3)
+    - policies_to_vis (list): list of policies' indices to visualize a subset of the policies for each run/agent
+
+    Outputs:
+    - scatter plot of policy-conditioned free energies at EACH time step in the experiment
+    - scatter plot of policy-conditioned free energies across episodes
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'pi_free_energies'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    # num_runs = data["num_runs"]
+    # num_policies = data["num_policies"]
+    exp_name = data["exp_name"]
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+
+    # Take care of the fact that policies are created and saved differently in the two types of agents
+    if "paths" in exp_name:
+        policies = data["policies"]
+    elif "plans" in exp_name:
+        policies = data["ordered_policies"][0, 0, 0, :, :]
+    else:
+        raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
+    # was passed through the command line
+    if select_run != -1:
+
+        pi_runs = data["pi_probabilities"][:, -1, select_run, -1]
+        selected_runs = (pi_runs > 0.5).nonzero()[0]
+        pi_fe = data["state_logprob_first"][selected_runs]
+    else:
+        pi_fe = data["state_logprob_first"]
+
+    # Checking that the step_fe_pi is within an episode
+    assert (
+        step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
+    ) or step_fe_pi == -1, "Invalid step number."
+
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
+
+    ### Figure with policy-conditioned free energies across episodes
+    fig, ax = plt.subplots(figsize=(5, 4), tight_layout=True)
+
+    if len(policies_to_vis) == 0:
+        # Looping over the policies for Figure 2
+        for p in range(NUM_POLICIES_VIS):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            std_pi_fe = np.std(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            # Making sure avg_pi_fe has the right dimensions
+            # print(avg_pi_fe.shape)
+            # print((num_episodes, num_steps))
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
+            )
+
+    else:
+        # Looping over the policies for Figure 2
+        for i, p in enumerate(policies_to_vis):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
+            )
+
+        # Confidence intervals (if needed, uncomment following lines)
+        # ax.fill_between(
+        #     x2,
+        #     y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
+
+    # Completing drawing axes for Figure 2
+    ax.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
+    )
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Log-probabilities", rotation=90)
+    ax.set_ylim(y_limits[0], y_limits[1])
+
+    if step_fe_pi != -1:
+        step_num = f"{step_fe_pi + 1}"
+    else:
+        step_num = f"{num_steps}"
+
+    title = f"Expected state log-probability at step {step_num} for the initial state"
+    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    ax.set_title(title, pad=15)
+
+    fig.savefig(
+        save_dir
+        + "/"
+        + f"{env_layout}_{exp_name}_policies_state_logprob_first_step{step_num}.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+
+def plot_pi_obs_loglik(
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    y_limits,
+    select_run,
+    save_dir,
+    env_layout,
+    policies_to_vis=[],
+):
+    """Function to visualize all policy-conditioned free energies across time steps and episodes
+    (all on the same axis).
+
+    Inputs:
+    - file_data_path (str): path to the .npy file where the data was stored
+    - step_fe_pi (int): timestep from which to plot the free energy
+    - x_ticks_estep (int): step for the ticks in the x axis when plotting as a function of episode number
+    - x_ticks_tstep (int): step for the ticks in the x axis when plotting as a function of total timesteps
+    - y_limits (list): list with lower and upper value for the y axis
+    - select_run (int): index to select data from only a subset of the runs (depending on policy probs)
+    - save_dir (str): string with the directory path where to save the figure
+    - env_layout (str): layout of the training evironment (e.g., Tmaze3)
+    - policies_to_vis (list): list of policies' indices to visualize a subset of the policies for each run/agent
+
+    Outputs:
+    - scatter plot of policy-conditioned free energies at EACH time step in the experiment
+    - scatter plot of policy-conditioned free energies across episodes
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'pi_free_energies'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    # num_runs = data["num_runs"]
+    # num_policies = data["num_policies"]
+    exp_name = data["exp_name"]
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+
+    # Take care of the fact that policies are created and saved differently in the two types of agents
+    if "paths" in exp_name:
+        policies = data["policies"]
+    elif "plans" in exp_name:
+        policies = data["ordered_policies"][0, 0, 0, :, :]
+    else:
+        raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
+    # was passed through the command line
+    if select_run != -1:
+
+        pi_runs = data["pi_probabilities"][:, -1, select_run, -1]
+        selected_runs = (pi_runs > 0.5).nonzero()[0]
+        pi_fe = data["obs_loglik"][selected_runs]
+    else:
+        pi_fe = data["obs_loglik"]
+
+    # Checking that the step_fe_pi is within an episode
+    assert (
+        step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
+    ) or step_fe_pi == -1, "Invalid step number."
+
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
+
+    ### Figure with policy-conditioned free energies across episodes
+    fig, ax = plt.subplots(figsize=(5, 4), tight_layout=True)
+
+    if len(policies_to_vis) == 0:
+        # Looping over the policies for Figure 2
+        for p in range(NUM_POLICIES_VIS):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            std_pi_fe = np.std(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            # Making sure avg_pi_fe has the right dimensions
+            # print(avg_pi_fe.shape)
+            # print((num_episodes, num_steps))
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
+            )
+
+    else:
+        # Looping over the policies for Figure 2
+        for i, p in enumerate(policies_to_vis):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
+            )
+
+        # Confidence intervals (if needed, uncomment following lines)
+        # ax.fill_between(
+        #     x2,
+        #     y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
+
+    # Completing drawing axes for Figure 2
+    ax.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
+    )
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Log-probabilities", rotation=90)
+    ax.set_ylim(y_limits[0], y_limits[1])
+
+    if step_fe_pi != -1:
+        step_num = f"{step_fe_pi + 1}"
+    else:
+        step_num = f"{num_steps}"
+
+    title = f"Expected observation log-likelihood at step {step_num}"
+    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    ax.set_title(title, pad=15)
+
+    fig.savefig(
+        save_dir
+        + "/"
+        + f"{env_layout}_{exp_name}_policies_obs_loglik_step{step_num}.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+        # pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+
+def plot_pi_transit_loglik(
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    y_limits,
+    select_run,
+    save_dir,
+    env_layout,
+    policies_to_vis=[],
+):
+    """Function to visualize all policy-conditioned free energies across time steps and episodes
+    (all on the same axis).
+
+    Inputs:
+    - file_data_path (str): path to the .npy file where the data was stored
+    - step_fe_pi (int): timestep from which to plot the free energy
+    - x_ticks_estep (int): step for the ticks in the x axis when plotting as a function of episode number
+    - x_ticks_tstep (int): step for the ticks in the x axis when plotting as a function of total timesteps
+    - y_limits (list): list with lower and upper value for the y axis
+    - select_run (int): index to select data from only a subset of the runs (depending on policy probs)
+    - save_dir (str): string with the directory path where to save the figure
+    - env_layout (str): layout of the training evironment (e.g., Tmaze3)
+    - policies_to_vis (list): list of policies' indices to visualize a subset of the policies for each run/agent
+
+    Outputs:
+    - scatter plot of policy-conditioned free energies at EACH time step in the experiment
+    - scatter plot of policy-conditioned free energies across episodes
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'pi_free_energies'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    # num_runs = data["num_runs"]
+    # num_policies = data["num_policies"]
+    exp_name = data["exp_name"]
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+
+    # Take care of the fact that policies are created and saved differently in the two types of agents
+    if "paths" in exp_name:
+        policies = data["policies"]
+    elif "plans" in exp_name:
+        policies = data["ordered_policies"][0, 0, 0, :, :]
+    else:
+        raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
+    # was passed through the command line
+    if select_run != -1:
+
+        pi_runs = data["pi_probabilities"][:, -1, select_run, -1]
+        selected_runs = (pi_runs > 0.5).nonzero()[0]
+        pi_fe = data["transit_loglik"][selected_runs]
+    else:
+        pi_fe = data["transit_loglik"]
+
+    # Checking that the step_fe_pi is within an episode
+    assert (
+        step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
+    ) or step_fe_pi == -1, "Invalid step number."
+
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
+
+    ### Figure with policy-conditioned free energies across episodes
+    fig, ax = plt.subplots(figsize=(5, 4), tight_layout=True)
+
+    if len(policies_to_vis) == 0:
+        # Looping over the policies for Figure 2
+        for p in range(NUM_POLICIES_VIS):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            std_pi_fe = np.std(
+                pi_fe[:, :, p + POLICY_INDEX_OFFSET, :], axis=0
+            )  # .squeeze()
+            # Making sure avg_pi_fe has the right dimensions
+            # print(avg_pi_fe.shape)
+            # print((num_episodes, num_steps))
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = -avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p + POLICY_INDEX_OFFSET])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i]
+                for i in list(policies[p + POLICY_INDEX_OFFSET].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(p),
+                label=f"$\\pi_{{{p + POLICY_INDEX_OFFSET}}}$: {policy_action_seq_leg}",
+            )
+
+    else:
+        # Looping over the policies for Figure 2
+        for i, p in enumerate(policies_to_vis):
+
+            # Computing the mean (average) and std of one policy's free energies over the runs
+            # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+            # will raise the exception
+            avg_pi_fe = np.mean(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            std_pi_fe = np.std(pi_fe[:, :, p, :], axis=0)  # .squeeze()
+            assert avg_pi_fe.shape == (num_episodes, num_steps), "Wrong dimenions!"
+
+            # Plotting the free energy at the last time step of every episode for all episodes
+            # Note 1: another time step can be chosen by changing the index number, i, in avg_pi_fe[:, i]
+            x2 = np.arange(1, num_episodes + 1)
+            y2 = -avg_pi_fe[:, step_fe_pi]
+
+            # int_vals = ",".join(str(int(x)) for x in policies[p])
+
+            # Policy action sequence converted into string
+            policy_action_arrows = [
+                actions_map[i] for i in list(policies[p].astype(int))
+            ]
+            policy_action_seq_leg = f"{', '.join(map(str, policy_action_arrows))}"
+
+            ax.plot(
+                x2,
+                y2,
+                ".-",
+                color=cmap(i),
+                label=f"$\\pi_{{{i + 1}}}$: {policy_action_seq_leg}",
+            )
+
+        # Confidence intervals (if needed, uncomment following lines)
+        # ax.fill_between(
+        #     x2,
+        #     y2 - (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     y2 + (1.96 * std_pi_fe[:, -1] / np.sqrt(num_runs)),
+        #     color=cmap(p),
+        #     alpha=0.3,
+        # )
+
+    # Completing drawing axes for Figure 2
+    ax.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
+    )
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Log-probabilities", rotation=90)
+    ax.set_ylim(y_limits[0], y_limits[1])
+
+    if step_fe_pi != -1:
+        step_num = f"{step_fe_pi + 1}"
+    else:
+        step_num = f"{num_steps}"
+
+    title = f"Expected transition log-likelihood at step {step_num}"
+    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    ax.set_title(title, pad=15)
+
+    fig.savefig(
+        save_dir
+        + "/"
+        + f"{env_layout}_{exp_name}_policies_transit_loglik_step{step_num}.pdf",
         format="pdf",
         dpi=200,
         bbox_inches=None,
@@ -3547,7 +4259,7 @@ def plot_matrix_B_kl(
     # Gymnasium grid coordinate system the negative and positive y axes are swapped
     B_params = np.zeros((4, num_states, num_states))
 
-    if "Tmaze4" in env_layout:
+    if "tmaze4" in env_layout:
         # Down action: 3
         B_params[3, :, :] = np.array(
             [
@@ -3592,7 +4304,7 @@ def plot_matrix_B_kl(
             ],
             dtype=np.float64,
         )
-    elif "Ymaze4" in env_layout:
+    elif "ymaze4" in env_layout:
 
         B_params[3, :, :] = np.array(
             [
@@ -3641,6 +4353,68 @@ def plot_matrix_B_kl(
             ],
             dtype=np.float64,
         )
+    elif "gridw9" in env_layout:
+
+        # Down action: 3
+        B_params[3, :, :] = np.array(
+            [
+                [1, 0, 1, 1, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+            dtype=np.float64,
+        )
+        # Left action: 2
+        B_params[2, :, :] = np.array(
+            [
+                [1, 1, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+            dtype=np.float64,
+        )
+        # Up action: 1
+        B_params[1, :, :] = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Right action: 0
+        B_params[0, :, :] = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 1, 1, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1],
+            ],
+            dtype=np.float64,
+        )
 
     rng = np.random.default_rng(seed=33)
     B = np.zeros((4, num_states, num_states))
@@ -3682,9 +4456,9 @@ def plot_matrix_B_kl(
     ax1.set_xlabel("Episodes")
     ax1.set_ylabel("Nats", rotation=90)
 
-    if "Tmaze4" in env_layout:
+    if "tmaze4" in env_layout:
         ax1.set_ylim(0, 18)
-    elif "Ymaze4" in env_layout:
+    elif "ymaze4" in env_layout:
         ax1.set_ylim(y_lims[0], y_lims[1])
     else:
         ax1.set_ylim(0, 20)
@@ -4069,17 +4843,17 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
     # Total number of steps
     total_steps = np.sum(tot_sv)
 
-    if env_layout == "Tmaze3":
+    if env_layout == "tmaze3":
         env_matrix = np.zeros((v_len, h_len))
         env_matrix[0, :] = tot_sv[:-1]
         env_matrix[1, 1] = tot_sv[-1]
 
-    elif env_layout == "Tmaze4":
+    elif env_layout == "tmaze4":
         env_matrix = np.zeros((v_len, h_len))
         env_matrix[0, :] = tot_sv[:-2]
         env_matrix[1, 1] = tot_sv[-2]
         env_matrix[2, 1] = tot_sv[-1]
-    elif env_layout == "Ymaze4":
+    elif env_layout == "ymaze4":
         env_matrix = np.zeros((v_len, h_len))
         env_matrix[0, 0] = tot_sv[0]
         env_matrix[0, 2] = tot_sv[1]

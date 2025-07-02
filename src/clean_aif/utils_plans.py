@@ -1116,26 +1116,36 @@ def process_obs(obs: np.ndarray, env_layout: str) -> int:
     - index: int
     """
 
-    if env_layout == "Tmaze3":
+    if env_layout == "tmaze3":
 
         index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, -1, -1]])
         state_index = index_repr[obs[1], obs[0]].item()
 
         assert state_index != -1, print(f"Value of state index is invalid.")
 
-    elif env_layout == "Tmaze4":
+    elif env_layout == "tmaze4":
 
         index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, 4, -1]])
         state_index = index_repr[obs[1], obs[0]].item()
 
         assert state_index != -1, print(f"Value of state index is invalid.")
 
-    elif env_layout == "Ymaze4":
+    elif env_layout == "ymaze4":
 
         index_repr = np.array([[0, -1, 1], [2, 3, 4], [-1, 5, -1]])
         state_index = index_repr[obs[1], obs[0]].item()
 
         assert state_index != -1, print(f"Value of state index is invalid.")
+
+    elif env_layout == "gridw9":
+
+        index_repr = np.arange(9).reshape(3, 3)
+        state_index = index_repr[obs[1], obs[0]].item()
+
+    elif env_layout == "gridw16":
+
+        index_repr = np.arange(16).reshape(4, 4)
+        state_index = index_repr[obs[1], obs[0]].item()
 
     else:
         raise ValueError(
@@ -1150,19 +1160,29 @@ def convert_state(state: int, env_layout: str) -> np.ndarray:
 
     assert state != -1, print(f"Value of state is invalid.")
 
-    if env_layout == "Tmaze3":
+    if env_layout == "tmaze3":
 
         index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, -1, -1]])
         y, x = np.where(index_repr == state)
 
-    elif env_layout == "Tmaze4":
+    elif env_layout == "tmaze4":
 
         index_repr = np.array([[0, 1, 2], [-1, 3, -1], [-1, 4, -1]])
         y, x = np.where(index_repr == state)
 
-    elif env_layout == "Ymaze4":
+    elif env_layout == "ymaze4":
 
         index_repr = np.array([[0, -1, 1], [2, 3, 4], [-1, 5, -1]])
+        y, x = np.where(index_repr == state)
+
+    elif env_layout == "gridw9":
+
+        index_repr = np.arange(9).reshape(3, 3)
+        y, x = np.where(index_repr == state)
+
+    elif env_layout == "gridw16":
+
+        index_repr = np.arange(16).reshape(4, 4)
         y, x = np.where(index_repr == state)
 
     else:

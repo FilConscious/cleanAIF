@@ -12,6 +12,7 @@ import sys
 
 from dataclasses import asdict
 from datetime import datetime
+import importlib
 import gymnasium
 import gymnasium_env  # Needed otherwise NamespaceNotFound error
 
@@ -22,7 +23,6 @@ from scipy import special
 from pathlib import Path
 
 # Custom imports
-from .ag_paths_cfg import *
 from .config import LOG_DIR
 from .utils_paths import *
 
@@ -1269,8 +1269,8 @@ def main():
         "--env_layout",
         "-el",
         type=str,
-        default="Tmaze3",
-        help="layout of the gridworld (choices: Tmaze3, Tmaze4, Ymaze4)",
+        default="tmaze4",
+        help="layout of the gridworld (choices: tmaze3, tmaze4, ymaze4)",
     )
     parser.add_argument(
         "--num_runs",
@@ -1412,6 +1412,10 @@ def main():
     ### 3. INIT AGENT PARAMETERS
     ##############################
 
+    # Importing config module dynamically based on env layout
+    module_name = f'.aif_paths_{cl_params["env_layout"]}_cfg'
+    agent_config = importlib.import_module(module_name, package=__package__)
+    Args = agent_config.Args
     # Create dataclass with default parameters configuration for the agent
     agent_params = Args()
     # Convert dataclass to dictionary
@@ -1449,7 +1453,8 @@ def main():
     NUM_STEPS = agent_params["num_steps"]
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
-    if env_layout == "Tmaze3":
+    if env_layout == "tmaze3":
+        SIZE = 3
         WALLS_LOC = [
             set_wall_xy(3),
             set_wall_xy(5),
@@ -1457,25 +1462,42 @@ def main():
             set_wall_xy(7),
             set_wall_xy(8),
         ]
-    elif env_layout == "Tmaze4":
+    elif env_layout == "tmaze4":
+        SIZE = 3
         WALLS_LOC = [
             set_wall_xy(3),
             set_wall_xy(5),
             set_wall_xy(6),
             set_wall_xy(8),
         ]
-    elif env_layout == "Ymaze4":
+    elif env_layout == "ymaze4":
+        SIZE = 3
         WALLS_LOC = [set_wall_xy(1), set_wall_xy(6), set_wall_xy(8)]
+
+    elif env_layout == "gridw9":
+        SIZE = 3
+        WALLS_LOC = []
+
+    elif env_layout == "gridw16":
+        SIZE = 4
+        WALLS_LOC = []
+
     else:
         raise ValueError(
-            "Value of 'env_layout' is not among the available ones. Choose from: Tmaze3, Tmaze4, Ymaze4."
+            "Value of 'env_layout' is not among the available ones. Choose from: tmaze3, tmaze4, ymaze4."
         )
-    # Fix target location in the environment (the same in every episode)
-    TARGET_LOC = convert_state(agent_params["goal_state"], env_layout)
+    # Fix target location(s) in the environment (the same in every episode)
+    TARGET_LOC = []
+    for goal in agent_params["goal_state"]:
+        g = convert_state(goal, env_layout)
+        TARGET_LOC.append(g)
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS, render_mode=None
+        "gymnasium_env/GridWorld-v1",
+        max_episode_steps=NUM_STEPS,
+        render_mode=None,
+        size=SIZE,
     )
 
     ##############################
@@ -1536,7 +1558,7 @@ def main():
             )
 
             # Retrieve observation of the agent's location
-            # print(f"Observation: {obs}; type {type(obs)}")
+            print(f"Observation: {obs}; type {type(obs)}")
             obs = obs["agent"]
             # Convert obs into index representation
             start_state = process_obs(obs, env_layout)

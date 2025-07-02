@@ -262,7 +262,7 @@ def main():
             params["step_fe_pi"][1],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 8],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -284,6 +284,54 @@ def main():
         plot_pi_fes(
             data_path,
             params["step_fe_pi"][-1],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            policies_to_vis=policies_to_vis,
+        )
+        # Plot expected state log-prob of the free energy
+        plot_pi_state_logprob(
+            data_path,
+            params["step_fe_pi"][0],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [-5, 5],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            policies_to_vis=policies_to_vis,
+        )
+        # Plot expected state log-prob for the first state of the free energy
+        plot_pi_state_logprob_first(
+            data_path,
+            params["step_fe_pi"][0],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            policies_to_vis=policies_to_vis,
+        )
+        # Plot expected obs likelihood of the free energy
+        plot_pi_obs_loglik(
+            data_path,
+            params["step_fe_pi"][0],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            policies_to_vis=policies_to_vis,
+        )
+        # Plot expected obs likelihood of the free energy
+        plot_pi_transit_loglik(
+            data_path,
+            params["step_fe_pi"][0],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
             [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
@@ -332,7 +380,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 10],
+            [0, 12],
             num_tsteps=0,
             policies_to_vis=policies_to_vis,
         )
@@ -374,31 +422,6 @@ def main():
             params["env_layout"],
             policies_to_vis=policies_to_vis,
         )
-        # Plot categorical distributions Q(S|pi) from an episode's *first* step (averaged over the runs)
-        # plot_Qs_pi_first(
-        #     data_path,
-        #     params["select_policy"],
-        #     params["select_episode"],
-        #     result_dir,
-        #     params["env_layout"],
-        # )
-        # Plot categorical distributions Q(S|pi) from an episode's *last* step (averaged over the runs)
-        # plot_Qs_pi_last(
-        #     data_path,
-        #     params["select_policy"],
-        #     params["select_episode"],
-        #     result_dir,
-        #     params["env_layout"],
-        # )
-        # Plot categorical distributions Q(S|pi) from ALL steps in a single episode (averaged over the runs)
-        plot_Qs_pi_all(
-            data_path,
-            params["select_policy"],
-            params["select_episode"],
-            result_dir,
-            params["env_layout"],
-        )
-
         # Plot matrices A (state-observation mappings)
         plot_matrix_A(
             data_path,
@@ -433,6 +456,30 @@ def main():
             params["x_ticks_estep"],
             params["policy_horizon"],
             params["select_run"],
+            result_dir,
+            params["env_layout"],
+        )
+        # Plot categorical distributions Q(S|pi) from an episode's *first* step (averaged over the runs)
+        # plot_Qs_pi_first(
+        #     data_path,
+        #     params["select_policy"],
+        #     params["select_episode"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
+        # Plot categorical distributions Q(S|pi) from an episode's *last* step (averaged over the runs)
+        # plot_Qs_pi_last(
+        #     data_path,
+        #     params["select_policy"],
+        #     params["select_episode"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
+        # Plot categorical distributions Q(S|pi) from ALL steps in a single episode (averaged over the runs)
+        plot_Qs_pi_all(
+            data_path,
+            params["select_policy"],
+            params["select_episode"],
             result_dir,
             params["env_layout"],
         )

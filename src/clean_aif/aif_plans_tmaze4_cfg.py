@@ -24,11 +24,11 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Environment layout """
-    env_layout: str = "Ymaze4"  # choice: Tmaze3, Tmaze4, Ymaze4
+    env_layout: str = "tmaze4"  # choice: Tmaze3, Tmaze4, Ymaze4
     """ Max number of steps in an episode """
     num_steps: int = 4
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
-    num_states: int = 6
+    num_states: int = 5
     ### Agent ###
     """ the number of observation channels or modalities """
     obs_channels: int = 1
@@ -39,9 +39,9 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 5
+    start_state: int = 4
     """ index of goal state/location """
-    goal_state: int = 0
+    goal_state: tuple = (0,)
     """ number of policies the agent consider at each planning step """
     num_policies: int = 64
     """ planning horizon, also the length of a policy """
@@ -99,7 +99,7 @@ class Args:
     #     self.pref_array = self.create_pref_array(self.num_states, self.num_steps)
 
     @staticmethod
-    def init_C_array(num_states: int, goal_state: int, pref_type: str) -> np.ndarray:
+    def init_C_array(num_states: int, goal_state: tuple, pref_type: str) -> np.ndarray:
         """
         Initialize preference array, denoted by C in the active inference literature. The vector
         stores the parameters of a categorical distribution with the probability mass concentrated on
@@ -123,8 +123,12 @@ class Args:
             print("Setting agent's preferences...")
             # Assign probability to non-goal states...
             pref_array[:, 0] = 0.1 / (num_states - 1)
+            # Divide remaining prob mass equally among goals
+            prob_mass_goal = 0.9 / len(goal_state)
+            for g in goal_state:
+                pref_array[g, 0] = prob_mass_goal
             # Assign probability to goal state
-            pref_array[goal_state, 0] = 0.9
+            # pref_array[goal_state, 0] = 0.9
             print(pref_array)
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
@@ -132,6 +136,7 @@ class Args:
             )
 
         elif pref_type == "obs":
+            # TODO: need to be aligned with options allowed in the case of state preferences
             # NOTE 1: we are assuming a 1-to-1 correspondence between states and observations, i.e. obs `1`
             # indicates to the agent that it is in state `1`. Thus, the agent actually deals with an MDP as
             # opposed to a POMDP, and selecting either type of preferences does not make a difference.
