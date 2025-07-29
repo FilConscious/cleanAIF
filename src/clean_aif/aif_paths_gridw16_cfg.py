@@ -40,7 +40,7 @@ class Args:
     """ index of starting state (agent knows start location) """
     start_state: int = 4
     """ index of goal state/location """
-    goal_state: tuple = (3, 11, 15)
+    goal_state: tuple = (11,)
     """ number of policies the agent considers for planning """
     num_policies: int = 256
     """ planning horizon, also the length of a policy """
@@ -215,10 +215,10 @@ class Args:
                 # (2) Set higher preference for the goal state at each time step
                 pref_array[:, :] = 0.1 / (num_states - 1)
                 # Divide remaining prob mass equally among goals
-                # prob_mass_goal = 0.9 / len(goal_state)\
-                prob_mass_goal = [0.3, 0.3, 0.3]
+                prob_mass_goal = 0.9 / len(goal_state)
+                # prob_mass_goal = [0.3, 0.3, 0.3]
                 for i, g in enumerate(goal_state):
-                    pref_array[g, :] = prob_mass_goal[i]
+                    pref_array[g, :] = prob_mass_goal
                 print(pref_array)
 
             elif pref_loc == "all_diff":

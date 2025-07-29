@@ -174,7 +174,7 @@ class Args:
         B_params = np.zeros((num_actions, num_states, num_states))
 
         # Assigning 1s to correct transitions for every action.
-        if env_layout == "Tmaze3":
+        if env_layout == "tmaze3":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze3'
             # only transitions to accessible states are considered/modelled
 
@@ -222,7 +222,7 @@ class Args:
             )
 
         # Assigning 1s to correct transitions for every action.
-        elif env_layout == "Tmaze4":
+        elif env_layout == "tmaze4":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
             # only transitions to accessible states are considered/modelled
 
@@ -269,6 +269,61 @@ class Args:
                     [0, 1, 1, 0, 0],
                     [0, 0, 0, 1, 0],
                     [0, 0, 0, 0, 1],
+                ],
+                dtype=np.float64,
+            )
+
+        elif env_layout == "ymaze4":
+            # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
+            # only transitions to accessible states are considered/modelled
+
+            # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
+            # Gymnasium grid coordinate system the negative and positive y axes are swapped
+            # Down action: 3
+            B_params[3, :, :] = np.array(
+                [
+                    [1, 0, 1, 0, 0, 0],
+                    [0, 1, 0, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 0, 1],
+                    [0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0],
+                ],
+                dtype=np.float64,
+            )
+            # Left action: 2
+            B_params[2, :, :] = np.array(
+                [
+                    [1, 0, 0, 0, 0, 0],
+                    [0, 1, 0, 0, 0, 0],
+                    [0, 0, 1, 1, 0, 0],
+                    [0, 0, 0, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 1],
+                ],
+                dtype=np.float64,
+            )
+            # Up action: 1
+            B_params[1, :, :] = np.array(
+                [
+                    [0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0],
+                    [1, 0, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0],
+                    [0, 1, 0, 0, 1, 0],
+                    [0, 0, 0, 1, 0, 1],
+                ],
+                dtype=np.float64,
+            )
+            # Right action: 0
+            B_params[0, :, :] = np.array(
+                [
+                    [1, 0, 0, 0, 0, 0],
+                    [0, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0],
+                    [0, 0, 1, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 1],
                 ],
                 dtype=np.float64,
             )

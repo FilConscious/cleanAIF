@@ -26,7 +26,7 @@ class Args:
     """ Environment layout """
     env_layout: str = "gridw9"  # choice: Tmaze3, Tmaze4, Ymaze4
     """ Max number of steps in an episode """
-    num_steps: int = 4
+    num_steps: int = 5
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
     num_states: int = 9
     ### Agent ###
@@ -39,14 +39,14 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 3
+    start_state: int = 0
     """ index of goal state/location """
-    goal_state: tuple = (2, 8)
+    goal_state: tuple = (8,)
     """ number of policies the agent consider at each planning step """
-    num_policies: int = 64
+    num_policies: int = 256
     """ planning horizon, also the length of a policy """
     """ NOTE: also MAX number of future steps for which expected free energy is computed """
-    plan_horizon: int = 3
+    plan_horizon: int = 4
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ init empty agent's policies arrays """
@@ -124,12 +124,12 @@ class Args:
             # Assign probability to non-goal states...
             pref_array[:, 0] = 0.1 / (num_states - 1)
             # Divide remaining prob mass equally among goals
-            # prob_mass_goal = 0.9 / len(goal_state)
-            # for g in goal_state:
-            #     pref_array[g, 0] = prob_mass_goal
-            prob_mass_goal = [0.3, 0.6]
-            for i, g in enumerate(goal_state):
-                pref_array[g, :] = prob_mass_goal[i]
+            prob_mass_goal = 0.9 / len(goal_state)
+            for g in goal_state:
+                pref_array[g, 0] = prob_mass_goal
+            # prob_mass_goal = [0.3, 0.6]
+            # for i, g in enumerate(goal_state):
+            #     pref_array[g, :] = prob_mass_goal[i]
             print(pref_array)
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(

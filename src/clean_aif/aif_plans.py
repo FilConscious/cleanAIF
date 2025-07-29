@@ -1598,6 +1598,7 @@ def main():
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
     if env_layout == "tmaze3":
+        SIZE = 3
         WALLS_LOC = [
             set_wall_xy(3),
             set_wall_xy(5),
@@ -1606,6 +1607,7 @@ def main():
             set_wall_xy(8),
         ]
     elif env_layout == "tmaze4":
+        SIZE = 3
         WALLS_LOC = [
             set_wall_xy(3),
             set_wall_xy(5),
@@ -1613,12 +1615,15 @@ def main():
             set_wall_xy(8),
         ]
     elif env_layout == "ymaze4":
+        SIZE = 3
         WALLS_LOC = [set_wall_xy(1), set_wall_xy(6), set_wall_xy(8)]
 
     elif env_layout == "gridw9":
+        SIZE = 3
         WALLS_LOC = []
 
     elif env_layout == "gridw16":
+        SIZE = 4
         WALLS_LOC = []
     else:
         raise ValueError(
@@ -1633,7 +1638,10 @@ def main():
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS - 1, render_mode=None
+        "gymnasium_env/GridWorld-v1",
+        max_episode_steps=NUM_STEPS - 1,
+        render_mode=None,
+        size=SIZE,
     )
 
     ##############################

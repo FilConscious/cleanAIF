@@ -41,7 +41,7 @@ class Args:
     """ index of starting state (agent knows start location) """
     start_state: int = 4
     """ index of goal state/location """
-    goal_state: tuple = (3, 11, 15)
+    goal_state: tuple = (11,)
     """ number of policies the agent consider at each planning step """
     num_policies: int = 256
     """ planning horizon, also the length of a policy """
@@ -124,12 +124,12 @@ class Args:
             # Assign probability to non-goal states...
             pref_array[:, 0] = 0.1 / (num_states - 1)
             # Divide remaining prob mass equally among goals
-            # prob_mass_goal = 0.9 / len(goal_state)
+            prob_mass_goal = 0.9 / len(goal_state)
             # for g in goal_state:
             #     pref_array[g, 0] = prob_mass_goal
-            prob_mass_goal = [0.3, 0.3, 0.3]
+            # prob_mass_goal = [0.3, 0.3, 0.3]
             for i, g in enumerate(goal_state):
-                pref_array[g, :] = prob_mass_goal[i]
+                pref_array[g, :] = prob_mass_goal
             print(pref_array)
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(

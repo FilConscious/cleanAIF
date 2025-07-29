@@ -167,7 +167,7 @@ class Args:
     def init_C_array(
         num_states: int,
         steps: int,
-        goal_state: list,
+        goal_state: tuple,
         pref_type: str = "states",
         pref_loc: str = "last",
     ) -> np.ndarray:
@@ -217,7 +217,7 @@ class Args:
                 # Divide remaining prob mass equally among goals
                 prob_mass_goal = 0.9 / len(goal_state)
                 for g in goal_state:
-                    pref_array[g, -1] = prob_mass_goal
+                    pref_array[g, :] = prob_mass_goal
                 print(pref_array)
 
             elif pref_loc == "all_diff":

@@ -33,5 +33,7 @@ path = "src/clean_aif/__init__.py"
 main_aif_paths = "clean_aif.aif_paths:main"
 # main refers to the function inside the script `aif_plans.py`
 main_aif_plans = "clean_aif.aif_plans:main"
+# main refers to the function inside the script `aif_plans_pi_cutoff.py`
+main_aif_plans_pi_cutoff = "clean_aif.aif_plans_pi_cutoff:main"
 # entry script for plotting results from aif_paths.py
 vis_aif = "clean_aif.vis_plots:main"

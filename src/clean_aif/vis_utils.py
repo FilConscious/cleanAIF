@@ -30,7 +30,7 @@ plt.rc("legend", fontsize=12)
 plt.rc("figure", titlesize=14)
 
 POLICY_INDEX_OFFSET = 0
-NUM_POLICIES_VIS = 64
+NUM_POLICIES_VIS = 16
 
 # Actions in the maze for observer
 actions_map = {
@@ -39,6 +39,49 @@ actions_map = {
     2: "$\\leftarrow$",
     3: "$\\uparrow$",
 }
+
+POLICIES_TO_VIS_GRIDW9 = np.array(
+    [
+        [0, 0, 1, 1],
+        [1, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 0],
+        [1, 0, 1, 0],
+        [1, 0, 0, 1],
+        [0, 1, 2, 1],
+        [1, 1, 0, 3],
+        [1, 0, 0, 3],
+        [1, 0, 3, 2],
+        [0, 1, 1, 3],
+        [0, 1, 3, 1],
+        [0, 0, 1, 2],
+        [0, 1, 2, 2],
+        [0, 1, 3, 3],
+        [1, 2, 3, 3],
+    ]
+)
+
+
+POLICIES_TO_VIS_TMAZE4 = np.array(
+    [
+        [2, 3, 3],
+        [3, 3, 1],
+        [3, 2, 2],
+        [1, 2, 0],
+        [0, 3, 3],
+        [0, 0, 3],
+        [0, 2, 2],
+        [3, 3, 2],
+        [3, 3, 3],
+        [2, 3, 0],
+        [3, 0, 2],
+        [1, 1, 1],
+        [2, 2, 3],
+        [3, 3, 0],
+        [0, 2, 3],
+        [1, 3, 3],
+    ]
+)
 
 
 ######################################################################################################
@@ -88,8 +131,8 @@ def plot_avg_good_agents(file_data_path, x_ticks_estep, save_dir, env_layout):
     plt.ylabel("Percentage of agents", rotation=90)
     # plt.legend(loc="upper right") # not needed for single line
     # Title
-    title = "Agents solving the task"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = "Agents solving the task\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     plt.title(title, pad=15)
 
     # Add a customized grid
@@ -163,6 +206,18 @@ def plot_pi_fes(
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
 
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
+
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
     if select_run != -1:
@@ -176,7 +231,7 @@ def plot_pi_fes(
     # Checking that the step_fe_pi is within an episode
     assert (
         step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
-    ) or step_fe_pi == -1, "Invalid step number."
+    ) or step_fe_pi == -1, f"Invalid step number: {step_fe_pi}"
 
     # Pre-generate distinct colors
     cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
@@ -318,7 +373,8 @@ def plot_pi_fes(
     ax.set_ylim(y_limits[0], y_limits[1])
 
     # Create a separate figure for the legend
-    fig_legend = plt.figure(figsize=(8, 2))
+    # fig_legend = plt.figure(figsize=(8, 2))
+    fig_legend = plt.figure(figsize=(10, 2))
     # Use the same handles and labels
     handles, labels = ax.get_legend_handles_labels()
     fig_legend.legend(
@@ -348,8 +404,8 @@ def plot_pi_fes(
     else:
         step_num = f"{num_steps}"
 
-    title = f"Policy-conditioned free energy at step {step_num}"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = f"Policy-conditioned free energy at step {step_num}\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -408,6 +464,18 @@ def plot_pi_state_logprob(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -524,8 +592,8 @@ def plot_pi_state_logprob(
     else:
         step_num = f"{num_steps}"
 
-    title = f"Expected state log-probability at step {step_num}"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = f"Expected state log-probability at step {step_num}\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -586,6 +654,18 @@ def plot_pi_state_logprob_first(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -702,8 +782,8 @@ def plot_pi_state_logprob_first(
     else:
         step_num = f"{num_steps}"
 
-    title = f"Expected state log-probability at step {step_num} for the initial state"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = f"Expected state log-probability at step {step_num} for the initial state\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -764,6 +844,18 @@ def plot_pi_obs_loglik(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -880,8 +972,8 @@ def plot_pi_obs_loglik(
     else:
         step_num = f"{num_steps}"
 
-    title = f"Expected observation log-likelihood at step {step_num}"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = f"Expected observation log-likelihood at step {step_num}\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -942,6 +1034,18 @@ def plot_pi_transit_loglik(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -1058,8 +1162,8 @@ def plot_pi_transit_loglik(
     else:
         step_num = f"{num_steps}"
 
-    title = f"Expected transition log-likelihood at step {step_num}"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = f"Expected transition log-likelihood at step {step_num}\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -1132,6 +1236,18 @@ def plot_pi_fes_subplots(
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
+
+        # Visualize default 16 policies, unless specified differently from CL
+        if len(policies_to_vis) == 0:
+            # Broadcasting comparison: compare each target with all rows
+            matches = (
+                policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+            )  # shape: (16, num_rows, 4)
+            # Now reduce over last dimension to check full-row match
+            row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+            # Each row in row_matches should contain exactly one True
+            row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+            policies_to_vis = list(row_indices)
 
         # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
         # was passed through the command line
@@ -1228,11 +1344,11 @@ def plot_pi_fes_subplots(
 
         if "paths" in exp_name:
             ax[num_data].set_title(
-                f"Policy-conditioned free energy at step {step_num} (open loop)\n"
+                f"Policy-conditioned free energy at step {step_num} (action-unaware)\n"
             )
         elif "plans" in exp_name:
             ax[num_data].set_title(
-                f"Policy-conditioned free energy at step {step_num} (closed loop)\n"
+                f"Policy-conditioned free energy at step {step_num} (action-aware)\n"
             )
 
     # Padding
@@ -1353,8 +1469,8 @@ def plot_marginal_fe(
     ax.set_ylabel("Free energy", rotation=90)
     ax.set_ylim(y_limits[0], y_limits[1])
     # Title
-    title = f"Free energy at step {step_num}"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = f"Free energy at step {step_num}\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
     ax.fill_between(
         x2,
@@ -1376,6 +1492,132 @@ def plot_marginal_fe(
 ######################################################################################################
 ##### Functions to plot expected free energies and their component across episodes
 ######################################################################################################
+
+
+def plot_pi_fes_efe(
+    file_data_path,
+    step_fe_pi,
+    x_ticks_estep,
+    x_ticks_tstep,
+    y_limits,
+    select_run,
+    save_dir,
+    env_layout,
+    policies_to_vis=[],
+):
+    """Function to visualize unnormalized policy probabilities (policy-conditioned FE + EFE) at the first
+    step across episodes
+
+    Inputs:
+    - file_data_path (str): path to the .npy file where the data was stored
+    - step_fe_pi (int): timestep from which to plot the free energy
+    - x_ticks_estep (int): step for the ticks in the x axis when plotting as a function of episode number
+    - x_ticks_tstep (int): step for the ticks in the x axis when plotting as a function of total timesteps
+    - y_limits (list): list with lower and upper value for the y axis
+    - select_run (int): index to select data from only a subset of the runs (depending on policy probs)
+    - save_dir (str): string with the directory path where to save the figure
+    - env_layout (str): layout of the training evironment (e.g., Tmaze3)
+    - policies_to_vis (list): list of policies' indices to visualize a subset of the policies for each run/agent
+
+    Outputs:
+    - scatter plot of policy-conditioned free energies at EACH time step in the experiment
+    - scatter plot of policy-conditioned free energies across episodes
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'pi_free_energies'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    # num_runs = data["num_runs"]
+    # num_policies = data["num_policies"]
+    exp_name = data["exp_name"]
+    num_episodes = data["num_episodes"]
+    num_steps = data["num_steps"]
+
+    # Take care of the fact that policies are created and saved differently in the two types of agents
+    if "paths" in exp_name:
+        policies = data["policies"]
+    elif "plans" in exp_name:
+        policies = data["ordered_policies"][0, 0, 0, :, :]
+    else:
+        raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
+
+    # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
+    # was passed through the command line
+    if select_run != -1:
+
+        pi_runs = data["pi_probabilities"][:, -1, select_run, -1]
+        selected_runs = (pi_runs > 0.5).nonzero()[0]
+        pi_fe = data["pi_free_energies"][selected_runs]
+        efe = data["expected_free_energies"][selected_runs]
+    else:
+        pi_fe = data["pi_free_energies"]
+        efe = data["expected_free_energies"]
+
+    # Checking that the step_fe_pi is within an episode
+    assert (
+        step_fe_pi >= 0 and step_fe_pi <= num_steps - 1
+    ) or step_fe_pi == -1, f"Invalid step number: {step_fe_pi}"
+
+    # Pre-generate distinct colors
+    cmap = plt.cm.get_cmap("tab20", NUM_POLICIES_VIS)
+
+    ### Figure with policy-conditioned free energies at EACH timestep in the experiment
+    fig, ax = plt.subplots(figsize=(5, 4))
+    # Looping over the policies for Figure 1
+    for p in range(NUM_POLICIES_VIS):
+
+        # Computing the mean (average) and std of one policy's free energies over the runs
+        # TODO: handle rare case in which you train only for one episode, in that case squeeze()
+        # will raise the exception
+        avg_pi_fe = np.mean(pi_fe[:, :, p, step_fe_pi], axis=0)  # .squeeze()
+        std_pi_fe = np.std(pi_fe[:, :, p, step_fe_pi], axis=0)  # .squeeze()
+        # Averaging the expected free energies over the runs
+        avg_efe = np.mean(efe[:, :, p, step_fe_pi], axis=0)  # .squeeze()
+
+        # Plotting the free energy for every time step
+        x1 = np.arange(num_episodes)
+        y1 = (avg_pi_fe + avg_efe).flatten()
+
+        # ax.plot(x1, y1, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+        ax.plot(x1, y1, ".-", color=cmap(p), label=f"$\\pi_{{{p}}}$")
+
+    # Completing drawing axes for Figure 1
+    ax.set_xticks(np.arange(x_ticks_estep, num_episodes + 1, step=x_ticks_tstep))
+    ax.set_xlabel("Step")
+    ax.set_ylabel("FE + EFE (for each policy)", rotation=90)
+    # ax.legend(
+    #     ncol=4,
+    #     loc="upper center",
+    #     title_fontsize=16,
+    #     bbox_to_anchor=(0.5, -0.2),
+    #     fancybox=True,
+    # )
+    ax.set_title("Unnormalized policy probabilities at each step across episodes\n")
+
+    # Save figures and show
+    fig.savefig(
+        save_dir
+        + "/"
+        + f"{env_layout}_{exp_name}_unorm_policies_probs_step{step_fe_pi}.jpg",
+        format="jpg",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    # plt.show()
+    plt.close()
+
+
 def plot_efe(
     file_data_path,
     select_policy,
@@ -1414,6 +1656,18 @@ def plot_efe(
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
 
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
+
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
     if select_policy != -1:
@@ -1435,8 +1689,8 @@ def plot_efe(
 
     if select_step == None:
         x_label = "Step"
-        title = "Expected free energy at every step"
-        title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+        title = "Expected free energy at every step\n"
+        title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
         # Plotting all the time steps across episodes
         for p in range(num_policies):
             x = np.arange(num_episodes * num_steps)
@@ -1447,8 +1701,8 @@ def plot_efe(
 
     else:
         x_label = "Episode"
-        title = f"Expected free energy at step {select_step + 1}"
-        title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+        title = f"Expected free energy at step {select_step + 1}\n"
+        title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
 
         if len(policies_to_vis) == 0:
             # Plotting EFE at single time step for each episode
@@ -1641,11 +1895,11 @@ def plot_efe_subplots(
 
         if "paths" in exp_name:
             ax[num_data].set_title(
-                f"Expected free energy at step {select_step + 1} (open loop)\n"
+                f"Expected free energy at step {select_step + 1} (action-unaware)\n"
             )
         elif "plans" in exp_name:
             ax[num_data].set_title(
-                f"Expected free energy at step {select_step + 1} (closed loop)\n"
+                f"Expected free energy at step {select_step + 1} (action-aware)\n"
             )
 
     # Figure title
@@ -1717,6 +1971,18 @@ def plot_efe_risk(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -1832,7 +2098,7 @@ def plot_efe_risk(
     axes_1.set_ylabel("Risk", rotation=90)
     axes_1.set_ylim(y_lims[0], y_lims[1])
 
-    title_label += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title_label += " (action-unaware)" if "paths" in exp_name else " (action-aware)"
     axes_1.set_title(f"Risk at {title_label}", pad=15)
     # Save figures
     fig_1.savefig(
@@ -1885,6 +2151,18 @@ def plot_efe_bnov(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -1999,7 +2277,7 @@ def plot_efe_bnov(
     axes_2.set_ylabel("B-novelty", rotation=90)
     axes_2.set_ylim(y_lims[0], y_lims[1])
 
-    title_label += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title_label += " (action-unaware)" if "paths" in exp_name else " (action-aware)"
     axes_2.set_title(f"B-novelty at {title_label}", pad=15)
     # Save figure
     fig_2.savefig(
@@ -2175,9 +2453,9 @@ def plot_efe_risk_subplots(
         axes[num_data].set_ylim(y_limits[0], y_limits[1])
 
         if "paths" in exp_name:
-            axes[num_data].set_title(f"Risk at {title_label} (open loop)\n")
+            axes[num_data].set_title(f"Risk at {title_label} (action-unaware)\n")
         elif "plans" in exp_name:
-            axes[num_data].set_title(f"Risk at {title_label} (closed loop)\n")
+            axes[num_data].set_title(f"Risk at {title_label} (action-aware)\n")
 
     # Figure title
     # plot_title = f"Risk at {title_label}\n"
@@ -2371,9 +2649,9 @@ def plot_efe_bnov_subplots(
         axes[num_data].set_ylim(y_limits[0], y_limits[1])
 
         if "paths" in exp_name:
-            axes[num_data].set_title(f"B-novelty at {title_label} (open loop)\n")
+            axes[num_data].set_title(f"B-novelty at {title_label} (action-unaware)\n")
         elif "plans" in exp_name:
-            axes[num_data].set_title(f"B-novelty at {title_label} (closed loop)\n")
+            axes[num_data].set_title(f"B-novelty at {title_label} (action-aware)\n")
 
     # Figure title
     # plot_title = f"B-novelty at {title_label}\n"
@@ -2442,6 +2720,18 @@ def plot_efe_ambiguity(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -2617,6 +2907,18 @@ def plot_efe_anov(
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
+
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
 
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
@@ -3187,6 +3489,18 @@ def plot_pi_prob_first(
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
 
+    # Visualize default 16 policies, unless specified differently from CL
+    if len(policies_to_vis) == 0:
+        # Broadcasting comparison: compare each target with all rows
+        matches = (
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
+        )  # shape: (16, num_rows, 4)
+        # Now reduce over last dimension to check full-row match
+        row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
+        # Each row in row_matches should contain exactly one True
+        row_indices = np.argmax(row_matches, axis=1)  # shape: (16,)
+        policies_to_vis = list(row_indices)
+
     # Ignoring certain runs depending on the final probability of a certain policy, if corresponding argument
     # was passed through the command line
     if select_run != -1:
@@ -3279,8 +3593,8 @@ def plot_pi_prob_first(
     ax.set_ylabel("Probability mass", rotation=90)
     ax.set_ylim(y_limits[0], y_limits[1])
 
-    title = "First-step policy probability"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = "First-step policy probability\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
     # Save figure and show
     plt.savefig(
@@ -3391,8 +3705,8 @@ def plot_pi_prob_first_subplots(
         else:
 
             # Title
-            title = "First-step policy probability"
-            title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+            title = "First-step policy probability\n"
+            title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
             ax[num_data].set_title(title + "\n")
 
             # Create inset if needed
@@ -4457,17 +4771,17 @@ def plot_matrix_B_kl(
     ax1.set_ylabel("Nats", rotation=90)
 
     if "tmaze4" in env_layout:
-        ax1.set_ylim(0, 18)
+        ax1.set_ylim(0, 20)
     elif "ymaze4" in env_layout:
         ax1.set_ylim(y_lims[0], y_lims[1])
     else:
-        ax1.set_ylim(0, 20)
+        ax1.set_ylim(0, 32)
 
     # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
-    # title += "\n(open loop)" if "paths" in exp_name else " (closed loop)"
+    # title += "\n(action-unaware)" if "paths" in exp_name else " (action-aware)"
     title = (
         f"Sum of KL divergences for each action\n"
-        f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+        f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
     )
     ax1.set_title(title, pad=15)
 
@@ -4527,7 +4841,7 @@ def plot_matrix_B_kl(
     # Formatting
     title = (
         f"Total KL divergence in selected episodes\n"
-        f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+        f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
     )
     ax2.set_title(title, pad=15)
     ax2.set_xticks(x_labels)
@@ -4686,15 +5000,15 @@ def plot_matrix_B(
         ax1.set_ylabel("Probability mass", rotation=90)
 
         # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
-        # title += "\n(open loop)" if "paths" in exp_name else " (closed loop)"
+        # title += "\n(action-unaware)" if "paths" in exp_name else " (action-aware)"
         title = (
             f"Transition probabilities from state {s + 1} for action {actions_map[a]}\n"
-            f"{'(open loop)' if 'paths' in exp_name else '(closed loop)'}"
+            f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
         )
         ax1.set_title(title, pad=15)
 
         # Create a separate figure for the legend
-        fig_legend = plt.figure(figsize=(8, 2))
+        fig_legend = plt.figure(figsize=(10, 2))
         # Use the same handles and labels
         handles, labels = ax1.get_legend_handles_labels()
         fig_legend.legend(
@@ -4770,8 +5084,8 @@ def plot_matrix_B(
 
         ax2.set_xlabel("States")
         ax2.set_ylabel("States", rotation=90)
-        title = f"Transition matrix for action {actions_map[a]}"
-        title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+        title = f"Transition matrix for action {actions_map[a]}\n"
+        title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
         ax2.set_title(f"{title}", pad=15)
 
         # Save figure and show
@@ -4898,8 +5212,8 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
     # Format color bar as percentages
     cbar.ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
 
-    title = "State-access frequency"
-    title += " (open loop)" if "paths" in exp_name else " (closed loop)"
+    title = "State-access frequency\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
     ax.set_title(title, pad=15)
 
     # Save figure and show

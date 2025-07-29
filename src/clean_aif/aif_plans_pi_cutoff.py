@@ -25,7 +25,7 @@ import time
 
 # Custom imports
 from .config import LOG_DIR
-from .utils_plans import *
+from .utils_plans_cutoff import *
 
 # Set the print options for NumPy
 np.set_printoptions(precision=3, suppress=True)
@@ -454,15 +454,20 @@ class Agent(object):
             #     self.num_states, current_state_probs, pi_actions, self.B
             # )
 
-            Qs_p_future_traj = (
-                np.ones((self.num_states, efe_tsteps)) * 1 / self.num_states
-            )
+            if efe_tsteps != 0:
+                Qs_p_future_traj = (
+                    np.ones((self.num_states, efe_tsteps)) * 1 / self.num_states
+                )
 
-            # Concatenate past, present and future state beliefs for CURRENT policy
-            # NOTE: each policy will have a shared past and present
-            Qs_p_traj = np.concatenate(
-                (self.Qs[:, 0 : self.current_tstep + 1], Qs_p_future_traj), axis=1
-            )
+                # Concatenate past, present and future state beliefs for CURRENT policy
+                # NOTE: each policy will have a shared past and present
+                Qs_p_traj = np.concatenate(
+                    (self.Qs[:, 0 : self.current_tstep + 1], Qs_p_future_traj), axis=1
+                )
+            else:
+                # Concatenate past, present beliefs for CURRENT policy
+                # NOTE: each policy will have a shared past and present
+                Qs_p_traj = np.copy(self.Qs[:, 0 : self.current_tstep + 1])
 
             # Qs_p_traj = np.ones((self.num_states, trajectory_len)) * 1 / self.num_states
             # Qs_p_traj[:, 0] = np.copy(self.D)
@@ -473,10 +478,18 @@ class Agent(object):
 
             # Compute action sequence from past to future given current policy
             # NOTE: this is a combination of already taken actions and the policy's actions
-            pi_actions = np.concatenate(
-                (self.actual_action_sequence[: self.current_tstep], pi_actions),
-                axis=0,
-            )
+            if efe_tsteps != 0:
+
+                pi_actions = np.concatenate(
+                    (
+                        self.actual_action_sequence[: self.current_tstep],
+                        pi_actions[-efe_tsteps:],
+                    ),
+                    axis=0,
+                )
+
+            else:
+                pi_actions = self.actual_action_sequence[: self.current_tstep]
 
             # Compute variational free energy with prior distributions Q(S_t|pi)
             # NOTE: if B parameters are learned then you need to pass in self.B_params and
@@ -509,32 +522,16 @@ class Agent(object):
                 learning_B=self.learning_B,
             )
 
+            ### DEBUG ###
+            if self.current_tstep == 0:
+                if pi_actions[0] == pi_actions[1] == 3 and pi_actions[2] == 2:
+                    print(f"Prior beliefs: {Qs_p_traj}")
+                    print(f"Prior FE: {F_pi_old}")
+            ### END ###
+
             # Inference loop
             while True:
                 i += 1
-                # IMPORTANT: here we are replacing zero probabilities with the value 0.0001
-                # to avoid zeroes in logs.
-                # Qs_p_traj = np.where(Qs_p_traj == 0, 0.0001, Qs_p_traj)
-                # Computing the variational free energy for the current policy
-                # Note 1: if B parameters are learned then you need to pass in self.B_params and
-                # self.learning_B (the same applies for A)
-                # logA_pi, logB_pi, logD_pi, F_pi = vfe(
-                #     trajectory_len,
-                #     self.num_states,
-                #     self.current_tstep,
-                #     self.current_obs,
-                #     pi,
-                #     pi_actions,
-                #     self.A,
-                #     self.B,
-                #     self.D,
-                #     Qs_p_traj,
-                #     A_params=self.A_params,
-                #     learning_A=self.learning_A,
-                #     B_params=self.B_params,
-                #     learning_B=self.learning_B,
-                # )
-
                 # Computing the free energy gradient for the current policy
                 grad_F_pi = grad_vfe(
                     trajectory_len,
@@ -597,14 +594,28 @@ class Agent(object):
             # print(efe_tsteps)
             # print(self.Qs_ps[pi][:, -efe_tsteps:].shape)
             # print(Qs_p_traj[:, -efe_tsteps:].shape)
+            if (
+                self.current_tstep == 0
+                or self.current_tstep == 1
+                or self.current_tstep == 2
+            ):
+                if pi_actions[0] == pi_actions[2] == 3 and pi_actions[1] == 2:
+                    print(f"Policy {pi_actions}")
+                    print(f"Last FE: {F_pi}")
+                    print("Updated Beliefs")
+                    print(Qs_p_traj)
+
             if efe_tsteps != 0:
                 self.Qs_ps[pi][:, -efe_tsteps:] = Qs_p_traj[:, -efe_tsteps:]
+
             # Save in a separate array the policy-dependent future state beliefs the agent computes
             # at EACH time step in every episode
             # TODO: this does not seem to be used, likely to be REMOVED
             self.Qs_all_ps[self.current_tstep, pi, :, :] = np.copy(self.Qs_ps[pi])
             # Store the last update of Qs_p_traj for the current policy
             # NB: this is then sliced at the current step to compute an updated self.Qs
+            # print("Belifes for trajectory:")
+            # print(f"{Qs_p_traj}")
             self.Qs_ps_traj[pi] = Qs_p_traj
             # Storing the last computed free energy and components
             self.free_energies[pi, self.current_tstep] = F_pi
@@ -668,6 +679,7 @@ class Agent(object):
                 efe_tsteps = self.steps - self.current_tstep - 1
                 G_pi, tot_Hs, tot_slog_s_over_C, tot_AsW_As, tot_AsW_Bs, sq_AsW_Bs = (
                     efe(
+                        self.steps,
                         efe_tsteps,
                         self.current_tstep,
                         pi,
@@ -719,6 +731,9 @@ class Agent(object):
         self.Qpi[:, self.current_tstep] = sigma(
             -self.Qpi[:, self.current_tstep] + pi_prior_probs
         )
+        if self.current_tstep == 1 or self.current_tstep == 2:
+            print(self.Qpi[:, self.current_tstep])
+
         print("Policies Probs > 0.005")
         pi_indices = np.where(self.Qpi[:, self.current_tstep] > 0.005)[0]
         print(f"Policies indices: {pi_indices}")
@@ -828,7 +843,7 @@ class Agent(object):
         # which is simply the wanted index (an integer).
 
         actions_probs = np.matmul(
-            (self.policies[:, 0] == actions_matrix),
+            (self.policies[:, self.current_tstep] == actions_matrix),
             self.Qpi[:, self.current_tstep],
         )
         print(f"Action probabilities: {actions_probs}")
@@ -1607,6 +1622,7 @@ def main():
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
     if env_layout == "tmaze3":
+        SIZE = 3
         WALLS_LOC = [
             set_wall_xy(3),
             set_wall_xy(5),
@@ -1615,6 +1631,7 @@ def main():
             set_wall_xy(8),
         ]
     elif env_layout == "tmaze4":
+        SIZE = 3
         WALLS_LOC = [
             set_wall_xy(3),
             set_wall_xy(5),
@@ -1622,10 +1639,17 @@ def main():
             set_wall_xy(8),
         ]
     elif env_layout == "ymaze4":
+        SIZE = 3
         WALLS_LOC = [set_wall_xy(1), set_wall_xy(6), set_wall_xy(8)]
 
     elif env_layout == "gridw9":
+        SIZE = 3
         WALLS_LOC = []
+
+    elif env_layout == "gridw16":
+        SIZE = 4
+        WALLS_LOC = []
+
     else:
         raise ValueError(
             "Value of 'env_layout' is not among the available ones. Choose from: Tmaze3, Tmaze4, Ymaze4."
@@ -1639,7 +1663,10 @@ def main():
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/GridWorld-v1", max_episode_steps=NUM_STEPS - 1, render_mode=None
+        "gymnasium_env/GridWorld-v1",
+        max_episode_steps=NUM_STEPS - 1,
+        render_mode=None,
+        size=SIZE,
     )
 
     ##############################

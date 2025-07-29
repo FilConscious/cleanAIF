@@ -189,7 +189,7 @@ def main():
         plot_matrix_B_kl(
             data_path,
             params["x_ticks_estep"],
-            [0, 22],
+            [0, 22],  # Tmaze4: [0, 18]; gridw9: [0, 22]
             params["state_B"],
             params["action_B"],
             params["select_policy"],
@@ -209,7 +209,7 @@ def main():
             params["step_fe_pi"][0],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 3],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 10]
+            [0, 3],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 3]; gridw9: [0, 3]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -219,7 +219,7 @@ def main():
             params["step_fe_pi"][1],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 5],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 10]
+            [0, 5],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 4]; gridw9: [0, 5]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -229,7 +229,7 @@ def main():
             params["step_fe_pi"][2],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 8],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 10]
+            [0, 8],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 6]; gridw9: [0, 8]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -239,18 +239,29 @@ def main():
             params["step_fe_pi"][3],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 10]
+            [0, 12],  # Tmaze3: [0, 5.5]; Tmaze4: [0, 10]; gridw9: [0, 12]
             params["select_policy"],
             result_dir,
             params["env_layout"],
         )
+        plot_marginal_fe(
+            data_path,
+            params["step_fe_pi"][4],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [0, 16],  # gridw9: [0, 16]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+        )
+
         # Plot policy-conditioned free energies, F_pi, on the same axis
         plot_pi_fes(
             data_path,
             params["step_fe_pi"][0],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 3],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            [0, 3],  # Tmaze3: [0, 5]; Tmaze4: [0, 5]; gridw9: [0, 3]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -262,7 +273,7 @@ def main():
             params["step_fe_pi"][1],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            [0, 8],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]; gridw9: [0, 8]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -274,7 +285,7 @@ def main():
             params["step_fe_pi"][2],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 8],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10] gridw9: [0, 10]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -283,10 +294,22 @@ def main():
         # Plot policy-conditioned free energies, F_pi, on the same axis
         plot_pi_fes(
             data_path,
-            params["step_fe_pi"][-1],
+            params["step_fe_pi"][3],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+            [0, 12],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]; gridw9: [0, 12]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            policies_to_vis=policies_to_vis,
+        )
+        # Plot policy-conditioned free energies, F_pi, on the same axis
+        plot_pi_fes(
+            data_path,
+            params["step_fe_pi"][4],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [0, 14],  # Tmaze3: [0, 5]; gridw9: [0, 14]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -305,41 +328,74 @@ def main():
             policies_to_vis=policies_to_vis,
         )
         # Plot expected state log-prob for the first state of the free energy
-        plot_pi_state_logprob_first(
-            data_path,
-            params["step_fe_pi"][0],
-            params["x_ticks_estep"],
-            params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-            policies_to_vis=policies_to_vis,
-        )
-        # Plot expected obs likelihood of the free energy
-        plot_pi_obs_loglik(
-            data_path,
-            params["step_fe_pi"][0],
-            params["x_ticks_estep"],
-            params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-            policies_to_vis=policies_to_vis,
-        )
-        # Plot expected obs likelihood of the free energy
-        plot_pi_transit_loglik(
-            data_path,
-            params["step_fe_pi"][0],
-            params["x_ticks_estep"],
-            params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-            policies_to_vis=policies_to_vis,
-        )
+        # plot_pi_state_logprob_first(
+        #     data_path,
+        #     params["step_fe_pi"][0],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
+        # # Plot expected obs likelihood of the free energy
+        # plot_pi_obs_loglik(
+        #     data_path,
+        #     params["step_fe_pi"][0],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
+        # # Plot expected obs likelihood of the free energy
+        # plot_pi_transit_loglik(
+        #     data_path,
+        #     params["step_fe_pi"][0],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
+        # plot_pi_fes_efe(
+        #     data_path,
+        #     params["step_fe_pi"][1],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 12]; gridw9: [0, 10]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
+        # plot_pi_fes_efe(
+        #     data_path,
+        #     params["step_fe_pi"][2],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]; gridw9: [0, 10]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
+        # plot_pi_fes_efe(
+        #     data_path,
+        #     params["step_fe_pi"][3],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 8]; gridw9: [0, 10]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
         # Plot expected free energies, EFE, for each policy on the same axis
         plot_efe(
             data_path,
@@ -347,7 +403,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 12],
+            [0, 18],  # Tmaze4: [0, 12]; gridw9 [0, 18]
             select_step=0,
             policies_to_vis=policies_to_vis,
         )
@@ -358,7 +414,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 10],
+            [0, 14],  # Tmaze4: [0, 10]; gridw9 [0, 14]
             select_step=1,
             policies_to_vis=policies_to_vis,
         )
@@ -369,8 +425,19 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 10],
+            [0, 8],  # Tmaze4: [0, 8]; gridw9 [0, 8]
             select_step=2,
+            policies_to_vis=policies_to_vis,
+        )
+        # # # Plot expected free energies, EFE, for each policy on the same axis
+        plot_efe(
+            data_path,
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            params["x_ticks_estep"],
+            [0, 4],  # gridw9 [0, 4]
+            select_step=3,
             policies_to_vis=policies_to_vis,
         )
         # Plot the expected free energy component RISK for all policies
@@ -380,7 +447,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 12],
+            [0, 18],  # Tmaze4: [0, 12]; gridw9 [0, 18]
             num_tsteps=0,
             policies_to_vis=policies_to_vis,
         )
@@ -391,7 +458,7 @@ def main():
             result_dir,
             params["env_layout"],
             params["x_ticks_estep"],
-            [0, 1],
+            [0, 2],  # Tmaze4: [0, 1]; gridw9 [0, 2]
             num_tsteps=0,
             policies_to_vis=policies_to_vis,
         )
@@ -416,7 +483,7 @@ def main():
         plot_pi_prob_first(
             data_path,
             params["x_ticks_estep"],
-            [0, 0.10],  # Tmaze3: [0, 0.45]; Tmaze4: [0, 0.09]
+            [0, 0.02],  # Tmaze3: [0, 0.45]; Tmaze4: [0, 0.1]; gridw9: [0, 0.02]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -451,14 +518,15 @@ def main():
             params["env_layout"],
         )
         # Plot action sequence for a selected run/agent
-        plot_action_seq(
-            data_path,
-            params["x_ticks_estep"],
-            params["policy_horizon"],
-            params["select_run"],
-            result_dir,
-            params["env_layout"],
-        )
+        # plot_action_seq(
+        #     data_path,
+        #     params["x_ticks_estep"],
+        #     params["policy_horizon"],
+        #     params["select_run"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
+
         # Plot categorical distributions Q(S|pi) from an episode's *first* step (averaged over the runs)
         # plot_Qs_pi_first(
         #     data_path,
@@ -476,122 +544,122 @@ def main():
         #     params["env_layout"],
         # )
         # Plot categorical distributions Q(S|pi) from ALL steps in a single episode (averaged over the runs)
-        plot_Qs_pi_all(
-            data_path,
-            params["select_policy"],
-            params["select_episode"],
-            result_dir,
-            params["env_layout"],
-        )
+        # plot_Qs_pi_all(
+        #     data_path,
+        #     params["select_policy"],
+        #     params["select_episode"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
 
     # Access data from all selected experiments to plot results in subplots
 
     # Plot policy-conditioned free energies, F_pi, on the same axis
     # Plot Fe_pi at different time steps if the list is not empty
-    for step_fe_pi in params["step_fe_pi"]:
+    # for step_fe_pi in params["step_fe_pi"]:
 
-        if step_fe_pi == 0:
-            y_range = [0, 3]  # Tmaze4 [0, 5]
-        elif step_fe_pi == 1:
-            y_range = [0, 8]  # Tmaze4 [0, 10]
-        elif step_fe_pi == 2:
-            y_range = [0, 8]  # Tmaze4 [0, 15]
-        else:
-            y_range = [0, 10]  # Tmaze4 [0, 15]
+    #     if step_fe_pi == 0:
+    #         y_range = [0, 3]  # Tmaze4 [0, 5]
+    #     elif step_fe_pi == 1:
+    #         y_range = [0, 8]  # Tmaze4 [0, 10]
+    #     elif step_fe_pi == 2:
+    #         y_range = [0, 8]  # Tmaze4 [0, 15]
+    #     else:
+    #         y_range = [0, 10]  # Tmaze4 [0, 15]
 
-        plot_pi_fes_subplots(
-            data_to_vis,
-            step_fe_pi,
-            params["x_ticks_estep"],
-            params["x_ticks_tstep"],
-            y_range,  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-            num_policies_vis,
-            policies_to_vis=params["policies_to_vis"],
-        )
+    #     plot_pi_fes_subplots(
+    #         data_to_vis,
+    #         step_fe_pi,
+    #         params["x_ticks_estep"],
+    #         params["x_ticks_tstep"],
+    #         y_range,  # Tmaze3: [0, 5]; Tmaze4: [0, 10]
+    #         params["select_policy"],
+    #         result_dir,
+    #         params["env_layout"],
+    #         num_policies_vis,
+    #         policies_to_vis=params["policies_to_vis"],
+    #     )
 
-    plot_efe_subplots(
-        data_to_vis,
-        params["x_ticks_estep"],
-        [2, 10],  # Tmaze3: [2, 6]; Tmaze4: [2, 10]
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        select_step=0,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_efe_subplots(
-        data_to_vis,
-        params["x_ticks_estep"],
-        [2, 10],  # Tmaze3: [2, 6]; Tmaze4: [3, 11]
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        select_step=1,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_efe_subplots(
-        data_to_vis,
-        params["x_ticks_estep"],
-        [0, 10],  # Tmaze3: [2, 6]; Tmaze4: [3, 11]
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        select_step=2,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_efe_risk_subplots(
-        data_to_vis,
-        [3, 10],  # Tmaze3: [2, 6]; Tmaze4: [3, 11]
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        num_tsteps=0,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_efe_bnov_subplots(
-        data_to_vis,
-        [0, 0.9],  # Tmaze3: [0.1, 0.5]; Tmaze4: [0, 0.9]
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        num_tsteps=0,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_efe_ambiguity_subplots(
-        data_to_vis,
-        [0, 5],
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        num_tsteps=0,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_efe_anov_subplots(
-        data_to_vis,
-        [0, 5],
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        num_tsteps=0,
-        policies_to_vis=params["policies_to_vis"],
-    )
-    plot_pi_prob_first_subplots(
-        data_to_vis,
-        params["x_ticks_estep"],
-        [0, 0.1],  # Tmaze3: [0, 0.45]; Tmaze4: [0, 0.09]
-        params["select_policy"],
-        result_dir,
-        params["env_layout"],
-        num_policies_vis,
-        policies_to_vis=params["policies_to_vis"],
-    )
+    # plot_efe_subplots(
+    #     data_to_vis,
+    #     params["x_ticks_estep"],
+    #     [2, 10],  # Tmaze3: [2, 6]; Tmaze4: [2, 10]
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     select_step=0,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_efe_subplots(
+    #     data_to_vis,
+    #     params["x_ticks_estep"],
+    #     [2, 10],  # Tmaze3: [2, 6]; Tmaze4: [3, 11]
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     select_step=1,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_efe_subplots(
+    #     data_to_vis,
+    #     params["x_ticks_estep"],
+    #     [0, 10],  # Tmaze3: [2, 6]; Tmaze4: [3, 11]
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     select_step=2,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_efe_risk_subplots(
+    #     data_to_vis,
+    #     [3, 10],  # Tmaze3: [2, 6]; Tmaze4: [3, 11]
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     num_tsteps=0,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_efe_bnov_subplots(
+    #     data_to_vis,
+    #     [0, 0.9],  # Tmaze3: [0.1, 0.5]; Tmaze4: [0, 0.9]
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     num_tsteps=0,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_efe_ambiguity_subplots(
+    #     data_to_vis,
+    #     [0, 5],
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     num_tsteps=0,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_efe_anov_subplots(
+    #     data_to_vis,
+    #     [0, 5],
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     num_tsteps=0,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
+    # plot_pi_prob_first_subplots(
+    #     data_to_vis,
+    #     params["x_ticks_estep"],
+    #     [0, 0.1],  # Tmaze3: [0, 0.45]; Tmaze4: [0, 0.09]
+    #     params["select_policy"],
+    #     result_dir,
+    #     params["env_layout"],
+    #     num_policies_vis,
+    #     policies_to_vis=params["policies_to_vis"],
+    # )
