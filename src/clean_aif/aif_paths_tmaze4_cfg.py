@@ -277,7 +277,7 @@ class Args:
         B_params = np.zeros((num_actions, num_states, num_states))
 
         # Assigning 1s to correct transitions for every action.
-        if env_layout == "Tmaze3":
+        if env_layout == "tmaze3":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze3'
             # only transitions to accessible states are considered/modelled
 
@@ -325,7 +325,7 @@ class Args:
             )
 
         # Assigning 1s to correct transitions for every action.
-        elif env_layout == "Tmaze4":
+        elif env_layout == "tmaze4":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
             # only transitions to accessible states are considered/modelled
 
@@ -377,7 +377,7 @@ class Args:
             )
 
         # Assigning 1s to correct transitions for every action.
-        elif env_layout == "Ymaze4":
+        elif env_layout == "ymaze4":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
             # only transitions to accessible states are considered/modelled
 

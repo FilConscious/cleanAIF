@@ -56,7 +56,7 @@ class Args:
         )
     )
     """ preference prior type """
-    pref_type: str = "states"
+    pref_type: str = "states_manh"
     """ time step(s) on which the preference prior is placed """
     pref_loc: str = "all_goal"  # "last", all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
@@ -154,14 +154,27 @@ class Args:
 
         return sel_policies
 
-    # def __post_init__(self):
-    #     """
-    #     Class method that runs at instance creation AFTER the dataclass is initialized, useful for additional
-    #     initialization logic that depends on the instance attributes.
-    #     """
+    @staticmethod
+    def goal_distribution_manh(num_states: int, goal_state: int, sharpness=1.0):
+        """
+        Returns a categorical distribution over `num_states` states, with highest probability at `goal_state`
+        and smoothly decreasing based on the Manhattan distance of the goal with respect to agent's initial
+        state. The `sharpness` parameter controls how smoothly the probability decreases.
+        """
 
-    #     # Create and set preference array for the agent
-    #     self.pref_array = self.create_pref_array(self.num_states, self.num_steps)
+        l = np.sqrt(num_states).astype(int)
+        index_repr = np.arange(num_states).reshape(l, l)
+        y_goal, x_goal = np.where(index_repr == goal_state)
+        manh_distances = []
+
+        for s in np.arange(num_states):
+            y, x = np.where(index_repr == s)
+            manh_dist = np.abs(y - y_goal) + np.abs(x - x_goal)
+            manh_distances.append(manh_dist)
+
+        logits = -sharpness * np.array(manh_distances)
+        probs = np.exp(logits) / np.sum(np.exp(logits))
+        return probs
 
     @staticmethod
     def init_C_array(
@@ -241,6 +254,13 @@ class Args:
                 "The preferences do not sum to one!"
             )
 
+        elif pref_type == "states_manh":
+            # NOTE: this assumes that the agent wants to reach a single goal so we take the first element of
+            # the tuple goal_state
+            prefs = Args.goal_distribution_manh(num_states, goal_state[0])
+            # print(prefs.shape)
+            pref_array[:, :] = prefs
+
         elif pref_type == "obs":
             # NOTE 1: we are assuming a 1-to-1 correspondence between states and observations, i.e. obs `1`
             # indicates to the agent that it is in state `1`. Thus, the agent actually deals with an MDP as
@@ -279,7 +299,7 @@ class Args:
         B_params = np.zeros((num_actions, num_states, num_states))
 
         # Assigning 1s to correct transitions for every action.
-        if env_layout == "Tmaze3":
+        if env_layout == "tmaze3":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze3'
             # only transitions to accessible states are considered/modelled
 
@@ -327,7 +347,7 @@ class Args:
             )
 
         # Assigning 1s to correct transitions for every action.
-        elif env_layout == "Tmaze4":
+        elif env_layout == "tmaze4":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
             # only transitions to accessible states are considered/modelled
 
@@ -379,7 +399,7 @@ class Args:
             )
 
         # Assigning 1s to correct transitions for every action.
-        elif env_layout == "Ymaze4":
+        elif env_layout == "ymaze4":
             # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
             # only transitions to accessible states are considered/modelled
 
@@ -434,7 +454,7 @@ class Args:
                 dtype=np.float64,
             )
 
-        elif env_layout == "TmazeXall":
+        elif env_layout == "gridw9":
             # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
             n = int(np.sqrt(num_states))
             env_matrix_labels = np.reshape(np.arange(num_states), (n, n))
@@ -454,13 +474,7 @@ class Args:
                     # Down action: 3
                     B_params[3, labels_ud, labels_ud] = 1
                     # Up action: 1
-                    B_params[1, labels_ud[0], labels_ud[0]] = (
-                        1  # Hitting wall and stay at the same state
-                    )
-                    B_params[1, labels_ud[1] + 3, labels_ud[1]] = 1
-                    B_params[1, labels_ud[2], labels_ud[2]] = (
-                        1  # Hitting wall and stay at the same state
-                    )
+                    B_params[1, labels_ud + 3, labels_ud] = 1
                     # Right action: 0
                     B_params[0, labels_rl + 1, labels_rl] = 1
                     # Left action: 2
@@ -470,24 +484,11 @@ class Args:
                     # Down action: 3
                     B_params[3, labels_ud - 3, labels_ud] = 1
                     # Up action: 1
-                    B_params[1, labels_ud[0] + 3, labels_ud[0]] = 1
-                    B_params[1, labels_ud[1], labels_ud[1]] = (
-                        1  # Hitting wall and stay at the same state
-                    )
-                    B_params[1, labels_ud[2] + 3, labels_ud[2]] = 1
+                    B_params[1, labels_ud + 3, labels_ud] = 1
                     # Right action: 0
-                    B_params[0, labels_rl[0] + 1, labels_rl[0]] = 1
-                    B_params[0, labels_rl[1], labels_rl[1]] = (
-                        1  # Hitting wall and stay at the same state
-                    )
-                    B_params[0, labels_rl[2] + 1, labels_rl[2]] = 1
+                    B_params[0, labels_rl + 1, labels_rl] = 1
                     # Left action: 2
-                    B_params[2, labels_rl[0] - 1, labels_rl[0]] = 1
-                    B_params[2, labels_rl[1], labels_rl[1]] = (
-                        1  # Hitting wall and stay at the same state
-                    )
-                    B_params[2, labels_rl[2] - 1, labels_rl[2]] = 1
-
+                    B_params[2, labels_rl - 1, labels_rl] = 1
                 elif r == 2:
                     # Down action: 3
                     B_params[3, labels_ud - 3, labels_ud] = 1
