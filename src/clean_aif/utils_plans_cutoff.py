@@ -5,6 +5,7 @@ Created on Wed Aug  5 16:16:00 2020
 @author: Filippo Torresan
 """
 
+from gymnasium.envs.registration import load_plugin_envs
 import numpy as np
 import math
 from scipy import special
@@ -268,13 +269,33 @@ def vfe(
             if t < (trajectory_len - 1):
                 # Retrieve action the policy dictates at t
                 action = pi_actions[t]
+
+                # Find columns where any entry is < 1
+                # degen_cols = np.any(
+                #    B_params[action] < 1, axis=0
+                # )  # boolean mask, shape: (B_params.shape[1])
+                # Create an epsilon matrix of same shape as B_params
+                # epsilon = np.zeros_like(B_params[action])
+                # Add 1 to every row in "degenerate" columns
+                # epsilon[:, degen_cols] = 0.5
+
                 # Clipping Dirichlet parameters to avoid large negative digammas causing numerical instability
                 # when running for longer experiments (>200 episodes)
                 B_params[action] = np.clip(B_params[action], 1, None)
-                # Computing the expectation of the Dirichlet distributions using
-                # their parameters and the digamma function
+                # Computing the expectation of the Dirichlet distributions
                 ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
                 logB_pi[t, :, :] = ExplogB
+
+                ### DEBUG ###
+                # if current_tstep == 0 and np.any(ExplogB < -20):
+                #     print(f"Inference Time Step {t}")
+                #     print(f"B params for action {action}")
+                #     print(B_params[action])
+                #     print(f"psi: {psi(B_params[action])}")
+                #     print(f"psi sum: {psi(np.sum(B_params[action], axis=0))}")
+                #     print(f"ExplogB at: {ExplogB}")
+
+                ### END ###
         else:
             # Same as above for when learning_B = False
             if t < (trajectory_len - 1):
@@ -405,17 +426,27 @@ def grad_vfe(
 
         # Computing the gradients w.r.t. Q(s_t|pi) where 0<t<=current_tstep
         elif t > 0 and t <= current_tstep:
-            # NOTE: the agent is always considering efe_tstep after the current_tstep even if the latter
-            # is the terminal or truncation point so there is no issue in the indexing Qs_p[:, t+1]
-            grad_F_pi[:, t] = (
-                np.ones(num_states)
-                + np.log(Qs_p[:, t])
-                - (
-                    np.matmul(current_obs[:, t], logA_pi)
-                    + np.matmul(Qs_p[:, t + 1], logB_pi[t, :, :])
-                    + np.matmul(logB_pi[t - 1, :, :], Qs_p[:, t - 1])
+
+            if t != (trajectory_len - 1):
+                grad_F_pi[:, t] = (
+                    np.ones(num_states)
+                    + np.log(Qs_p[:, t])
+                    - (
+                        np.matmul(current_obs[:, t], logA_pi)
+                        + np.matmul(Qs_p[:, t + 1], logB_pi[t, :, :])
+                        + np.matmul(logB_pi[t - 1, :, :], Qs_p[:, t - 1])
+                    )
                 )
-            )
+            # Case when t is the terminal state
+            elif t == (trajectory_len - 1):
+                grad_F_pi[:, t] = (
+                    np.ones(num_states)
+                    + np.log(Qs_p[:, t])
+                    - (
+                        np.matmul(current_obs[:, t], logA_pi)
+                        + +np.matmul(logB_pi[t - 1, :, :], Qs_p[:, t - 1])
+                    )
+                )
 
         # Computing the gradients w.r.t. Q(s_t|pi) where t>current_tstep
         # (i.e., w.r.t. categorical beliefs about future time steps)
@@ -594,7 +625,9 @@ def total_free_energy(current_tstep, unfolding, free_energies, Qpi, **kwargs):
 
 
 def efe(
+    last_step,
     future_steps,
+    current_tstep,
     pi,
     pi_actions,
     A,
@@ -660,9 +693,9 @@ def efe(
     # Loop over the time steps in which EFE is computed
     # NOTE: if t is the present time step and EFE is computed for 4 steps, then it is computed at
     # t, t+1, t+2, and t+3.
-    for tau in range(0, future_steps):
+    for tau in range(current_tstep + 1, last_step):
         # Compute AMBIGUITY term in EFE
-        Hs = np.dot(H, Qs_pi[pi, :, tau])
+        Hs = np.dot(H, Qs_pi[pi, :, tau - 1])
         # Add the ambiguity computed at tau to the total
         tot_Hs += Hs
 
@@ -672,9 +705,13 @@ def efe(
         # predicts the state has zero probability and the preference is low, then the KL divergence turns
         # out to be zero (with the above replacement); conversely, if the preference was high then the Qs_pi
         # got things very wrong and the KL divergence will be high.
-        Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
+        Qs_pi_risk = np.where(
+            Qs_pi[pi, :, tau - 1] == 0,
+            np.amin(C),
+            Qs_pi[pi, :, tau - 1],
+        )
         # Compute RISK term in EFE
-        if pref_type == "states":
+        if pref_type == "states" or pref_type == "states_manh":
             # Computing risk based on preferred states
             # NOTE (!!! IMPORTANT !!!): we have replaced `np.log(C[:, tau])` with `np.log(C[:, 0])`
             # because in this active inference implementation we don't currently have the possibility
@@ -696,7 +733,8 @@ def efe(
             W_A = 0.5 * (1 / A_params - 1 / np.sum(A_params, axis=0))
             # Computing the A-novelty term
             AsW_As = np.dot(
-                np.matmul(A, Qs_pi[pi, :, tau]), np.matmul(W_A, Qs_pi[pi, :, tau])
+                np.matmul(A, Qs_pi[pi, :, tau]),
+                np.matmul(W_A, Qs_pi[pi, :, tau]),
             )
             # Add the A-novelty computed at tau to the total
             tot_AsW_As += AsW_As
@@ -704,7 +742,7 @@ def efe(
         # If B matrices are learned compute B-NOVELTY terms in EFE
         if learning_B:
             # At tau = episode_steps - 1 there is no action so the B-novelty terms are zero
-            if tau == (future_steps - 1):
+            if tau == (last_step - 1):
                 AsW_Bs = 0
             else:
                 # Action that policy pi dictates at time step tau and W_B matrix needed
@@ -718,14 +756,15 @@ def efe(
                 )
                 # Computing the B-novelty term
                 AsW_Bs = np.dot(
-                    np.matmul(A, Qs_pi[pi, :, tau + 1]),
-                    np.matmul(W_B, Qs_pi[pi, :, tau + 1]),
+                    np.matmul(A, Qs_pi[pi, :, tau]),
+                    np.matmul(W_B, Qs_pi[pi, :, tau]),
                 )
 
             # Save B-novelty component computed at tau (to have the full sequence of B-novelties
             # for each policy)
             # print(f"EFE at future time step {tau}: {AsW_Bs}")
-            sq_AsW_Bs[tau] = AsW_Bs
+            if current_tstep == 0:
+                sq_AsW_Bs[tau - 1] = AsW_Bs
 
             # Add the B-novelty term computed at tau to the total
             tot_AsW_Bs += AsW_Bs
