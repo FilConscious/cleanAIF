@@ -185,6 +185,23 @@ def main():
         policies_to_vis = params["policies_to_vis"][
             i * num_policies_vis : (i * num_policies_vis) + num_policies_vis
         ]
+        # plot_action_probs(
+        #     data_path,
+        #     params["x_ticks_estep"],
+        #     [0, 0.4],
+        #     0,
+        #     result_dir,
+        #     params["env_layout"],
+        # )
+        plot_matrix_B(
+            data_path,
+            params["x_ticks_estep"],
+            params["state_B"],
+            params["action_B"],
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+        )
         # Plot matrices B (transitions probabilities)
         plot_matrix_B_kl(
             data_path,
@@ -244,16 +261,16 @@ def main():
             result_dir,
             params["env_layout"],
         )
-        plot_marginal_fe(
-            data_path,
-            params["step_fe_pi"][4],
-            params["x_ticks_estep"],
-            params["x_ticks_tstep"],
-            [0, 16],  # gridw9: [0, 16]
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-        )
+        # plot_marginal_fe(
+        #     data_path,
+        #     params["step_fe_pi"][4],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 16],  # gridw9: [0, 16]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
 
         # Plot policy-conditioned free energies, F_pi, on the same axis
         plot_pi_fes(
@@ -261,7 +278,7 @@ def main():
             params["step_fe_pi"][0],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 3],  # Tmaze3: [0, 5]; Tmaze4: [0, 5]; gridw9: [0, 3]
+            [0, 5],  # Tmaze4: [0, 5]; gridw9: [0, 3]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -273,7 +290,7 @@ def main():
             params["step_fe_pi"][1],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 8],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]; gridw9: [0, 8]
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10]; gridw9: [0, 10]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -285,7 +302,7 @@ def main():
             params["step_fe_pi"][2],
             params["x_ticks_estep"],
             params["x_ticks_tstep"],
-            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 10] gridw9: [0, 10]
+            [0, 8],  # Tmaze4: [0, 8] gridw9: [0, 12]
             params["select_policy"],
             result_dir,
             params["env_layout"],
@@ -304,17 +321,17 @@ def main():
             policies_to_vis=policies_to_vis,
         )
         # Plot policy-conditioned free energies, F_pi, on the same axis
-        plot_pi_fes(
-            data_path,
-            params["step_fe_pi"][4],
-            params["x_ticks_estep"],
-            params["x_ticks_tstep"],
-            [0, 14],  # Tmaze3: [0, 5]; gridw9: [0, 14]
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-            policies_to_vis=policies_to_vis,
-        )
+        # plot_pi_fes(
+        #     data_path,
+        #     params["step_fe_pi"][4],
+        #     params["x_ticks_estep"],
+        #     params["x_ticks_tstep"],
+        #     [0, 14],  # Tmaze3: [0, 5]; gridw9: [0, 14]
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     policies_to_vis=policies_to_vis,
+        # )
         # Plot expected state log-prob of the free energy
         plot_pi_state_logprob(
             data_path,
@@ -363,17 +380,17 @@ def main():
         #     params["env_layout"],
         #     policies_to_vis=policies_to_vis,
         # )
-        # plot_pi_fes_efe(
-        #     data_path,
-        #     params["step_fe_pi"][1],
-        #     params["x_ticks_estep"],
-        #     params["x_ticks_tstep"],
-        #     [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 12]; gridw9: [0, 10]
-        #     params["select_policy"],
-        #     result_dir,
-        #     params["env_layout"],
-        #     policies_to_vis=policies_to_vis,
-        # )
+        plot_pi_fes_efe(
+            data_path,
+            params["step_fe_pi"][1],
+            params["x_ticks_estep"],
+            params["x_ticks_tstep"],
+            [0, 10],  # Tmaze3: [0, 5]; Tmaze4: [0, 12]; gridw9: [0, 10]
+            params["select_policy"],
+            result_dir,
+            params["env_layout"],
+            policies_to_vis=policies_to_vis,
+        )
         # plot_pi_fes_efe(
         #     data_path,
         #     params["step_fe_pi"][2],
@@ -430,16 +447,16 @@ def main():
             policies_to_vis=policies_to_vis,
         )
         # # # Plot expected free energies, EFE, for each policy on the same axis
-        plot_efe(
-            data_path,
-            params["select_policy"],
-            result_dir,
-            params["env_layout"],
-            params["x_ticks_estep"],
-            [0, 4],  # gridw9 [0, 4]
-            select_step=3,
-            policies_to_vis=policies_to_vis,
-        )
+        # plot_efe(
+        #     data_path,
+        #     params["select_policy"],
+        #     result_dir,
+        #     params["env_layout"],
+        #     params["x_ticks_estep"],
+        #     [0, 4],  # gridw9 [0, 4]
+        #     select_step=3,
+        #     policies_to_vis=policies_to_vis,
+        # )
         # Plot the expected free energy component RISK for all policies
         plot_efe_risk(
             data_path,
@@ -518,14 +535,14 @@ def main():
             params["env_layout"],
         )
         # Plot action sequence for a selected run/agent
-        # plot_action_seq(
-        #     data_path,
-        #     params["x_ticks_estep"],
-        #     params["policy_horizon"],
-        #     params["select_run"],
-        #     result_dir,
-        #     params["env_layout"],
-        # )
+        plot_action_seq(
+            data_path,
+            params["x_ticks_estep"],
+            params["policy_horizon"],
+            params["select_run"],
+            result_dir,
+            params["env_layout"],
+        )
 
         # Plot categorical distributions Q(S|pi) from an episode's *first* step (averaged over the runs)
         # plot_Qs_pi_first(

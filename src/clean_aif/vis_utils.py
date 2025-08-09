@@ -53,35 +53,34 @@ POLICIES_TO_VIS_GRIDW9 = np.array(
         [1, 0, 0, 3],
         [1, 0, 3, 2],
         [0, 1, 1, 3],
-        [0, 1, 3, 1],
-        [0, 0, 1, 2],
-        [0, 1, 2, 2],
-        [0, 1, 3, 3],
-        [1, 2, 3, 3],
+        [0, 2, 0, 0],
+        [0, 2, 1, 1],
+        [2, 1, 1, 0],
+        [3, 2, 0, 0],
+        [3, 3, 1, 1],
     ]
 )
 
-
-POLICIES_TO_VIS_TMAZE4 = np.array(
-    [
-        [2, 3, 3],
-        [3, 3, 1],
-        [3, 2, 2],
-        [1, 2, 0],
-        [0, 3, 3],
-        [0, 0, 3],
-        [0, 2, 2],
-        [3, 3, 2],
-        [3, 3, 3],
-        [2, 3, 0],
-        [3, 0, 2],
-        [1, 1, 1],
-        [2, 2, 3],
-        [3, 3, 0],
-        [0, 2, 3],
-        [1, 3, 3],
-    ]
-)
+# POLICIES_TO_VIS_TMAZE4 = np.array(
+#     [
+#         [2, 3, 3],
+#         [3, 3, 1],
+#         [3, 2, 2],
+#         [1, 2, 0],
+#         [0, 3, 3],
+#         [0, 0, 3],
+#         [0, 2, 2],
+#         [3, 3, 2],
+#         [3, 3, 3],
+#         [2, 3, 0],
+#         [3, 0, 2],
+#         [1, 1, 1],
+#         [2, 2, 3],
+#         [3, 3, 0],
+#         [0, 2, 3],
+#         [1, 3, 3],
+#     ]
+# )
 
 
 ######################################################################################################
@@ -5229,6 +5228,89 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
 ###########################################################################################################
 ##### Action sequence for a selected agent/run
 ###########################################################################################################
+
+
+def plot_action_probs(
+    file_data_path,
+    x_ticks_estep,
+    y_limits,
+    step,
+    save_dir,
+    env_layout,
+):
+    """Function to plot the (un)normalized probabilities for each action at one or every step across episodes,
+    averaged over the runs at the first time step of each episode for one experiment.
+
+    Inputs:
+    - file_data_path (str): file path to stored data
+    - x_ticks_tstep (int): step for the ticks in the x axis
+    - y_limits (list): list with lower and upper value for the y axis
+    - step (int): index to identify the step for which to plot the action probabilities
+    - save_dir (str): directory where to save the images
+    - env_layout (str): layoiut of the environment
+    - policies_to_vis (list): list of policies' indices to visualize a subset of the policies for each run/agent
+
+    Outputs:
+    - line plot showing the evolution of Q(pi) across episodes.
+    """
+
+    # Retrieving the data dictionary and extracting the content of required keys, e.g. 'pi_probabilities'
+    data = np.load(file_data_path, allow_pickle=True).item()
+    exp_name = data["exp_name"]
+    num_runs = data["num_runs"]
+    num_episodes = data["num_episodes"]
+    action_probs = data["action_probs"]
+
+    # Averaging the probabilities over the runs for a single step of each episode
+    # avg_action_prob = np.mean(action_probs[:, :, :, step], axis=0).T
+    # std_action_prob = np.std(action_probs[:, :, :, step], axis=0).T
+
+    ### DEBUG ###
+    # Select only one run
+    avg_action_prob = action_probs[1, :, :, step].T
+    # reshape((4, num_episodes))  # .squeeze()
+    std_action_prob = action_probs[1, :, :, step].T
+
+    # Making sure avg_pi_prob_ls has the right dimensions
+    # print(avg_action_prob.shape)
+    # assert avg_action_prob.shape == (num_episodes, 4), print(
+    #     f"Shape {avg_action_prob.shape}"
+    # )
+    # assert np.all(np.sum(avg_pi_prob_ls, axis=1)) == True, 'Probabilities do not sum to one!'
+
+    fig, ax = plt.subplots(figsize=(5, 4), tight_layout=True)
+    x = np.arange(1, num_episodes + 1)
+    y = avg_action_prob
+
+    for a in range(4):
+
+        ax.plot(
+            x,
+            y[a],
+            ".-",
+        )
+
+    ax.set_xticks(
+        [1] + list(np.arange(x_ticks_estep, (num_episodes) + 1, step=x_ticks_estep))
+    )
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Probability mass", rotation=90)
+    ax.set_ylim(y_limits[0], y_limits[1])
+
+    title = "First-step action probability\n"
+    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    ax.set_title(title, pad=15)
+    # Save figure and show
+    plt.savefig(
+        save_dir + "/" + f"{env_layout}_{exp_name}_first_action_probs.pdf",
+        format="pdf",
+        dpi=200,
+        bbox_inches=None,
+    )
+    plt.show()
+    plt.close()
+
+
 def plot_action_seq(
     file_data_path,
     x_ticks_estep,
@@ -5253,6 +5335,8 @@ def plot_action_seq(
     for i, r in enumerate(run_index):
         # Data for a specific run/agent (use index according to desired run/agent)
         run_actions = action_seqs[r]
+        # print("Shape of run_actions")
+        # print(run_actions.shape)
         # Create episode index repeated for each action (x axis)
         episodes = np.repeat(np.arange(1, num_episodes + 1), policy_horizon)
         # Create time steps, e.g. 0 and 1 for each episode if policy_horizon = 2 (y axis)
