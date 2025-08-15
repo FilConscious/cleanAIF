@@ -98,6 +98,7 @@ class Agent(object):
         self.learning_D: bool = params["learn_D"]
         self.seed: int = params["seed"]
         self.task_type: str = params["task_type"]
+        self.epsilon: float = 0.001
         self.rng = np.random.default_rng(seed=self.seed)
 
         # 1. Generative Model, initializing the relevant components used in the computation
@@ -217,6 +218,7 @@ class Agent(object):
         self.policies = params.get("policies")
         self.Qpi = np.zeros((self.num_policies, self.steps))
         self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
+        self.action_probs = np.zeros((self.num_actions, self.steps))
 
         # State probabilities given a policy for every time step, the multidimensional array
         # contains self.steps distributions for each policy (i.e. policies*states*timesteps parameters).
@@ -404,6 +406,24 @@ class Agent(object):
                     logD_pi,
                 )
 
+                ### DEBUG ###
+                # if self.current_tstep == 0:
+                #     if np.array_equal(pi_actions, [0, 1, 1, 0]):
+                #         self.logB_pi = logB_pi
+                #         self.grad_F_pi = grad_F_pi
+                #         print(grad_F_pi)
+                #         self.Qs_pi_second = self.Qs_pi[pi, :, :]
+                #         print(self.Qs_pi[pi, :, :])
+                #         self.grad_log_Qs = np.log(self.Qs_pi[pi, :, :])
+                #         print(np.log(self.Qs_pi[pi, :, :]))
+                #         self.grad_Qs_logB_matmul = -np.matmul(
+                #             self.Qs_pi[pi, :, self.current_tstep + 1],
+                #             logB_pi[self.current_tstep, :, :],
+                #         )
+                #         print(self.grad_Qs_logB_matmul)
+                #         print("-------------------------------------")
+                ### END ###
+
                 # Update Q(S_t|pi), for all t in [1, T], by setting gradients to zero
                 # NOTE: the update equation below is based on the computations of Da Costa, 2020, p. 9,
                 # by setting the gradient to zero one can solve for the parameters that minimize the gradient,
@@ -417,18 +437,6 @@ class Agent(object):
                 # Storing the state beliefs at the first step of the episode
                 if self.current_tstep == 0:
                     self.Qsf_pi[pi, :, :] = self.Qs_pi[pi, :, :]
-
-                ### DEBUG ###
-                # if self.current_tstep == 0:
-                #     if np.array_equal(pi_actions, [2, 3, 3]):
-                #         if i == 6:
-                #             print(f"Perceptual Iteration {i}")
-                #             print(f"Policy {pi_actions} | st_logB_stp: {st_logB_stp}")
-                #             print("Policy Q(s|pi)")
-                #             print(self.Qs_pi[pi, :, :])
-                #             assert -st_logB_stp < 6.5, print(
-                #                 f"Expected log-likelihhod exploded. st_logB_stp = {st_logB_stp}"
-                #             )
 
                 # Compute value of policy-conditioned free energy with updated Q(S_t|pi)
                 # NOTE: at convergence this value will be the free energy minimum
@@ -460,7 +468,7 @@ class Agent(object):
                 )
 
                 # Stop at convergence or when hit the max number of iterations
-                if abs(F_pi - F_pi_old) < 0.001 or i >= self.inf_iters:
+                if abs(F_pi - F_pi_old) < self.epsilon or i >= self.inf_iters:
                     break
 
                 F_pi_old = F_pi
@@ -687,6 +695,7 @@ class Agent(object):
             (self.policies[:, self.current_tstep] == actions_matrix),
             self.Qpi[:, self.current_tstep],
         )
+        self.action_probs[:, self.current_tstep] = actions_probs
         # TODO: what if instead of taking the greedy action action we sample?
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
@@ -795,6 +804,24 @@ class Agent(object):
         # print(f"Action sequence: {self.actual_action_sequence}")
         # print("Policy independent state probabilities:")
         # print(f"{self.Qs}")
+        # W_B_a0 = 0.5 * (
+        #     1 / self.B_params[0, :, :] - 1 / np.sum(self.B_params[0, :, :], axis=0)
+        # )
+        # W_B_a1 = 0.5 * (
+        #     1 / self.B_params[1, :, :] - 1 / np.sum(self.B_params[1, :, :], axis=0)
+        # )
+        # W_B_a2 = 0.5 * (
+        #     1 / self.B_params[2, :, :] - 1 / np.sum(self.B_params[2, :, :], axis=0)
+        # )
+        # W_B_a3 = 0.5 * (
+        #     1 / self.B_params[3, :, :] - 1 / np.sum(self.B_params[3, :, :], axis=0)
+        # )
+        # print("B_params (action 0)")
+        # print(self.B_params[0])
+        # print(self.B_params[1])
+        # print(self.B_params[2])
+        # print(self.B_params[3])
+        # print(f"Action-based W_Bs used to compute B-novelty in the episode")
         #### END ####
         print("Updating Dirichlet parameters...")
         # NOTE: below we retrieve the second last Qpi because that corresponds to the last time step an
@@ -815,6 +842,17 @@ class Agent(object):
             self.learning_A,
             self.learning_B,
         )
+
+        # Rescaling B-params to avoid degenerate B-novelty values
+        # B_params_0 = np.sum(self.B_params, axis=1)
+        # B_params_0_clipped = np.clip(
+        #     B_params_0, a_min=0.1 * self.num_states, a_max=10 * self.num_states
+        # )
+        # rescale_weight = B_params_0_clipped / B_params_0
+
+        # self.B_params = (
+        #     self.B_params * rescale_weight[:, None, :]
+        # )  # rescale to keep proportions
 
         # After getting the new parameters, you need to sample from the corresponding Dirichlet distributions
         # to get new approximate posteriors P(A) and P(B). Below we distinguish between different learning
@@ -1144,6 +1182,9 @@ class LogData(object):
         self.pi_probabilities: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
         )
+        self.action_probs: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_actions, self.num_max_steps)
+        )
         """State-observation mappings (matrix A) at the end of each episode"""
         self.so_mappings: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_states, self.num_states)
@@ -1195,6 +1236,7 @@ class LogData(object):
         self.policy_state_prob_first[run, episode, :, :, :] = kwargs["Qsf_pi"]
         self.every_tstep_prob[run, episode, :, :, :, :] = kwargs["Qt_pi"]
         self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
+        self.action_probs[run, episode, :, :] = kwargs["action_probs"]
         self.so_mappings[run, episode, :, :] = kwargs["A"]
         self.transitions_prob[run, episode, :, :, :] = kwargs["B"]
 
@@ -1234,6 +1276,7 @@ class LogData(object):
         data["policy_state_prob_first"] = self.policy_state_prob_first
         data["every_tstep_prob"] = self.every_tstep_prob
         data["pi_probabilities"] = self.pi_probabilities
+        data["action_probs"] = self.action_probs
         data["so_mappings"] = self.so_mappings
         data["transition_prob"] = self.transitions_prob
         # Save data to local file
@@ -1367,7 +1410,7 @@ def main():
         "--pref_loc",
         "-pfl",
         type=str,
-        default="last",
+        default="all_goal",
         help="choices: last, all_goal, all_diff",
     )
     # Whether to use a policy prior when udapting the policies' probabilities
@@ -1573,6 +1616,19 @@ def main():
             while steps_count < NUM_STEPS:
                 # Agent returns an action based on current observation/state
                 action = agent.step(current_state)
+                ### DEBUG ###
+                # if e > 138 and steps_count == 0:
+                #     print(f"logB_pi for policy [0,1,1,0]")
+                #     print(agent.logB_pi)
+                #     print(f"FE gradient")
+                #     print(agent.grad_F_pi)
+                #     print("Q(S_0|pi) to be updated")
+                #     print(agent.Qs_pi_second)
+                #     print("Grad log Qs_pi")
+                #     print(agent.grad_log_Qs)
+                #     print("Grad Qs_pi and logB matmul")
+                #     print(agent.grad_Qs_logB_matmul)
+                ### END ###
                 # Except when at the last episode's step, the agent's action affects the environment;
                 # at the last time step the environment does not change but the agent engages in learning
                 # (parameters update)
@@ -1601,6 +1657,18 @@ def main():
                 # Update step count
                 steps_count += 1
 
+                # print("-------- DEBUGGING --------")
+                # if e > 250:
+                #     print("Expected transition log-likelihood at first step:")
+                #     print(agent.transit_loglik[:, 0])
+                #     print("Action 0")
+                #     print(agent.B[0])
+                #     print("Action 1")
+                #     print(agent.B[1])
+                #     print("Action 2")
+                #     print(agent.B[2])
+                #     print("Action 3")
+                #     print(agent.B[3])
             #### DEBUG ####
             # if e == 40:
 

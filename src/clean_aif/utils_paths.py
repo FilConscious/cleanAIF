@@ -153,22 +153,49 @@ def vfe(
             if t < (steps - 1):
                 # Retrieve action the policy dictates at t
                 action = pi_actions[t]
-                # Find columns where any entry is < 1
-                degen_cols = np.any(
-                    B_params[action] < 1, axis=0
-                )  # boolean mask, shape: (B_params.shape[1])
-                # Create an epsilon matrix of same shape as B_params
-                epsilon = np.zeros_like(B_params[action])
-                # Add 1 to every row in "degenerate" columns
-                epsilon[:, degen_cols] = 1.0
+
+                ### DEBUG ###
+                # if current_tstep == 0:
+                #     print(f"Inference Time Step {t}")
+                #     print(f"B params for action {action}")
+                #     print(B_params[action])
+
+                #     print(
+                #         f"ExplogB at: {psi(B_params[action]) - psi(
+                #     np.sum(B_params[action], axis=0))}"
+                #     )
+                # if t == 0:
+                #       if np.array_equal(pi_actions, [0, 1, 1, 0]):
+                #         # print(f"psi: {psi(B_params[action])}")
+                #         # print(f"psi sum: {psi(np.sum(B_params[action], axis=0))}")
+                #         print(f"psi - psi_sum:")
+                #         print(
+                #             psi(B_params[action])
+                #             - psi(np.sum(B_params[action], axis=0))
+                #         )
+                #         print("Clipped")
+                #         print(
+                #             np.clip(
+                #                 (
+                #                     psi(B_params[action])
+                #                     - psi(np.sum(B_params[action], axis=0))
+                #                 ),
+                #                 a_min=-5.5,
+                #                 a_max=None,
+                #             )
+                #         )
+                ### END ###
+
                 # Computing the expectation of the Dirichlet distributions using
-                # NOTE: using smoothing parameter epsilon to avoid degenerate digamma values
-                ExplogB = psi(B_params[action] + epsilon) - psi(
-                    np.sum(B_params[action] + epsilon, axis=0)
-                )
+                ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
+                # Clip expectation of Dirichlet parameters to avoid degenerate variational updates
+                # logB_pi[t, :, :] = np.clip(ExplogB, a_min=-5.5, a_max=None)
                 logB_pi[t, :, :] = ExplogB
 
                 ### DEBUG ###
+                # if current_tstep == 0:
+                #     print(f"B_params after correction: {B_params[action]}")
+                #     print(f"ExplogB at: {ExplogB}")
                 # if current_tstep == 0 and np.any(ExplogB < -20):
                 #     print(f"Inference Time Step {t}")
                 #     print(f"B params for action {action}")
@@ -200,13 +227,11 @@ def vfe(
         # of categorical distributions).
         if t != 0:
             ### DEBUG ###
-
-            exp_transit_loglik = np.dot(
-                Qs_pi[pi, :, t], np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
-            )
-            if exp_transit_loglik < -20:
-                print(f"st_logB_stp at {t}: {exp_transit_loglik}")
-
+            # exp_transit_loglik = np.dot(
+            #     Qs_pi[pi, :, t], np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
+            # )
+            # if exp_transit_loglik < -20:
+            #     print(f"st_logB_stp at {t}: {exp_transit_loglik}")
             ### END ###
             st_logB_stp += np.dot(
                 Qs_pi[pi, :, t], np.matmul(logB_pi[t - 1, :, :], Qs_pi[pi, :, t - 1])
@@ -282,15 +307,12 @@ def grad_vfe(
         # Computing the gradient w.r.t. Q(s_0|pi), i.e. the categorical over the initial state
         if t == 0:
             ##### DEBUGGING #####
-            # print(f'Current timestep: {current_tstep}')
-            # print(f'Q(S_0=10|pi=1): {Qs_pi[1, 10, t]}')
-            # print(f'Q(S_1=15|pi=1): {Qs_pi[1, 15, t+1]}')
-            # print(f'obs times logA: {np.matmul(current_obs[:,t], logA_pi)}')
-            # print(f'Qsi times logB: {np.matmul(Qs_pi[pi, :, t+1], logB_pi[t,:,:])}')
-            # print(f'logA_pi: {logA_pi[10]}')
-            # print(f'logB_pi: {logB_pi[t,15,10]}')
-            # print(f'current obs: {current_obs[10,t]}')
-            # print(f'logD_pi: {logD_pi[10]}')
+            # print(f"Gradient info at t = {current_tstep}")
+            # print("Log of Q(s|pi)")
+            # print(f"{np.log(Qs_pi[pi, :, t])}")
+            # print(f"logB_pi: {logB_pi[t,15,10]}")
+            # print(f"current obs: {current_obs[10,t]}")
+            # print(f"logD_pi: {logD_pi[10]}")
             ##### END #####
             grad_F_pi[:, t] = (
                 np.ones(num_states)
@@ -597,7 +619,7 @@ def efe(
         # got things very wrong and the KL divergence will be high.
         Qs_pi_risk = np.where(Qs_pi[pi, :, tau] == 0, np.amin(C), Qs_pi[pi, :, tau])
         # Compute RISK term in EFE
-        if pref_type == "states":
+        if pref_type == "states" or pref_type == "states_manh":
             # Computing risk based on preferred states
             slog_s_over_C = np.dot(Qs_pi_risk, np.log(Qs_pi_risk) - np.log(C[:, tau]))
         else:
@@ -635,12 +657,33 @@ def efe(
                     1 / B_params[action, :, :]
                     - 1 / np.sum(B_params[action, :, :], axis=0)
                 )
+                # W_B = np.clip(W_B, a_min=None, a_max=0.55)
                 # Computing the B-novelty term
+                # NOTE: should be tau or tau + 1?
                 AsW_Bs = np.dot(
-                    np.matmul(A, Qs_pi[pi, :, tau + 1]),
-                    np.matmul(W_B, Qs_pi[pi, :, tau + 1]),
+                    # np.matmul(A, Qs_pi[pi, :, tau + 1]),
+                    Qs_pi[pi, :, tau + 1],
+                    np.matmul(W_B, Qs_pi[pi, :, tau]),
                 )
+                ### DEBUG ###
+                if np.array_equal(pi_actions, [0, 1, 1, 0]):
+                    print("B novelty calc for pi [0, 1, 1, 0]")
+                    print(Qs_pi[pi, :, tau + 1])
+                    print(Qs_pi[pi, :, tau])
+                    print(W_B)
+                    # print("Final vectors")
+                    # print(np.matmul(A, Qs_pi[pi, :, tau + 1]))
+                    # print(np.matmul(W_B, Qs_pi[pi, :, tau]))
+                    # print("A")
+                    # print(A)
+                    print("B nov")
+                    print(AsW_Bs)
+                    print("B nov simpler")
+                    print(
+                        np.dot(Qs_pi[pi, :, tau + 1], np.matmul(W_B, Qs_pi[pi, :, tau]))
+                    )
 
+                ### END ###
             # When the EFE terms are computed at curren_tstep = 0, save all B-novelty terms for each of the
             # considered tau to see how "novel" a certain future trajectory appears
             if current_tstep == 0:
@@ -799,6 +842,17 @@ def dirichlet_update(
         # print(f"Old B params {B_params[2,:]}")
         # print(f"Dirichlet update: {Dirichlet_update_B}")
         Q_B_params = B_params + Dirichlet_update_B
+        # degen_cols = np.any(
+        #    Q_B_params < 1, axis=1
+        # )  # boolean mask, shape: (B_params.shape[1])
+        # Create an epsilon matrix of same shape as B_params
+        # epsilon = np.ones_like(Q_B_params)
+        # Add 1 to every row in "degenerate" columns
+        # for i in range(4):
+        #     epsilon[i, :, degen_cols[i]] = 1.0
+
+        # Q_B_params += epsilon
+
         # print("New B params for action 2:")
         # print(f"{B_params[2,:]}")
         # print("New B params for action 3:")
