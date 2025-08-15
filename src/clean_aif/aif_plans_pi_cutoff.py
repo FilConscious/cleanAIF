@@ -193,8 +193,13 @@ class Agent(object):
 
         elif self.learning_D == False:
 
-            self.D = np.ones(self.num_states) * 0.0001
-            self.D[self.start_state] = 1 - (0.0001 * (self.num_states - 1))
+            # Sharp prior on initial
+            self.D = np.ones(self.num_states) * 0.01
+            self.D[self.start_state] = 1 - (0.01 * (self.num_states - 1))
+
+            # Uniform prior on initial state
+            # self.D = np.ones(self.num_states) / self.num_states
+            # print(self.D)
 
         # 2. Variational Distribution, initializing the relevant components used in the computation
         # of free energy and expected free energy:
@@ -223,6 +228,7 @@ class Agent(object):
         # for the NEXT time step.
         self.Qpi = np.zeros((self.num_policies, self.steps))
         self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
+        self.action_probs = np.zeros((self.num_actions, self.steps))
 
         # Policy-independent states probability distributions, numpy array of size (num_states, timesteps).
         # NOTE: these are used in free energy minimization, they are state beliefs of the common past each
@@ -846,6 +852,7 @@ class Agent(object):
             (self.policies[:, self.current_tstep] == actions_matrix),
             self.Qpi[:, self.current_tstep],
         )
+        self.action_probs[:, self.current_tstep] = actions_probs
         print(f"Action probabilities: {actions_probs}")
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
@@ -1290,6 +1297,9 @@ class LogData(object):
         self.pi_probabilities: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
         )
+        self.action_probs: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_actions, self.num_max_steps)
+        )
         """State-observation mappings (matrix A) at the end of each episode"""
         self.so_mappings: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_states, self.num_states)
@@ -1356,6 +1366,7 @@ class LogData(object):
             "Qs_all_ps"
         ]  # at every time step
         self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
+        self.action_probs[run, episode, :, :] = kwargs["action_probs"]
         self.so_mappings[run, episode, :, :] = kwargs["A"]
         self.transitions_prob[run, episode, :, :, :] = kwargs["B"]
         self.ordered_policies[run, episode, :, :, :] = kwargs["ordered_policies"]
@@ -1396,6 +1407,7 @@ class LogData(object):
         data["policy_state_prob_first"] = self.policy_state_prob_first
         data["every_tstep_prob"] = self.every_tstep_prob
         data["pi_probabilities"] = self.pi_probabilities
+        data["action_probs"] = self.action_probs
         data["so_mappings"] = self.so_mappings
         data["transition_prob"] = self.transitions_prob
         data["ordered_policies"] = self.ordered_policies
@@ -1520,7 +1532,7 @@ def main():
         "-pft",
         type=str,
         default="states",
-        help="choices: states, obs",
+        help="choices: states, statesmanh, obs",
     )
     # Whether to use a policy prior when udapting the policies' probabilities
     parser.add_argument("--policy_prior", "-ppr", action="store_true")
