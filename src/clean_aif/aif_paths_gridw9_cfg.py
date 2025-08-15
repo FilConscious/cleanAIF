@@ -56,9 +56,9 @@ class Args:
         )
     )
     """ preference prior type """
-    pref_type: str = "states_manh"
+    pref_type: str = "states"
     """ time step(s) on which the preference prior is placed """
-    pref_loc: str = "all_goal"  # "last", all_goal", "all_diff"
+    pref_loc: str = "all_diff"  # "last", all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
@@ -243,11 +243,11 @@ class Args:
                 # IMPORTANT: the probabilities below need to be set MANUALLY depending on the environment
                 # in which the agent acts and based on the trajectory we want it to follow.
 
-                # Example: trajectory in a T-maze leading to the goal (on the left arm) in 3 steps
-                pref_array[0, 3] = 0.9
-                pref_array[3, 2] = 0.9
-                pref_array[6, 1] = 0.9
-                print(pref_array)
+                # Fix a trajectory of intermediate goals leading to the goal in 5 steps (soft preferences)
+                inter_goals = [0, 1, 4, 7, 8]
+                for t in range(Args.num_steps):
+                    g = inter_goals[t]
+                    pref_array[g, t] = 0.9
 
             # Checking all the probabilities sum to one
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
