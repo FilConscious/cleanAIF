@@ -240,26 +240,36 @@ class Args:
                 print("Setting agent's preferences...")
                 # (3) Define agent's preferences for each time step (i.e. a different goal for each step time)
                 pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
+
                 # IMPORTANT: the probabilities below need to be set MANUALLY depending on the environment
                 # in which the agent acts and based on the trajectory we want it to follow.
-
-                # Fix a trajectory of intermediate goals leading to the goal in 5 steps (soft preferences)
+                # Fix a trajectory of intermediate goals leading to the goal in 5 steps
                 inter_goals = [0, 1, 4, 7, 8]
                 for t in range(Args.num_steps):
                     g = inter_goals[t]
                     pref_array[g, t] = 0.9
 
-            # Checking all the probabilities sum to one
-            assert np.all(np.sum(pref_array, axis=0)) == 1, print(
-                "The preferences do not sum to one!"
-            )
-
         elif pref_type == "states_manh":
-            # NOTE: this assumes that the agent wants to reach a single goal so we take the first element of
-            # the tuple goal_state
-            prefs = Args.goal_distribution_manh(num_states, goal_state[0])
-            # print(prefs.shape)
-            pref_array[:, :] = prefs
+
+            if pref_loc == "all_goal":
+                print("Setting agent's preferences...")
+                # NOTE: this assumes that the agent wants to reach a single goal so we take the first element of
+                # the tuple goal_state
+                prefs = Args.goal_distribution_manh(num_states, goal_state[0])
+                # print(prefs.shape)
+                pref_array[:, :] = prefs
+                print(pref_array)
+
+            elif pref_loc == "all_diff":
+                print("Setting agent's preferences...")
+                # Fix a trajectory of intermediate goals leading to the goal in 5 steps
+                inter_goals = [0, 1, 4, 7, 8]
+                for t in range(Args.num_steps):
+                    g = inter_goals[t]
+                    prefs = Args.goal_distribution_manh(num_states, g)
+                    pref_array[:, t] = prefs
+
+                print(pref_array)
 
         elif pref_type == "obs":
             # NOTE 1: we are assuming a 1-to-1 correspondence between states and observations, i.e. obs `1`
@@ -276,6 +286,11 @@ class Args:
             assert np.all(np.sum(pref_array, axis=0)) == 1, print(
                 "The preferences do not sum to one!"
             )
+
+        # Checking all the probabilities sum to one
+        assert np.all(np.sum(pref_array, axis=0)) == 1, print(
+            "The preferences do not sum to one!"
+        )
 
         return pref_array
 

@@ -844,15 +844,15 @@ class Agent(object):
         )
 
         # Rescaling B-params to avoid degenerate B-novelty values
-        # B_params_0 = np.sum(self.B_params, axis=1)
-        # B_params_0_clipped = np.clip(
-        #     B_params_0, a_min=0.1 * self.num_states, a_max=10 * self.num_states
-        # )
-        # rescale_weight = B_params_0_clipped / B_params_0
+        B_params_0 = np.sum(self.B_params, axis=1)
+        B_params_0_clipped = np.clip(
+            B_params_0, a_min=0.1 * self.num_states, a_max=10 * self.num_states
+        )
+        rescale_weight = B_params_0_clipped / B_params_0
 
-        # self.B_params = (
-        #     self.B_params * rescale_weight[:, None, :]
-        # )  # rescale to keep proportions
+        self.B_params = (
+            self.B_params * rescale_weight[:, None, :]
+        )  # rescale to keep proportions
 
         # After getting the new parameters, you need to sample from the corresponding Dirichlet distributions
         # to get new approximate posteriors P(A) and P(B). Below we distinguish between different learning

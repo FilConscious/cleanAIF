@@ -189,7 +189,7 @@ def vfe(
                 # Computing the expectation of the Dirichlet distributions using
                 ExplogB = psi(B_params[action]) - psi(np.sum(B_params[action], axis=0))
                 # Clip expectation of Dirichlet parameters to avoid degenerate variational updates
-                # logB_pi[t, :, :] = np.clip(ExplogB, a_min=-5.5, a_max=None)
+                logB_pi[t, :, :] = np.clip(ExplogB, a_min=-5.5, a_max=None)
                 logB_pi[t, :, :] = ExplogB
 
                 ### DEBUG ###
@@ -666,23 +666,22 @@ def efe(
                     np.matmul(W_B, Qs_pi[pi, :, tau]),
                 )
                 ### DEBUG ###
-                if np.array_equal(pi_actions, [0, 1, 1, 0]):
-                    print("B novelty calc for pi [0, 1, 1, 0]")
-                    print(Qs_pi[pi, :, tau + 1])
-                    print(Qs_pi[pi, :, tau])
-                    print(W_B)
-                    # print("Final vectors")
-                    # print(np.matmul(A, Qs_pi[pi, :, tau + 1]))
-                    # print(np.matmul(W_B, Qs_pi[pi, :, tau]))
-                    # print("A")
-                    # print(A)
-                    print("B nov")
-                    print(AsW_Bs)
-                    print("B nov simpler")
-                    print(
-                        np.dot(Qs_pi[pi, :, tau + 1], np.matmul(W_B, Qs_pi[pi, :, tau]))
-                    )
-
+                # if np.array_equal(pi_actions, [0, 1, 1, 0]):
+                # print("B novelty calc for pi [0, 1, 1, 0]")
+                # print(Qs_pi[pi, :, tau + 1])
+                # print(Qs_pi[pi, :, tau])
+                # print(W_B)
+                # print("Final vectors")
+                # print(np.matmul(A, Qs_pi[pi, :, tau + 1]))
+                # print(np.matmul(W_B, Qs_pi[pi, :, tau]))
+                # print("A")
+                # print(A)
+                # print("B nov")
+                # print(AsW_Bs)
+                # print("B nov simpler")
+                # print(
+                #     np.dot(Qs_pi[pi, :, tau + 1], np.matmul(W_B, Qs_pi[pi, :, tau]))
+                # )
                 ### END ###
             # When the EFE terms are computed at curren_tstep = 0, save all B-novelty terms for each of the
             # considered tau to see how "novel" a certain future trajectory appears

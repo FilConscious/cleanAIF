@@ -693,6 +693,9 @@ def efe(
     # Loop over the time steps in which EFE is computed
     # NOTE: if t is the present time step and EFE is computed for 4 steps, then it is computed at
     # t, t+1, t+2, and t+3.
+    # NOTE: If current_tstep = 0, we compute the B-novelty term from the future t = 1 onwards. To do that we
+    # need Q(S_t|pi) with t>=1. However, Qs_pi below has shape (pi,states,efe_steps), meaning that (pi, states,0)
+    # refers to the belief for the future time step t=1. Therefore, we need to slice it using tau - 1.
     for tau in range(current_tstep + 1, last_step):
         # Compute AMBIGUITY term in EFE
         Hs = np.dot(H, Qs_pi[pi, :, tau - 1])
@@ -756,8 +759,9 @@ def efe(
                 )
                 # Computing the B-novelty term
                 AsW_Bs = np.dot(
-                    np.matmul(A, Qs_pi[pi, :, tau]),
-                    np.matmul(W_B, Qs_pi[pi, :, tau]),
+                    # np.matmul(A, Qs_pi[pi, :, tau]),
+                    Qs_pi[pi, :, tau],
+                    np.matmul(W_B, Qs_pi[pi, :, tau - 1]),
                 )
 
             # Save B-novelty component computed at tau (to have the full sequence of B-novelties

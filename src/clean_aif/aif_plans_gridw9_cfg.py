@@ -54,7 +54,7 @@ class Args:
         default_factory=lambda: Args.init_policies(Args.plan_horizon)
     )
     """ preferences type """
-    pref_type: str = "states_manh"
+    pref_type: str = "states"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
