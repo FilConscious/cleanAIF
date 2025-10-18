@@ -40,6 +40,7 @@ actions_map = {
     3: "$\\uparrow$",
 }
 
+# Used in latest experiments for new paper testing prior preferences
 POLICIES_TO_VIS_GRIDW9 = np.array(
     [
         [0, 0, 1, 1],
@@ -61,7 +62,30 @@ POLICIES_TO_VIS_GRIDW9 = np.array(
     ]
 )
 
+# Used for submission to arxiv (action-unaware paper)
+# POLICIES_TO_VIS_GRIDW9 = np.array(
+#     [
+#         [0, 0, 1, 1],
+#         [1, 1, 0, 0],
+#         [0, 1, 0, 1],
+#         [0, 1, 1, 0],
+#         [1, 0, 1, 0],
+#         [1, 0, 0, 1],
+#         [0, 1, 2, 1],
+#         [1, 1, 0, 3],
+#         [1, 0, 0, 3],
+#         [1, 0, 3, 2],
+#         [0, 1, 1, 3],
+#         [0, 2, 0, 0],
+#         [0, 2, 1, 1],
+#         [2, 3, 1, 0],
+#         [0, 1, 3, 3],
+#         [1, 2, 3, 3],
+#     ]
+# )
+
 # POLICIES_TO_VIS_TMAZE4 = np.array(
+# POLICIES_TO_VIS_GRIDW9 = np.array(
 #     [
 #         [2, 3, 3],
 #         [3, 3, 1],
@@ -131,7 +155,18 @@ def plot_avg_good_agents(file_data_path, x_ticks_estep, save_dir, env_layout):
     # plt.legend(loc="upper right") # not needed for single line
     # Title
     title = "Agents solving the task\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     plt.title(title, pad=15)
 
     # Add a customized grid
@@ -404,7 +439,18 @@ def plot_pi_fes(
         step_num = f"{num_steps}"
 
     title = f"Policy-conditioned free energy at step {step_num}\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -592,7 +638,19 @@ def plot_pi_state_logprob(
         step_num = f"{num_steps}"
 
     title = f"Expected state log-probability at step {step_num}\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -782,7 +840,19 @@ def plot_pi_state_logprob_first(
         step_num = f"{num_steps}"
 
     title = f"Expected state log-probability at step {step_num} for the initial state\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -972,7 +1042,19 @@ def plot_pi_obs_loglik(
         step_num = f"{num_steps}"
 
     title = f"Expected observation log-likelihood at step {step_num}\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -1162,7 +1244,18 @@ def plot_pi_transit_loglik(
         step_num = f"{num_steps}"
 
     title = f"Expected transition log-likelihood at step {step_num}\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
 
     fig.savefig(
@@ -1341,14 +1434,40 @@ def plot_pi_fes_subplots(
         ax[num_data].set_ylim(y_limits[0], y_limits[1])
         step_num = f"{step_fe_pi + 1}"
 
-        if "paths" in exp_name:
+        if "hardgs" in exp_name:
+            stitle = "(hard with goal shaping)"
             ax[num_data].set_title(
-                f"Policy-conditioned free energy at step {step_num} (action-unaware)\n"
+                f"Policy-conditioned free energy at step {step_num} \n" + stitle
             )
-        elif "plans" in exp_name:
+        elif "softgs" in exp_name:
+            stitle = "(soft with goal shaping)"
             ax[num_data].set_title(
-                f"Policy-conditioned free energy at step {step_num} (action-aware)\n"
+                f"Policy-conditioned free energy at step {step_num} \n" + stitle
             )
+        elif "hard" in exp_name:
+            stitle = "(hard without goal shaping)"
+            ax[num_data].set_title(
+                f"Policy-conditioned free energy at step {step_num} \n" + stitle
+            )
+        elif "soft" in exp_name:
+            stitle = "(soft without goal shaping)"
+            ax[num_data].set_title(
+                f"Policy-conditioned free energy at step {step_num} \n" + stitle
+            )
+        else:
+            stitle = "(preferences)"
+            ax[num_data].set_title(
+                f"Policy-conditioned free energy at step {step_num} \n" + stitle
+            )
+
+        # if "paths" in exp_name:
+        #     ax[num_data].set_title(
+        #         f"Policy-conditioned free energy at step {step_num} (action-unaware)\n"
+        #     )
+        # elif "plans" in exp_name:
+        #     ax[num_data].set_title(
+        #         f"Policy-conditioned free energy at step {step_num} (action-aware)\n"
+        #     )
 
     # Padding
     plt.subplots_adjust(wspace=0.3)
@@ -1689,7 +1808,18 @@ def plot_efe(
     if select_step == None:
         x_label = "Step"
         title = "Expected free energy at every step\n"
-        title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+        # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+        if "hardgs" in exp_name:
+            title += "(hard with goal shaping)"
+        elif "softgs" in exp_name:
+            title += "(soft with goal shaping)"
+        elif "hard" in exp_name:
+            title += "(hard without goal shaping)"
+        elif "soft" in exp_name:
+            title += "(soft without goal shaping)"
+        else:
+            title += "(preferences)"
+
         # Plotting all the time steps across episodes
         for p in range(num_policies):
             x = np.arange(num_episodes * num_steps)
@@ -1701,7 +1831,17 @@ def plot_efe(
     else:
         x_label = "Episode"
         title = f"Expected free energy at step {select_step + 1}\n"
-        title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+        # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+        if "hardgs" in exp_name:
+            title += "(hard with goal shaping)"
+        elif "softgs" in exp_name:
+            title += "(soft with goal shaping)"
+        elif "hard" in exp_name:
+            title += "(hard without goal shaping)"
+        elif "soft" in exp_name:
+            title += "(soft without goal shaping)"
+        else:
+            title += "(preferences)"
 
         if len(policies_to_vis) == 0:
             # Plotting EFE at single time step for each episode
@@ -2097,7 +2237,18 @@ def plot_efe_risk(
     axes_1.set_ylabel("Risk", rotation=90)
     axes_1.set_ylim(y_lims[0], y_lims[1])
 
-    title_label += " (action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title_label += " (action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title_label += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title_label += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title_label += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title_label += "(soft without goal shaping)"
+    else:
+        title_label += "(preferences)"
+
     axes_1.set_title(f"Risk at {title_label}", pad=15)
     # Save figures
     fig_1.savefig(
@@ -2276,7 +2427,18 @@ def plot_efe_bnov(
     axes_2.set_ylabel("B-novelty", rotation=90)
     axes_2.set_ylim(y_lims[0], y_lims[1])
 
-    title_label += " (action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title_label += " (action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title_label += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title_label += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title_label += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title_label += "(soft without goal shaping)"
+    else:
+        title_label += "(preferences)"
+
     axes_2.set_title(f"B-novelty at {title_label}", pad=15)
     # Save figure
     fig_2.savefig(
@@ -3593,7 +3755,18 @@ def plot_pi_prob_first(
     ax.set_ylim(y_limits[0], y_limits[1])
 
     title = "First-step policy probability\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
     # Save figure and show
     plt.savefig(
@@ -4778,10 +4951,23 @@ def plot_matrix_B_kl(
 
     # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
     # title += "\n(action-unaware)" if "paths" in exp_name else " (action-aware)"
-    title = (
-        f"Sum of KL divergences for each action\n"
-        f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
-    )
+    if "hardgs" in exp_name:
+        stitle = "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        stitle = "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        stitle = "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        stitle = "(soft without goal shaping)"
+    else:
+        stitle = "(preferences)"
+
+    title = f"Sum of KL divergences for each action\n" f"{stitle}"
+
+    # title = (
+    #     f"Sum of KL divergences for each action\n"
+    #     f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
+    # )
     ax1.set_title(title, pad=15)
 
     # Create a separate figure for the legend
@@ -5000,10 +5186,27 @@ def plot_matrix_B(
 
         # title = f"Transition Probabilities from State {s + 1} for Action {actions_map[a]}"
         # title += "\n(action-unaware)" if "paths" in exp_name else " (action-aware)"
+        if "hardgs" in exp_name:
+            stitle = "(hard with goal shaping)"
+        elif "soft" in exp_name:
+            stitle = "(soft without goal shaping)"
+        elif "hard2" in exp_name:
+            stitle = "(sparse with hard goal)"
+        elif "hard" in exp_name:
+            stitle = "(hard without goal shaping)"
+        else:
+            stitle = "(preferences)"
+
         title = (
             f"Transition probabilities from state {s + 1} for action {actions_map[a]}\n"
-            f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
+            f"{stitle}"
         )
+
+        # title = (
+        #     f"Transition probabilities from state {s + 1} for action {actions_map[a]}\n"
+        #     f"{'(action-unaware)' if 'paths' in exp_name else '(action-aware)'}"
+        # )
+
         ax1.set_title(title, pad=15)
 
         # Create a separate figure for the legend
@@ -5212,7 +5415,18 @@ def plot_state_visits(file_path, v_len, h_len, select_policy, save_dir, env_layo
     cbar.ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
 
     title = "State-access frequency\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
 
     # Save figure and show
@@ -5297,12 +5511,23 @@ def plot_action_probs(
     ax.set_ylabel("Probability mass", rotation=90)
     ax.set_ylim(y_limits[0], y_limits[1])
 
-    title = "First-step action probability\n"
-    title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    title = f"Action probabilities at step {step+1}\n"
+    # title += "(action-unaware)" if "paths" in exp_name else " (action-aware)"
+    if "hardgs" in exp_name:
+        title += "(hard with goal shaping)"
+    elif "softgs" in exp_name:
+        title += "(soft with goal shaping)"
+    elif "hard" in exp_name:
+        title += "(hard without goal shaping)"
+    elif "soft" in exp_name:
+        title += "(soft without goal shaping)"
+    else:
+        title += "(preferences)"
+
     ax.set_title(title, pad=15)
     # Save figure and show
     plt.savefig(
-        save_dir + "/" + f"{env_layout}_{exp_name}_first_action_probs.pdf",
+        save_dir + "/" + f"{env_layout}_{exp_name}_s{step+1}_action_probs.pdf",
         format="pdf",
         dpi=200,
         bbox_inches=None,
