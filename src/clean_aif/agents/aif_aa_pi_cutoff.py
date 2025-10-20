@@ -24,8 +24,8 @@ from pathlib import Path
 import time
 
 # Custom imports
-from .config import LOG_DIR
-from .utils_plans_cutoff import *
+from ..config import LOG_DIR
+from ..utils_agents.utils_aa_cutoff import *
 
 # Set the print options for NumPy
 np.set_printoptions(precision=3, suppress=True)
@@ -1579,7 +1579,7 @@ def main():
     ##############################
 
     # Importing config module dynamically based on env layout
-    module_name = f'.aif_plans_{cl_params["env_layout"]}_cfg'
+    module_name = f'..config_agents.aif_aa_{cl_params["env_layout"]}_cfg'
     agent_config = importlib.import_module(module_name, package=__package__)
     Args = agent_config.Args
     # Create dataclass with default parameters configuration for the agent

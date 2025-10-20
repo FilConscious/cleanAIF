@@ -23,8 +23,8 @@ from scipy import special
 from pathlib import Path
 
 # Custom imports
-from .config import LOG_DIR
-from .utils_paths import *
+from ..config import LOG_DIR
+from ..utils_agents.utils_au import *
 
 
 class params(TypedDict):
@@ -1298,7 +1298,7 @@ def main():
         "--exp_name",
         "-expn",
         type=str,
-        default="aif-paths",
+        default="aif_au",
         help="the name of this experiment based on the active inference implementation",
     )
     parser.add_argument(
@@ -1456,7 +1456,7 @@ def main():
     ##############################
 
     # Importing config module dynamically based on env layout
-    module_name = f'.aif_paths_{cl_params["env_layout"]}_cfg'
+    module_name = f'..config_agents.aif_au_{cl_params["env_layout"]}_cfg'
     agent_config = importlib.import_module(module_name, package=__package__)
     Args = agent_config.Args
     # Create dataclass with default parameters configuration for the agent

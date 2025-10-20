@@ -17,8 +17,8 @@ class Args:
     """
 
     ### General ###
-    """the name of this experiment"""
-    exp_name: str = os.path.basename(__file__)[: -len(".py")]
+    """the name of this experiment: either 'aif_au_gridw9' or 'aif_aa_gridw9'"""
+    exp_name: str = "aif_au_gridw9"
     ### Environment ###
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
@@ -58,7 +58,7 @@ class Args:
     """ preference prior type """
     pref_type: str = "states"
     """ time step(s) on which the preference prior is placed """
-    pref_loc: str = "all_diff"  # "last", all_goal", "all_diff"
+    pref_loc: str = "all_goal"  # "last", all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
@@ -84,24 +84,9 @@ class Args:
         default_factory=lambda: Args.init_A_params(Args.num_states)
     )
 
-    # @staticmethod
-    # def init_policies() -> np.ndarray:
-    #     """
-    #     Method to specify the agent's policies for the duration of an episode; the agent is given some
-    #     "motor plans" (sequences of actions) to try out and perform during an episode. Note: policies
-    #     are usually hard coded in the discrete active inference literature (but also see recent
-    #     implementations: pymdp).
-    #     """
-
-    #     # Policies to move in Gridworld-v1
-    #     # NOTE: 0: "right", 1: "up", 2: "left", 3: "down"
-    #     policies = np.array([[1, 1, 0, 2], [0, 0, 1, 1]])
-
-    #    return policies
-
     @staticmethod
     def init_policies(
-        num_policies: int, policy_len: int, num_actions: int
+        num_policies: int, policy_len: int, num_actions: int, exp_name: str
     ) -> np.ndarray:
         """Function to create and select the policies the agent will use to plan and pick an action at
         one step in the interaction with the environment.
@@ -120,37 +105,43 @@ class Args:
         - policy_array: array of shape (num_policies, policy_len), all the policies stored as rows
         """
 
-        if num_policies == 1:
+        if exp_name == "aif_au_gridw9":
 
-            sel_policies = np.array([[3, 3, 2]])
+            if num_policies == 1:
 
-        elif num_policies == 2:
+                sel_policies = np.array([[3, 3, 2]])
 
-            sel_policies = np.array([[3, 3, 2], [0, 3, 1]])
+            elif num_policies == 2:
 
-        else:
-            # Init RNG for shuffling list of policies below
-            rng = np.random.default_rng()
-            # Set of actions
-            actions = np.arange(num_actions, dtype=np.int64)
-            # Create all the policies
-            policies_list = [p for p in product(actions, repeat=policy_len)]
-            # Convert list into array
-            policies_array = np.array(policies_list, dtype=np.int64)
-            # Number of all the sequences
-            num_all_pol = num_actions**policy_len
-            # All the row indices of policies_array
-            indices = np.arange(num_all_pol)
-            # Shuffle the indices
-            rng.shuffle(indices)
-            # Randomly select num_policies from the array with all the policies
-            # NOTE 1: if num_policies equals the number of all sequences, the end result is just
-            # policies_array with its rows shuffled
-            # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
-            # the selected policies may not include the optimal policy in this implementation
-            sel_policies = policies_array[indices[:num_policies], :]
-            # print("Policies")
-            # print(sel_policies)
+                sel_policies = np.array([[3, 3, 2], [0, 3, 1]])
+
+            else:
+                # Init RNG for shuffling list of policies below
+                rng = np.random.default_rng()
+                # Set of actions
+                actions = np.arange(num_actions, dtype=np.int64)
+                # Create all the policies
+                policies_list = [p for p in product(actions, repeat=policy_len)]
+                # Convert list into array
+                policies_array = np.array(policies_list, dtype=np.int64)
+                # Number of all the sequences
+                num_all_pol = num_actions**policy_len
+                # All the row indices of policies_array
+                indices = np.arange(num_all_pol)
+                # Shuffle the indices
+                rng.shuffle(indices)
+                # Randomly select num_policies from the array with all the policies
+                # NOTE 1: if num_policies equals the number of all sequences, the end result is just
+                # policies_array with its rows shuffled
+                # NOTE 2 (!!!ATTENTION!!!): if num_policies is NOT equal to the number of all sequencies,
+                # the selected policies may not include the optimal policy in this implementation
+                sel_policies = policies_array[indices[:num_policies], :]
+                # print("Policies")
+                # print(sel_policies)
+
+        elif exp_name == "aif_aa_gridw9":
+            # Array to store policies crated at the planning stage
+            sel_policies = np.empty((0, policy_len))
 
         return sel_policies
 
@@ -181,6 +172,7 @@ class Args:
         num_states: int,
         steps: int,
         goal_state: tuple,
+        exp_name: str,
         pref_type: str = "states",
         pref_loc: str = "last",
     ) -> np.ndarray:
@@ -267,7 +259,7 @@ class Args:
                 for t in range(Args.num_steps):
                     g = inter_goals[t]
                     prefs = Args.goal_distribution_manh(num_states, g)
-                    pref_array[:, t] = prefs
+                    pref_array[:, t] = prefs.squeeze()
 
                 print(pref_array)
 
@@ -292,10 +284,14 @@ class Args:
             "The preferences do not sum to one!"
         )
 
+        if exp_name == "aif_aa_gridw9":
+            # Goal shaping is not implemented for action-aware agents so we select a single preference vector
+            pref_array = pref_array[:, -1]
+
         return pref_array
 
     @staticmethod
-    def init_B_params(num_states: int, num_actions: int, env_layout: str) -> np.ndarray:
+    def init_B_params(num_states: int, num_actions: int) -> np.ndarray:
         """
         Initialize the Dirichlet parameters that specify the transition probabilities of the environment,
         stored and denoted by B matrices in the active inference literature, when the agent does not have to
@@ -311,213 +307,53 @@ class Args:
 
         """
 
+        # Init B_params matrix
         B_params = np.zeros((num_actions, num_states, num_states))
+        # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
+        n = int(np.sqrt(num_states))
+        env_matrix_labels = np.reshape(np.arange(num_states), (n, n))
 
-        # Assigning 1s to correct transitions for every action.
-        if env_layout == "tmaze3":
-            # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze3'
-            # only transitions to accessible states are considered/modelled
+        # Loop over the 3 rows of the maze (indexed from 0 to 2) to assign 1s to the correct transitions.
+        # IMPORTANT: The code below works for a maze of size (3, 3)
+        for r in range(3):
 
-            # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
-            # Gymnasium grid coordinate system the negative and positive y axes are swapped
-            # Down action: 3
-            B_params[3, :, :] = np.array(
-                [
-                    [1, 0, 0, 0],
-                    [0, 1, 0, 1],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 0],
-                ],
-                dtype=np.float64,
-            )
-            # Left action: 2
-            B_params[2, :, :] = np.array(
-                [
-                    [1, 1, 0, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 1],
-                ],
-                dtype=np.float64,
-            )
-            # Up action: 1
-            B_params[1, :, :] = np.array(
-                [
-                    [1, 0, 1, 1],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 1, 0, 0],
-                ],
-                dtype=np.float64,
-            )
-            # Right action: 0
-            B_params[0, :, :] = np.array(
-                [
-                    [0, 0, 0, 0],
-                    [1, 0, 0, 0],
-                    [0, 1, 1, 0],
-                    [0, 0, 0, 1],
-                ],
-                dtype=np.float64,
-            )
+            labels_ud = env_matrix_labels[r]
+            labels_rl = env_matrix_labels[:, r]
 
-        # Assigning 1s to correct transitions for every action.
-        elif env_layout == "tmaze4":
-            # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
-            # only transitions to accessible states are considered/modelled
+            if r == 0:
+                # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
+                # Gymnasium grid coordinate system the negative and positive y axes are swapped
+                # Down action: 3
+                B_params[3, labels_ud, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud + 3, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl + 1, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl, labels_rl] = 1
 
-            # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
-            # Gymnasium grid coordinate system the negative and positive y axes are swapped
-            # Down action: 3
-            B_params[3, :, :] = np.array(
-                [
-                    [1, 0, 0, 0, 0],
-                    [0, 1, 0, 1, 0],
-                    [0, 0, 1, 0, 0],
-                    [0, 0, 0, 0, 1],
-                    [0, 0, 0, 0, 0],
-                ],
-                dtype=np.float64,
-            )
-            # Left action: 2
-            B_params[2, :, :] = np.array(
-                [
-                    [1, 1, 0, 0, 0],
-                    [0, 0, 1, 0, 0],
-                    [0, 0, 0, 0, 0],
-                    [0, 0, 0, 1, 0],
-                    [0, 0, 0, 0, 1],
-                ],
-                dtype=np.float64,
-            )
-            # Up action: 1
-            B_params[1, :, :] = np.array(
-                [
-                    [1, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0],
-                    [0, 0, 1, 0, 0],
-                    [0, 1, 0, 0, 0],
-                    [0, 0, 0, 1, 1],
-                ],
-                dtype=np.float64,
-            )
-            # Right action: 0
-            B_params[0, :, :] = np.array(
-                [
-                    [0, 0, 0, 0, 0],
-                    [1, 0, 0, 0, 0],
-                    [0, 1, 1, 0, 0],
-                    [0, 0, 0, 1, 0],
-                    [0, 0, 0, 0, 1],
-                ],
-                dtype=np.float64,
-            )
-
-        # Assigning 1s to correct transitions for every action.
-        elif env_layout == "ymaze4":
-            # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'Tmaze4'
-            # only transitions to accessible states are considered/modelled
-
-            # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
-            # Gymnasium grid coordinate system the negative and positive y axes are swapped
-            # Down action: 3
-            B_params[3, :, :] = np.array(
-                [
-                    [1, 0, 1, 0, 0, 0],
-                    [0, 1, 0, 0, 1, 0],
-                    [0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 1, 0, 1],
-                    [0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0],
-                ],
-                dtype=np.float64,
-            )
-            # Left action: 2
-            B_params[2, :, :] = np.array(
-                [
-                    [1, 0, 0, 0, 0, 0],
-                    [0, 1, 0, 0, 0, 0],
-                    [0, 0, 1, 1, 0, 0],
-                    [0, 0, 0, 0, 1, 0],
-                    [0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 1],
-                ],
-                dtype=np.float64,
-            )
-            # Up action: 1
-            B_params[1, :, :] = np.array(
-                [
-                    [0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0],
-                    [1, 0, 1, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0],
-                    [0, 1, 0, 0, 1, 0],
-                    [0, 0, 0, 1, 0, 1],
-                ],
-                dtype=np.float64,
-            )
-            # Right action: 0
-            B_params[0, :, :] = np.array(
-                [
-                    [1, 0, 0, 0, 0, 0],
-                    [0, 1, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0],
-                    [0, 0, 1, 0, 0, 0],
-                    [0, 0, 0, 1, 1, 0],
-                    [0, 0, 0, 0, 0, 1],
-                ],
-                dtype=np.float64,
-            )
-
-        elif env_layout == "gridw9":
-            # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
-            n = int(np.sqrt(num_states))
-            env_matrix_labels = np.reshape(np.arange(num_states), (n, n))
-            # IMPORTANT: The code below works for a maze of size (3, 3); with flag env_layout = 'TmazeXall'
-            # all transitions are considered/modelled, also towards not accessible states (walls)
-            # TODO: Implement an automatic way to load these B-matrices depending on layout
-            # We are looping over the 3 rows of the maze (indexed from 0 to 2)
-            # and assigning 1s to the correct transitions.
-            for r in range(3):
-
-                labels_ud = env_matrix_labels[r]
-                labels_rl = env_matrix_labels[:, r]
-
-                if r == 0:
-                    # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
-                    # Gymnasium grid coordinate system the negative and positive y axes are swapped
-                    # Down action: 3
-                    B_params[3, labels_ud, labels_ud] = 1
-                    # Up action: 1
-                    B_params[1, labels_ud + 3, labels_ud] = 1
-                    # Right action: 0
-                    B_params[0, labels_rl + 1, labels_rl] = 1
-                    # Left action: 2
-                    B_params[2, labels_rl, labels_rl] = 1
-
-                elif r == 1:
-                    # Down action: 3
-                    B_params[3, labels_ud - 3, labels_ud] = 1
-                    # Up action: 1
-                    B_params[1, labels_ud + 3, labels_ud] = 1
-                    # Right action: 0
-                    B_params[0, labels_rl + 1, labels_rl] = 1
-                    # Left action: 2
-                    B_params[2, labels_rl - 1, labels_rl] = 1
-                elif r == 2:
-                    # Down action: 3
-                    B_params[3, labels_ud - 3, labels_ud] = 1
-                    # Up action: 1
-                    B_params[1, labels_ud, labels_ud] = 1
-                    # Right action: 0
-                    B_params[0, labels_rl, labels_rl] = 1
-                    # Left action: 2
-                    B_params[2, labels_rl - 1, labels_rl] = 1
+            elif r == 1:
+                # Down action: 3
+                B_params[3, labels_ud - 3, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud + 3, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl + 1, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl - 1, labels_rl] = 1
+            elif r == 2:
+                # Down action: 3
+                B_params[3, labels_ud - 3, labels_ud] = 1
+                # Up action: 1
+                B_params[1, labels_ud, labels_ud] = 1
+                # Right action: 0
+                B_params[0, labels_rl, labels_rl] = 1
+                # Left action: 2
+                B_params[2, labels_rl - 1, labels_rl] = 1
 
         # Increasing the magnitude of the Dirichlet parameters so that when the B matrices are sampled
         # the correct transitions for every action will have a value close to 1.
         B_params = B_params * 199 + 1
-        print(B_params[0])
 
         return B_params
 
