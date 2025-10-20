@@ -947,13 +947,16 @@ class Agent(object):
             self.learning_B,
         )
 
-        print(f"Qs size: {self.Qs.shape}")
-        print("Agent beliefs:")
-        print(np.argmax(self.Qs, axis=0))
-        # print(self.Qs)
-        print("Actual observations:")
-        print(np.argmax(self.current_obs, axis=0))
-        # print(self.current_obs)
+        # Rescaling B-params to avoid degenerate B-novelty values
+        B_params_0 = np.sum(self.B_params, axis=1)
+        B_params_0_clipped = np.clip(
+            B_params_0, a_min=0.1 * self.num_states, a_max=10 * self.num_states
+        )
+        rescale_weight = B_params_0_clipped / B_params_0
+
+        self.B_params = (
+            self.B_params * rescale_weight[:, None, :]
+        )  # rescale to keep proportions
 
         # After getting the new parameters, you need to sample from the corresponding Dirichlet distributions
         # to get new approximate posteriors P(A) and P(B). Below we distinguish between different learning
@@ -1150,6 +1153,7 @@ class LogData(object):
 
     def __init__(self, params: params) -> None:
         ### Retrieve relevant experiment/agent parameters ###
+        self.exp_name: str = params.get("exp_name")
         self.num_runs: int = params.get("num_runs")
         self.num_episodes: int = params.get("num_episodes")
         self.num_states: int = params.get("num_states")

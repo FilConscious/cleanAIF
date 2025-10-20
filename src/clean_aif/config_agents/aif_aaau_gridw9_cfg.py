@@ -18,7 +18,7 @@ class Args:
 
     ### General ###
     """the name of this experiment: either 'aif_au_gridw9' or 'aif_aa_gridw9'"""
-    exp_name: str = "aif_au_gridw9"
+    exp_name: str = "aif_aa_gridw9"
     ### Environment ###
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
@@ -52,7 +52,7 @@ class Args:
     """ hard-coded agent's policies """
     policies: np.ndarray = field(
         default_factory=lambda: Args.init_policies(
-            Args.num_policies, Args.plan_horizon, Args.num_actions
+            Args.num_policies, Args.plan_horizon, Args.num_actions, Args.exp_name
         )
     )
     """ preference prior type """
@@ -69,15 +69,14 @@ class Args:
             Args.num_states,
             Args.num_steps,
             Args.goal_state,
+            Args.exp_name,
             Args.pref_type,
             Args.pref_loc,
         )
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
     B_params: np.ndarray = field(
-        default_factory=lambda: Args.init_B_params(
-            Args.num_states, Args.num_actions, Args.env_layout
-        )
+        default_factory=lambda: Args.init_B_params(Args.num_states, Args.num_actions)
     )
     """ A params: specifies Dirichlet parameters to compute observation probabilities """
     A_params: np.ndarray = field(
@@ -286,7 +285,7 @@ class Args:
 
         if exp_name == "aif_aa_gridw9":
             # Goal shaping is not implemented for action-aware agents so we select a single preference vector
-            pref_array = pref_array[:, -1]
+            pref_array = pref_array[:, -1:]
 
         return pref_array
 

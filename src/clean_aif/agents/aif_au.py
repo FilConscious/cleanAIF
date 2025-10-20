@@ -798,31 +798,6 @@ class Agent(object):
         # Note 1: if A or B parameters are *not* learned the update method simply return self.A_params or
         # self.B_params
 
-        #### DEBUGGING ####
-        # print("Params for dirichlet update")
-        # print(f"Observation list: {self.current_obs}")
-        # print(f"Action sequence: {self.actual_action_sequence}")
-        # print("Policy independent state probabilities:")
-        # print(f"{self.Qs}")
-        # W_B_a0 = 0.5 * (
-        #     1 / self.B_params[0, :, :] - 1 / np.sum(self.B_params[0, :, :], axis=0)
-        # )
-        # W_B_a1 = 0.5 * (
-        #     1 / self.B_params[1, :, :] - 1 / np.sum(self.B_params[1, :, :], axis=0)
-        # )
-        # W_B_a2 = 0.5 * (
-        #     1 / self.B_params[2, :, :] - 1 / np.sum(self.B_params[2, :, :], axis=0)
-        # )
-        # W_B_a3 = 0.5 * (
-        #     1 / self.B_params[3, :, :] - 1 / np.sum(self.B_params[3, :, :], axis=0)
-        # )
-        # print("B_params (action 0)")
-        # print(self.B_params[0])
-        # print(self.B_params[1])
-        # print(self.B_params[2])
-        # print(self.B_params[3])
-        # print(f"Action-based W_Bs used to compute B-novelty in the episode")
-        #### END ####
         print("Updating Dirichlet parameters...")
         # NOTE: below we retrieve the second last Qpi because that corresponds to the last time step an
         # action was selected by the agent (no action is selected at the truncation or termination point)
@@ -1456,7 +1431,7 @@ def main():
     ##############################
 
     # Importing config module dynamically based on env layout
-    module_name = f'..config_agents.aif_au_{cl_params["env_layout"]}_cfg'
+    module_name = f'..config_agents.aif_aaau_{cl_params["env_layout"]}_cfg'
     agent_config = importlib.import_module(module_name, package=__package__)
     Args = agent_config.Args
     # Create dataclass with default parameters configuration for the agent

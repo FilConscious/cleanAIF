@@ -978,13 +978,16 @@ class Agent(object):
             self.learning_B,
         )
 
-        print(f"Qs size: {self.Qs.shape}")
-        print("Agent beliefs:")
-        print(np.argmax(self.Qs, axis=0))
-        # print(self.Qs)
-        print("Actual observations:")
-        print(np.argmax(self.current_obs, axis=0))
-        # print(self.current_obs)
+        # Rescaling B-params to avoid degenerate B-novelty values
+        B_params_0 = np.sum(self.B_params, axis=1)
+        B_params_0_clipped = np.clip(
+            B_params_0, a_min=0.1 * self.num_states, a_max=10 * self.num_states
+        )
+        rescale_weight = B_params_0_clipped / B_params_0
+
+        self.B_params = (
+            self.B_params * rescale_weight[:, None, :]
+        )  # rescale to keep proportions
 
         # After getting the new parameters, you need to sample from the corresponding Dirichlet distributions
         # to get new approximate posteriors P(A) and P(B). Below we distinguish between different learning
@@ -1181,6 +1184,7 @@ class LogData(object):
 
     def __init__(self, params: params) -> None:
         ### Retrieve relevant experiment/agent parameters ###
+        self.exp_name: str = params.get("exp_name")
         self.num_runs: int = params.get("num_runs")
         self.num_episodes: int = params.get("num_episodes")
         self.num_states: int = params.get("num_states")
@@ -1377,7 +1381,7 @@ class LogData(object):
         # Dictionary to store the data
         data = {}
         # Populate dictionary with corresponding key
-        data["exp_name"] = "aif_plans"
+        data["exp_name"] = self.exp_name
         data["num_runs"] = self.num_runs
         data["num_episodes"] = self.num_episodes
         data["num_states"] = self.num_states
@@ -1430,7 +1434,7 @@ def main():
         "--exp_name",
         "-expn",
         type=str,
-        default="aif-plans",
+        default="aif_aa_cutoff",
         help="the name of this experiment based on the active inference implementation",
     )
     parser.add_argument(
@@ -1534,6 +1538,16 @@ def main():
         default="states",
         help="choices: states, statesmanh, obs",
     )
+    # Time step(s) on which preference prior is placed
+    # NOTE: this is just a label used to identify the experiment, make sure it corresponds
+    # to the attribute/property set in the agent Args class, see top of file
+    parser.add_argument(
+        "--pref_loc",
+        "-pfl",
+        type=str,
+        default="all_goal",
+        help="choices: last, all_goal, all_diff",
+    )
     # Whether to use a policy prior when udapting the policies' probabilities
     parser.add_argument("--policy_prior", "-ppr", action="store_true")
     # Whether to shuffle policies at each times step in an episode
@@ -1556,7 +1570,7 @@ def main():
     exp_info = (
         f'{cl_params["gym_id"]}_{cl_params["env_layout"]}_{cl_params["exp_name"]}_{cl_params["task_type"]}'
         f'_nr{cl_params["num_runs"]}_ne{cl_params["num_episodes"]}_steps{cl_params["num_steps"]}'
-        f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}'
+        f'_infsteps{cl_params["inf_steps"]}_preftype_{cl_params["pref_type"]}_prefloc_{cl_params["pref_loc"]}'
         f'_npol{cl_params["num_policies"]}_phor{cl_params["plan_horizon"]}_ppr{cl_params["policy_prior"]}'
         f'_pshuffle{cl_params["shuffle_policies"]}_AS{cl_params["action_selection"]}'
         f'_lA{str(cl_params["learn_A"])[0]}_lB{str(cl_params["learn_B"])[0]}_lD{str(cl_params["learn_D"])[0]}'
@@ -1579,7 +1593,7 @@ def main():
     ##############################
 
     # Importing config module dynamically based on env layout
-    module_name = f'..config_agents.aif_aa_{cl_params["env_layout"]}_cfg'
+    module_name = f'..config_agents.aif_aaau_{cl_params["env_layout"]}_cfg'
     agent_config = importlib.import_module(module_name, package=__package__)
     Args = agent_config.Args
     # Create dataclass with default parameters configuration for the agent
@@ -1595,7 +1609,7 @@ def main():
                 default_params[key] = value
 
     update_params(agent_params, cl_params)
-    # print(agent_params)
+    print(agent_params)
 
     # Create ordered array of policies indices
     # !!!IMPORTANT!!!: if the agent is given a prior over policies, this is used to make sure that the
