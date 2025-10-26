@@ -233,9 +233,9 @@ def plot_pi_fes(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -503,9 +503,9 @@ def plot_pi_state_logprob(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -705,9 +705,9 @@ def plot_pi_state_logprob_first(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -907,9 +907,9 @@ def plot_pi_obs_loglik(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -1109,9 +1109,9 @@ def plot_pi_transit_loglik(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -1322,9 +1322,9 @@ def plot_pi_fes_subplots(
         num_steps = data["num_steps"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -1460,11 +1460,11 @@ def plot_pi_fes_subplots(
                 f"Policy-conditioned free energy at step {step_num} \n" + stitle
             )
 
-        # if "paths" or "au" in exp_name:
+        # if "paths" in exp_name or "au" in exp_name:
         #     ax[num_data].set_title(
         #         f"Policy-conditioned free energy at step {step_num} (action-unaware)\n"
         #     )
-        # elif "plans" or "aa" in exp_name:
+        # elif "plans" in exp_name or "aa" in exp_name:
         #     ax[num_data].set_title(
         #         f"Policy-conditioned free energy at step {step_num} (action-aware)\n"
         #     )
@@ -1651,9 +1651,9 @@ def plot_pi_fes_efe(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -1767,9 +1767,9 @@ def plot_efe(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -1957,9 +1957,9 @@ def plot_efe_subplots(
         num_steps = data["num_steps"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -2032,11 +2032,11 @@ def plot_efe_subplots(
         # plt.ylim(3, 11)  # Uncomment for Tmaze4 experiments, comment out for others
         ax[num_data].set_ylim(y_limits[0], y_limits[1])
 
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             ax[num_data].set_title(
                 f"Expected free energy at step {select_step + 1} (action-unaware)\n"
             )
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             ax[num_data].set_title(
                 f"Expected free energy at step {select_step + 1} (action-aware)\n"
             )
@@ -2104,9 +2104,9 @@ def plot_efe_risk(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -2295,9 +2295,9 @@ def plot_efe_bnov(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -2506,9 +2506,9 @@ def plot_efe_risk_subplots(
         num_steps = data["num_steps"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -2613,9 +2613,9 @@ def plot_efe_risk_subplots(
         # axes_1.set_ylim(4, 11)  # Uncomment for Tmaze4 experiments, comment out for others
         axes[num_data].set_ylim(y_limits[0], y_limits[1])
 
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             axes[num_data].set_title(f"Risk at {title_label} (action-unaware)\n")
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             axes[num_data].set_title(f"Risk at {title_label} (action-aware)\n")
 
     # Figure title
@@ -2702,9 +2702,9 @@ def plot_efe_bnov_subplots(
         num_steps = data["num_steps"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -2809,9 +2809,9 @@ def plot_efe_bnov_subplots(
         # axes_1.set_ylim(4, 11)  # Uncomment for Tmaze4 experiments, comment out for others
         axes[num_data].set_ylim(y_limits[0], y_limits[1])
 
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             axes[num_data].set_title(f"B-novelty at {title_label} (action-unaware)\n")
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             axes[num_data].set_title(f"B-novelty at {title_label} (action-aware)\n")
 
     # Figure title
@@ -2875,9 +2875,9 @@ def plot_efe_ambiguity(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -3062,9 +3062,9 @@ def plot_efe_anov(
     num_steps = data["num_steps"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -3270,9 +3270,9 @@ def plot_efe_ambiguity_subplots(
         num_steps = data["num_steps"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -3377,9 +3377,9 @@ def plot_efe_ambiguity_subplots(
         # axes_1.set_ylim(4, 11)  # Uncomment for Tmaze4 experiments, comment out for others
         axes[num_data].set_ylim(y_limits[0], y_limits[1])
 
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             axes[num_data].set_title(f"Policy-as-path agent\n")
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             axes[num_data].set_title(f"Policy-as-plan agent\n")
 
     # Figure title
@@ -3466,9 +3466,9 @@ def plot_efe_anov_subplots(
         num_steps = data["num_steps"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -3573,9 +3573,9 @@ def plot_efe_anov_subplots(
         # axes_1.set_ylim(4, 11)  # Uncomment for Tmaze4 experiments, comment out for others
         axes[num_data].set_ylim(y_limits[0], y_limits[1])
 
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             axes[num_data].set_title(f"Policy-as-path agent\n")
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             axes[num_data].set_title(f"Policy-as-plan agent\n")
 
     # Figure title
@@ -3643,9 +3643,9 @@ def plot_pi_prob_first(
     num_policies = data["num_policies"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         policies = data["ordered_policies"][0, 0, 0, :, :]
     else:
         raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -3709,7 +3709,7 @@ def plot_pi_prob_first(
 
         # Create inset if needed
         # axins = None
-        # if "paths" or "au" in exp_name:
+        # if "paths" in exp_name or "au" in exp_name:
         #     # Get current axes
         #     axins = inset_axes(ax, width="40%", height="40%", loc="upper right")
         #     axins.set_ylim(0.0152, 0.0162)
@@ -3829,9 +3829,9 @@ def plot_pi_prob_first_subplots(
         num_policies = data["num_policies"]
 
         # Take care of the fact that policies are created and saved differently in the two types of agents
-        if "paths" or "au" in exp_name:
+        if "paths" in exp_name or "au" in exp_name:
             policies = data["policies"]
-        elif "plans" or "aa" in exp_name:
+        elif "plans" in exp_name or "aa" in exp_name:
             policies = data["ordered_policies"][0, 0, 0, :, :]
         else:
             raise ValueError("exp_name is not an accepted name for the experiment.")
@@ -3885,7 +3885,7 @@ def plot_pi_prob_first_subplots(
 
             # Create inset if needed
             # axins = None
-            # if "paths" or "au" in exp_name:
+            # if "paths" in exp_name or "au" in exp_name:
             #     axins = inset_axes(
             #         ax[num_data], width="40%", height="40%", loc="upper right"
             #     )
@@ -4001,7 +4001,7 @@ def plot_Qs_pi_first(file_data_path, select_run, episode, save_dir, env_layout):
         Qs_pi_prob = data["policy_state_prob_first"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
         # Averaging the Q(S|pi) over the runs
         avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
@@ -4009,7 +4009,7 @@ def plot_Qs_pi_first(file_data_path, select_run, episode, save_dir, env_layout):
         last_episode_Qspi = avg_Qspi[episode, :, :, :]
         # print(last_episode_Qspi.shape)
 
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         num_policies = data["num_policies"]
         policies = data["ordered_policies"][0, 0, 0, :, :]
         # Retrieve the Qs to concatenate the first step of each episode to the remaining future steps
@@ -4165,7 +4165,7 @@ def plot_Qs_pi_last(file_data_path, select_run, episode, save_dir, env_layout):
         Qs_pi_prob = data["policy_state_prob"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
         # Averaging the Q(S|pi) over the runs
         avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
@@ -4283,7 +4283,7 @@ def plot_Qs_pi_last(file_data_path, select_run, episode, save_dir, env_layout):
             # plt.show()
             plt.close()
 
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
         # Retrieve the Qs to concatenate the first step of each episode to the remaining future steps
         Qs = data["states_beliefs"]
         # Averaging the Q(S) over the runs
@@ -4411,7 +4411,7 @@ def plot_Qs_pi_all(file_data_path, select_pol, episode, save_dir, env_layout):
         Qs_pi_prob = data["every_tstep_prob"]
 
     # Take care of the fact that policies are created and saved differently in the two types of agents
-    if "paths" or "au" in exp_name:
+    if "paths" in exp_name or "au" in exp_name:
         policies = data["policies"]
         # Averaging the Q(S|pi) over the runs
         avg_Qspi = np.mean(Qs_pi_prob, axis=0)  # .squeeze()
@@ -4531,7 +4531,7 @@ def plot_Qs_pi_all(file_data_path, select_pol, episode, save_dir, env_layout):
                 # plt.show()
                 plt.close(fig)
 
-    elif "plans" or "aa" in exp_name:
+    elif "plans" in exp_name or "aa" in exp_name:
 
         pass
 
@@ -5485,9 +5485,9 @@ def plot_action_probs(
 
     ### DEBUG ###
     # Select only one run
-    avg_action_prob = action_probs[1, :, :, step].T
+    avg_action_prob = action_probs[0, :, :, step].T
     # reshape((4, num_episodes))  # .squeeze()
-    std_action_prob = action_probs[1, :, :, step].T
+    std_action_prob = action_probs[0, :, :, step].T
 
     # Making sure avg_pi_prob_ls has the right dimensions
     # print(avg_action_prob.shape)
