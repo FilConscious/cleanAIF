@@ -1591,19 +1591,7 @@ def main():
             while steps_count < NUM_STEPS:
                 # Agent returns an action based on current observation/state
                 action = agent.step(current_state)
-                ### DEBUG ###
-                # if e > 138 and steps_count == 0:
-                #     print(f"logB_pi for policy [0,1,1,0]")
-                #     print(agent.logB_pi)
-                #     print(f"FE gradient")
-                #     print(agent.grad_F_pi)
-                #     print("Q(S_0|pi) to be updated")
-                #     print(agent.Qs_pi_second)
-                #     print("Grad log Qs_pi")
-                #     print(agent.grad_log_Qs)
-                #     print("Grad Qs_pi and logB matmul")
-                #     print(agent.grad_Qs_logB_matmul)
-                ### END ###
+
                 # Except when at the last episode's step, the agent's action affects the environment;
                 # at the last time step the environment does not change but the agent engages in learning
                 # (parameters update)
@@ -1632,18 +1620,6 @@ def main():
                 # Update step count
                 steps_count += 1
 
-                # print("-------- DEBUGGING --------")
-                # if e > 250:
-                #     print("Expected transition log-likelihood at first step:")
-                #     print(agent.transit_loglik[:, 0])
-                #     print("Action 0")
-                #     print(agent.B[0])
-                #     print("Action 1")
-                #     print(agent.B[1])
-                #     print("Action 2")
-                #     print(agent.B[2])
-                #     print("Action 3")
-                #     print(agent.B[3])
             #### DEBUG ####
             # if e == 40:
 

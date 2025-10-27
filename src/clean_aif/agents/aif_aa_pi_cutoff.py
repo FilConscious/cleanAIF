@@ -1033,6 +1033,42 @@ class Agent(object):
 
             print("No update (matrices A and Bs not subject to learning).")
 
+    def update_C(self):
+        """
+        Function to update agent's preferences.
+        """
+
+        # Compute action probabilities, i.e. P(a)
+        # actions_matrix = np.array([self.actions] * self.num_policies).T
+        # actions_logits = np.zeros((self.num_actions))
+
+        # for t in range(self.efe_tsteps):
+        #     actions_logits += np.matmul(
+        #         (self.policies[:, t] == actions_matrix),
+        #         self.Qpi[:, -1],
+        #     )
+
+        # actions_probs = special.softmax(actions_logits)
+
+        # Compute action-conditioned surprisal for each state value
+        last_qs = self.Qs[:, -1]
+        entropy_contr = np.zeros_like(last_qs)
+
+        for a in range(self.num_actions):
+            entropy_contr += np.sum(
+                -(self.B[a] * np.log(self.B[a])),
+                axis=0,
+            )
+
+        if np.argmin(entropy_contr) == np.argmax(self.C):
+
+            new_prefs = special.softmax(entropy_contr)[:, np.newaxis]
+            self.C = new_prefs * np.ones((1, self.steps))
+
+        print("New preferences set to:")
+        print(self.C)
+        print(f"Agent new goal is: state {np.argmax(self.C[:, -1])}")
+
     def step(self, new_obs, unfolding):
         """This method brings together all computational processes defined above, forming the
         perception-action loop of an active inference agent at every time step during an episode.
@@ -1061,22 +1097,6 @@ class Agent(object):
         self.ordered_policies[self.current_tstep, :, :] = np.copy(self.policies)
         # Initialize total free energy variable
         total_F = 0
-
-        ### ATTENTION: NOT NEEDED/CONSIDER REMOVING ###
-        # Sampling from the categorical distribution, i.e. corresponding column of A.
-        # Note 1: the agent_observation is a one-hot vector.
-        # Note 2 (IMPORTANT!): The computation below presupposes an interpretation of matrix A as a
-        # mapping from the environmental stimulus to the agent observation, i.e., as the perceptual
-        # processing that gives rise to an observation for the agent. However, in the active inference
-        # literature (in discrete state-spaces) the environment stimulus is typically regarded as that
-        # observation already.
-        # Note 3: for the above reason the computed values are not used/relevant as things stand.
-        # To make them relevant, we should pass self.agent_obs to the various methods that require it,
-        # e.g. the methods used to minimise free energy in self.perception().
-        # TODO: consider commenting out these two lines
-        # agent_observation = np.random.multinomial(1, self.A[:, new_obs], size=None)
-        # self.agent_obs[:, self.current_tstep] = agent_observation
-        ### END ###
 
         # During an episode perform perception, planning, and action selection based on current observation
         if self.current_tstep < self.steps - 1 and unfolding:
@@ -1148,6 +1168,38 @@ class Agent(object):
         # Setting self.current_obs and self.agent_obs to a zero array
         self.current_obs = np.zeros((self.num_states, self.steps))
         self.agent_obs = np.zeros((self.num_states, self.steps))
+
+        ### DEBUG ####
+        last_qs = self.Qs[:, -1]
+        entropy_contr = np.zeros_like(last_qs)
+
+        for a in range(self.num_actions):
+            print(f"Action {a}")
+            entropy_contr += (
+                # actions_probs[a]
+                # * last_qs.T
+                np.sum(
+                    -(self.B[a] * np.log(self.B[a])),
+                    axis=0,
+                )
+            )
+            print(
+                f"B entropy: {np.sum(
+                    -(self.B[a] * np.log(self.B[a])),
+                    axis=0,
+                )}"
+            )
+
+        if np.argmin(entropy_contr) == np.argmax(self.C):
+            print("Changing goal...")
+            # print(f"Entropy contribution: {entropy_contr}")
+            new_prefs = special.softmax(entropy_contr)[:, np.newaxis]
+            self.C = new_prefs * np.ones((1, self.steps))
+            print("New preferences:")
+            print(new_prefs)
+            print(f"Agent new goal is: state {np.argmax(self.C)}")
+        ### END ###
+
         # Setting self.Qs to a zero array
         self.Qs = np.zeros((self.num_states, self.steps))
         # Reset prior probabilities over states to be uniform
@@ -1763,10 +1815,12 @@ def main():
             # Current state (updated at every step and passed to the agent)
             current_state = start_state
 
-            # Establish different agent-environment interaction loops based on task_type
+            # Establish different agent-environment interaction loops based
             if task_type == "episodic":
+                # Agent acts until terminal state or truncation step is reached
                 unfolding = not terminated and not truncated
             elif task_type == "continuing":
+                # Agent acts until truncation step is reached
                 unfolding = not truncated
             else:
                 raise ValueError(
@@ -1775,7 +1829,7 @@ def main():
 
             # Agent and environment interact until the environment is truncated or terminated.
             # NOTE: the maximum number of steps is NUM_STEPS, i.e. the time step at which the environment
-            # is truncated regardless of whether the agent has reached the goal state or not..
+            # is truncated regardless of whether the agent has reached the goal state or not.
             print(f"Unfolding is {unfolding}")
             while unfolding:
 

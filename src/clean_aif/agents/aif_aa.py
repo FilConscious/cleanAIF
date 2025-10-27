@@ -223,6 +223,7 @@ class Agent(object):
         # for the NEXT time step.
         self.Qpi = np.zeros((self.num_policies, self.steps))
         self.Qpi[:, 0] = np.ones(self.num_policies) * 1 / self.num_policies
+        self.action_probs = np.zeros((self.num_actions, self.steps))
 
         # Policy-independent states probability distributions, numpy array of size (num_states, timesteps).
         # NOTE: these are used in free energy minimization, they are state beliefs of the common past each
@@ -822,6 +823,7 @@ class Agent(object):
             (self.policies[:, 0] == actions_matrix),
             self.Qpi[:, self.current_tstep],
         )
+        self.action_probs[:, self.current_tstep] = actions_probs
         print(f"Action probabilities: {actions_probs}")
         argmax_actions = np.argwhere(actions_probs == np.amax(actions_probs)).squeeze()
 
@@ -1001,6 +1003,44 @@ class Agent(object):
         elif self.learning_A == False and self.learning_B == False:
 
             print("No update (matrices A and Bs not subject to learning).")
+
+    def update_C(self):
+        """
+        Function to update agent's preferences.
+        """
+
+        # Compute action probabilities, i.e. P(a)
+        actions_matrix = np.array([self.actions] * self.num_policies).T
+        actions_logits = np.zeros((self.num_actions))
+
+        for t in range(self.efe_tsteps):
+            actions_logits += np.matmul(
+                (self.policies[:, t] == actions_matrix),
+                self.Qpi[:, -1],
+            )
+
+        actions_probs = special.softmax(actions_logits)
+
+        # Compute action-conditioned surprisal for each state value
+        last_qs = self.Qs[:, -1]
+        new_prefs = np.zeros_like(last_qs)
+
+        #### NOT CORRECT ####
+        # for a in range(self.num_actions):
+        #     new_prefs = actions_probs[a] * np.sum(
+        #         -((self.B_params[a] * last_qs.T) @ np.log(self.B_params[a].T))
+        #         @ np.eye(self.num_states),
+        #         axis=1,
+        #     )
+
+        #     new_prefs += new_prefs
+
+        new_prefs = special.softmax(new_prefs)[:, np.newaxis]
+        self.C = new_prefs * np.ones((1, self.steps))
+        print(self.C.shape)
+        print("New preferences set to:")
+        print(self.C)
+        print(f"Agent new goal is: state {np.argmax(self.C[:, -1])}")
 
     def step(self, new_obs, unfolding):
         """This method brings together all computational processes defined above, forming the
@@ -1270,6 +1310,9 @@ class LogData(object):
         self.pi_probabilities: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_policies, self.num_max_steps)
         )
+        self.action_probs: np.ndarray = np.zeros(
+            (self.num_runs, self.num_episodes, self.num_actions, self.num_max_steps)
+        )
         """State-observation mappings (matrix A) at the end of each episode"""
         self.so_mappings: np.ndarray = np.zeros(
             (self.num_runs, self.num_episodes, self.num_states, self.num_states)
@@ -1336,6 +1379,7 @@ class LogData(object):
             "Qs_all_ps"
         ]  # at every time step
         self.pi_probabilities[run, episode, :, :] = kwargs["Qpi"]
+        self.action_probs[run, episode, :, :] = kwargs["action_probs"]
         self.so_mappings[run, episode, :, :] = kwargs["A"]
         self.transitions_prob[run, episode, :, :, :] = kwargs["B"]
         self.ordered_policies[run, episode, :, :, :] = kwargs["ordered_policies"]
@@ -1376,6 +1420,7 @@ class LogData(object):
         data["policy_state_prob_first"] = self.policy_state_prob_first
         data["every_tstep_prob"] = self.every_tstep_prob
         data["pi_probabilities"] = self.pi_probabilities
+        data["action_probs"] = self.action_probs
         data["so_mappings"] = self.so_mappings
         data["transition_prob"] = self.transitions_prob
         data["ordered_policies"] = self.ordered_policies
@@ -1624,7 +1669,7 @@ def main():
 
     elif env_layout == "gridw9":
         SIZE = 3
-        WALLS_LOC = []
+        WALLS_LOC = [set_wall_xy(4), set_wall_xy(6)]
 
     elif env_layout == "gridw16":
         SIZE = 4
@@ -1716,10 +1761,12 @@ def main():
             # Current state (updated at every step and passed to the agent)
             current_state = start_state
 
-            # Establish different agent-environment interaction loops based on task_type
+            # Establish different agent-environment interaction loops based
             if task_type == "episodic":
+                # Agent acts until terminal state or truncation step is reached
                 unfolding = not terminated and not truncated
             elif task_type == "continuing":
+                # Agent acts until truncation step is reached
                 unfolding = not truncated
             else:
                 raise ValueError(
@@ -1728,7 +1775,7 @@ def main():
 
             # Agent and environment interact until the environment is truncated or terminated.
             # NOTE: the maximum number of steps is NUM_STEPS, i.e. the time step at which the environment
-            # is truncated regardless of whether the agent has reached the goal state or not..
+            # is truncated regardless of whether the agent has reached the goal state or not.
             print(f"Unfolding is {unfolding}")
             while unfolding:
 
