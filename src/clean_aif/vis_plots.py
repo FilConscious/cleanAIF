@@ -185,6 +185,13 @@ def main():
         policies_to_vis = params["policies_to_vis"][
             i * num_policies_vis : (i * num_policies_vis) + num_policies_vis
         ]
+        # Plot step count across episodes
+        plot_steps_count(
+            data_path,
+            params["x_ticks_estep"],
+            result_dir,
+            params["env_layout"],
+        )
         plot_action_probs(
             data_path,
             params["x_ticks_estep"],
@@ -559,14 +566,14 @@ def main():
             params["env_layout"],
         )
         # Plot action sequence for a selected run/agent
-        plot_action_seq(
-            data_path,
-            params["x_ticks_estep"],
-            params["policy_horizon"],
-            params["select_run"],
-            result_dir,
-            params["env_layout"],
-        )
+        # plot_action_seq(
+        #     data_path,
+        #     params["x_ticks_estep"],
+        #     params["policy_horizon"],
+        #     params["select_run"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
 
         # Plot categorical distributions Q(S|pi) from an episode's *first* step (averaged over the runs)
         # plot_Qs_pi_first(
