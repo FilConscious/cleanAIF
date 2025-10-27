@@ -1390,7 +1390,7 @@ class LogData(object):
         # Dictionary to store the data
         data = {}
         # Populate dictionary with corresponding key
-        data["exp_name"] = "aif_plans"
+        data["exp_name"] = self.exp_name
         data["num_runs"] = self.num_runs
         data["num_episodes"] = self.num_episodes
         data["num_states"] = self.num_states
@@ -1443,7 +1443,7 @@ def main():
         "--exp_name",
         "-expn",
         type=str,
-        default="aif-plans",
+        default="aif_aa",
         help="the name of this experiment based on the active inference implementation",
     )
     parser.add_argument(
@@ -1592,7 +1592,7 @@ def main():
     ##############################
 
     # Importing config module dynamically based on env layout
-    module_name = f'..config_agents.aif_aa_{cl_params["env_layout"]}_cfg'
+    module_name = f'..config_agents.aif_aaau_{cl_params["env_layout"]}_cfg'
     agent_config = importlib.import_module(module_name, package=__package__)
     Args = agent_config.Args
     # Create dataclass with default parameters configuration for the agent
@@ -1687,7 +1687,7 @@ def main():
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/GridWorld-v1",
+        "gymnasium_env/NsGridWorld-v1",
         max_episode_steps=NUM_STEPS - 1,
         render_mode=None,
         size=SIZE,
@@ -1745,7 +1745,8 @@ def main():
                 options={
                     "deterministic_agent_loc": AGENT_LOC,
                     "deterministic_target_loc": TARGET_LOC,
-                    "deterministic_wall_loc": WALLS_LOC,
+                    # "deterministic_wall_loc": [],
+                    "non_stationary_walls": WALLS_LOC,
                 },
             )
 
