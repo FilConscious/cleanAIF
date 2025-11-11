@@ -184,7 +184,7 @@ in the visualisation script, i.e., `src/clean_aif/vis_plots`.
 # How to reproduce results in [\[1](#citeproc_bib_item_1)\]
 
 We include below the command-line instructions to run the experiments
-and obtain the plots discussed in [\[1](#citeproc_bib_item_1)\]. To
+and obtain the plots discussed in \[[1](#citeproc_bib_item_1)\]. To
 obtain the same results, it is crucial to specify the configuration
 files for each agent in a way that matches the experiments' task. For
 this and further details on the theory and algorithmic implementations
