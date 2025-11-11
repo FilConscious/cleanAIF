@@ -18,14 +18,14 @@ class Args:
 
     ### General ###
     """the name of this experiment: either 'aif_au_gridw9' or 'aif_aa_gridw9'"""
-    exp_name: str = "aif_aa_gridw9"
+    exp_name: str = "aif_aa_gridw9"  # "aif_aa_gridw9"
     ### Environment ###
     """ Environment ID """
-    gym_id: str = "GridWorld-v1"
+    gym_id: str = "NsGridWorld-v1"
     """ Environment layout """
     env_layout: str = "gridw9"  # choice: Tmaze3, Tmaze4, Ymaze4
     """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
-    num_steps: int = 5
+    num_steps: int = 10
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
     num_states: int = 9
     ### Agent ###
@@ -40,7 +40,7 @@ class Args:
     """ index of starting state (agent knows start location) """
     start_state: int = 0
     """ index of goal state/location """
-    goal_state: tuple = (8,)
+    goal_state: tuple = (7,)
     """ number of policies the agent considers for planning """
     num_policies: int = 256
     """ planning horizon, also the length of a policy """

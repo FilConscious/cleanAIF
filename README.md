@@ -1,136 +1,70 @@
 
 # Table of Contents
 
-1.  [CleanAIF](#org2849e67)
-2.  [Overview](#orgece0bf2)
-    1.  [Policies as paths](#orgff6e691)
-    2.  [Policies as plans](#org4ab679b)
-    3.  [Features of the three agents](#org8adc89b)
-3.  [Installation](#org7d4f427)
-4.  [Run an experiment](#org8393def)
-5.  [References](#org1db9791)
+1.  [CleanAIF](#org582b0cb)
+2.  [Overview](#org84b22c0)
+    1.  [Agents](#org4ca7f3c)
+    2.  [Environments](#org0eed267)
+3.  [Installation](#orgeb8c7b7)
+4.  [How to run an experiment](#org13c8edb)
+5.  [How to reproduce results in (Torresan et al. 2025)](#org023dcbe)
+    1.  [Experiment 1: 4-step t-maze](#org64725a3)
+    2.  [Experiment 2: 5-step grid world](#org6ac5e5e)
+6.  [References](#orgdec1fc8)
 
 
 
-<a id="org2849e67"></a>
+<a id="org582b0cb"></a>
 
 # CleanAIF
 
-The code in this repository can be used to train different (discrete) active inference agents in custom Gymnasium environments and visualize various metrics.
+The code in this repository can be used to train agents with active inference in discrete state-spaces, e.g., a grid world, and visualize various learning metrics (e.g., free energy and expected free energy).
 
 
-<a id="orgece0bf2"></a>
+<a id="org84b22c0"></a>
 
 # Overview
 
-Active inference is a computational framework for adaptive behaviour inspired by neuroscientific considerations whose main tenet is that sentient agents follow an imperative to minimize prediction error. Formally, prediction error is quantified in terms of variational free energy, given a generative model, and expected free energy, given a set of policies (sequences of actions) the agent can pick from to act in the environment.
+Active inference is a computational framework for adaptive behaviour according to which intelligent agents follow an imperative to minimize variational and expected free energies given a generative model of the environment. In the active inference algorithm, minimising variational free energy corresponds to perception, i.e., inferring latent states from observations, whereas minimising expected free energy implements planning, i.e., inferring the best sequence of action (policy) to pursue. 
 
-In a nutshell, the framework provides a recipe to solve a partially observable Markov decision process (POMDP) and has mainly dealt with discrete action and states spaces. The repository currently offers the implementation of three active inference agents, each with its own main script, utility functions, and plotting scripts.
-
-The main difference between these agents consists in how policies are interpreted, which in turn has some implications for how to run experiments and understand the results. This distinction involving policies is explained below. After that the three agents currently implemented are described in more detail.
+In other words, the framework provides a recipe to solve a partially observable Markov decision process (POMDP). The repository currently offers the implementation of two main inference agents, each with its own main script, utility functions scripts, and configuration scripts (loosely inspired by [CleanRL](https://github.com/vwxyzjn/cleanrl)). These agents can be trained in a custom [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) environment (for episodic tasks).
 
 
-<a id="orgff6e691"></a>
+<a id="org4ca7f3c"></a>
 
-## Policies as paths
+## Agents
 
-In this type of agent, the policies are sequences of actions that specify a *full trajectory* in the environment, involving a fixed number of time steps that corresponds to the duration of each episode.
+The implemented agents can be described and distinguished as follow:
 
-At each time step, the agent collects an observation and tries to infer its past, present, and future locations, based on probabilistic beliefs about the most probable location at each time step through the “path” afforded by a policy (i.e., categorical probability distributions conditioned on a policy). This is the process of state-estimation via free energy minimization.
+1.  Action-aware agents
+    -   these agents have access to the sequence of actions they performed in the past, e.g., $(a_{1:\tau-1})$ where $\tau$ represent the present time step
+    -   perceptual inference corresponds to inferring the divergent future state-trajectory afforded by each policy $\pi_{i}$
+    -   policy inference involves updating the probability over policies by differentiating them only with respect to their future consequences (as the agent does not have uncertainty about past motor actions)
 
-Then, at the planning stage, the agent picks a policy after evaluating its expected free energy, quantifying whether for the remaining time steps that policy is likely to bring it at a specified goal state. The action the agent performs is the action the chosen policy dictates for that time step.
-
-This perception-planning-action loop is repeated at each time step for a set number of episodes, and at the end of each episode the agent can update parameters related to either the state-observation mapping or the transition probabilities in the environment.
-
-
-<a id="org4ab679b"></a>
-
-## Policies as plans
-
-In this type of agent, the policies are sequences of actions of a fixed length&#x2014;also known as the policy horizon&#x2014;that specify a *future motor plan* to be executed in the environment. The first action of a policy is supposed to be performed at the present time step, the second one at the next time step, and so on. Crucially, these action plans are not carried out in full in this implementation as it is made clear below.
-
-At each time step, the agent again collects an observation and tries to infer its past, present, and future locations. However, this time inference about the past and present relies on *policy-independent* categorical probability distributions, computed at each past time step after having received the corresponding observation while inference about future locations makes use again of policy-dependent probabilistic beliefs.
-
-At the planning stage, policies are gain evaluated based on their expected free energy. The action the agent performs is the action the chosen policy dictates for that time step whereas all the other actions in the motor plan are discarded, i.e. they are not going to be executed at the followint time step in the order the policy dictates.
-
-This perception-planning-action loop is repeated at each time step for a set number of episodes, each potentially lasting a varying number of time steps but not exceeding a maximum number, also know as the truncation point. An agent that correctly learns about the environment will be able to reach the goal state before the truncation point, causing the termination of that episode. At the end of each episode the agent can update parameters related to either the state-observation mapping or the transition probabilities in the environment.
+2.  Action-unaware agents
+    -   these agents *lack* access to the sequence of actions they performed in the past
+    -   perceptual inference involves inferring how consistent the past state-trajectory of each policy is with the collected observations, in addition to inferring the future state-trajectory afforded by each policy $\pi_{i}$
+    -   policy inference combines the evidence for each policy with the expected free energy to derive an update of the policy probabilities, guiding then action selection
 
 
-<a id="org8adc89b"></a>
+<a id="org0eed267"></a>
 
-## Features of the three agents
+## Environments
 
-1.  **Episodic policy-as-path agent**
-    
-    This is the original agent I implemented based on my initial understanding/interpretation of (Da Costa et al. 2020). The key features/aspects are:
-    
-    -   the environment is episodic, i.e., it resets after $T$ time steps (truncation point) by bringing the agent back to a fixed (or random), initial state
-    
-    -   the agent interacts with the environment for a total of $N$ episodes (each lasting $T$ time steps), set by the researcher/modeller
-    
-    -   the agent is tailored for this environment, meaning that:
-        -   the agent is aware of its starting location, i.e., the initial state of each episode (this condition can be relaxed)
-        
-        -   the agent has a set of preferences that dictate what its preferred location is at each time step, note that this could be uniform except for the final state
-        
-        -   each policy the agent considers is of length $T$, so the agent interacts with the environment for a number of steps equal to the episode duration
-        
-        -   the agent&rsquo;s goal is to be in a particular location at *end* of the episode, i.e. when the each episode terminates, another way of saying this is that *the time step at which the terminal state occurs is equal to the truncation point of the environment*, i.e., $t_{\text{termination}} = T$
-        
-        -   each policy can be interpreted as a *path* to the goal state/location
-        
-        -   the agent has policy-conditioned probabilistic beliefs for each time step in an episode, i.e., the agent considers random variables $S_{0}, \dots, S_{T-1}$ that refers to a time-dependent state of the environment in an episode
-        
-        -   the agent updates its key parameters at the end of each episode
-    
-    -   each episode represents the same POMDP both for the agent and the environment
+The agents can be trained in different grid worlds by selecting the corresponding configuration file (see examples of command-line instructions below). The available environments include:
 
-2.  **Episodic policy-as-plan agent**
-    
-    This is the agent implemented by (Heins et al. 2022). The key features/aspects are:
-    
-    -   the environment is episodic, i.e., it resets after a maximum number $T$ of time steps (truncation point) by bringing the agent back to a fixed (or random), initial state
-    
-    -   the agent interacts with the environment for a total of $N$ episodes but each can last a variable number $t$ of time steps, depending on whether the agent arrives at the goal state sooner or later, this is a crucial difference with agent (1):
-        -   if $t_{\text{terminal}}$ is used to denote the time step at which the goal/termination state is reached, then $t_{\text{terminal}} \leq T$, i.e., *the terminal state can be reached at a time step that is less than or equal to the truncation point of the environment*
-    
-    -   the agent is again tailored for this environment, meaning that:
-        -   the agent is aware of its starting location, i.e., the initial state of each episode (this condition can be relaxed)
-        
-        -   differently from agent (1) the length $h$ of each policy is such that $h \ll T$ (much shorter than the total number of steps in an episode) and $h \leq t_{\text{termination}} < h$, i.e., the policy horizon could exceed or be shorter than the minimum number of time steps required for reaching the goal/terminal state
-        
-        -   each policy can be interpreted as a *plan* the agent evaluates at each time step from which to perform an action that could bring it closer to the goal/terminal state
-        
-        -   the agent has a set of preferences that dictate what its preferred location is no matter the time step considered, the agent&rsquo;s goal is to be in that particular location *at some point*
-        
-        -   the agent has $h$ *policy-dependent* probabilistic beliefs for the corresponding future time steps each policy envisions, i.e.,  $S_{t + 1}, \dots, S_{h}$ where $t$ is the current/present time step, and *policy-independent* probabilistic beliefs that are accumulated as the trajectory in an environment grows, i.e., $S_{0}, \dots, S_{t}$, with $t = T$ when the maximum number of step has been reached in an episode
-        
-        -   the agent updates its key parameters at the end of each episode
-    
-    -   each episode represents a POMDP for the agent but one in which *the policies are not modelled as part of the POMDP*, they are the result of a canny trick to ensure the agent will reach the goal state at some point (note: this interpretation need to be double-checked)
+-   a T-maze, either with 4 or 5 states/tiles
+-   a Y-maze with 6 states/tiles
+-   and a square grid world, either with 9 or 16 states/tiles.
 
-3.  **Continuing policy-as-path agent**
-    
-    This is the new agent whose existence I became aware of after further thinking on how it would make sense to compare agent (1) and (2) above. It shares most of the key features/aspects with agent (1) but:
-    
-    -   the environment is *not* episodic, this means that the agent is provided with a continuous stream of experience, e.g., observations
-    
-    -   of course, that cannot be endless so we set a truncation point as for the setup of agent (2), say a large number of time steps $T$ that could represent the entire “life” of the agent
-    
-    -   the agent still “thinks” in terms of episodes with policies as paths (as agent (1)), while knowing that after $h$ time steps, the length of an episode/policy, learning should occur
-    
-    -   note that in this setup the environment does not reset after each episode because the environment is not episodic, the episodes are in the agent&rsquo;s mind
-    
-    -   one implication of this is that potentially the agent will start each episode in a different environmental location and the optimal policy will be every time different
-
-Consider that both agent (1) and agent (2) can be made closer to each other by simply making the truncation point different from the terminal state (for agent 1) or by equating truncation point and time step of terminal state (for agent 2). However, the crucial difference involving the policies remains.
+The configuration files can be modified to set the agent&rsquo;s goal in the environment, the type of preferences, the length of a policy, and the number of policies an agent will consider (see configuration files in `src/clean_aif/config_agents` folder).
 
 
-<a id="org7d4f427"></a>
+<a id="orgeb8c7b7"></a>
 
 # Installation
 
-The code in this repo allows you to train an active inference agent in different discrete, grid-world, custom environments, based on Gymnasium (<https://gymnasium.farama.org/>).
+The code in this repo allows you to train an active inference agent in various grid world environments based on [Gymnasium](https://github.com/Farama-Foundation/Gymnasium).
 
 This guide assumes that the user has installed [Git](https://git-scm.com/downloads) and Python (through [Anaconda](https://www.anaconda.com/download) or similar distributions) into their system. Also, the package depends on a custom Gymnasium environment that needs to be installed separately, follow the instructions at this [link](https://github.com/FilConscious/cust-gridworlds) before you do anything else.
 
@@ -166,44 +100,83 @@ if you have one (see the [GitHub SSH docs](https://docs.github.com/en/authentica
     
         pip install --editable .
 
-The latter step installs the package, together with other required libraries/packages, in editable mode. This means that it is possible to modify your working/local copy of the algorithm and used it immediately, without going through the whole process of building the package and installing it again.
+The last step installs the package, together with other required libraries/packages, in editable mode. This means that it is possible to modify your working/local copy of the algorithm and used it immediately, without going through the whole process of building the package and installing it again.
 
 
-<a id="org8393def"></a>
+<a id="org13c8edb"></a>
 
-# Run an experiment
+# How to run an experiment
 
-1.  Move into the local repo directory (if not already there):
+1.  Move into the local repo directory:
     
         cd /home/working-dir/cleanAIF
 
-2.  Activate the conda environment (if not already done):
+2.  Activate the conda environment:
     
         conda activate myenv
 
-3.  For training an agent in a simple T-maze you can execute the following commands from the terminal:
-    -   for the episodic policy-as-path agent:
+3.  For training an agent in the T-maze (with 4 states) you can execute the following commands from the terminal:
+    -   for the action-unaware agent:
         
-            main_aif_paths_cont --exp_name "aif-paths-cont" --gym_id "GridWorld-v1" --num_runs 10 --num_episodes 100 --num_steps 3 --inf_steps 5 --action_selection kd -lB --task_type "continuing"
+            main_aif_au --exp_name aif_au --gym_id gridworld-v1 --env_layout tmaze3 --num_runs 10 --num_episodes 100 --num_steps 3 --inf_steps 10 --action_selection kd -lB --num_policies 16 --pref_loc all_goal
     
-    -   for the continuing policy-as-path agent:
+    -   for the action-aware agent:
         
-            main_aif_paths_cont --exp_name "aif-paths-cont" --gym_id "GridWorld-v1" --num_runs 10 --num_episodes 100 --num_steps 3 --inf_steps 5 --action_selection kd -lB --task_type "continuing"
-    
-    -   for the episodic policy-as-plans agent:
-        
-        COMING SOON
+            main_aif_au --exp_name aif_aa --gym_id gridworld-v1 --env_layout tmaze3 --num_runs 10 --num_episodes 100 --num_steps 3 --inf_steps 10 --action_selection kd -lB --num_policies 16 --pref_loc all_goal
 
-4.  For visualizing some metrics you can execute the following:
+4.  For visualising metrics of one experiment:
     
-        vis_aif_paths_cont -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3 -xtes 10
+        vis_aif -gid gridworld-v1 -el tmaze3 -nexp 1 -rdir episodic_e100_pol16 -fpi 0 1 2 -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3 -xtes 20 -ph 2 -selrun 0 -npv 16 -sb 4 -ab 0 1 2 3
+
+A detailed explanation of each command-line argument can be found in the main script for each agent, e.g. `src/clean_aif/agents/aif_au.py`, and in the visualisation script, i.e., `src/clean_aif/vis_plots`. 
 
 
-<a id="org1db9791"></a>
+<a id="org023dcbe"></a>
+
+# How to reproduce results in (Torresan et al. 2025)
+
+We include below the command-line instructions to run the experiments and obtain the plots discussed in (Torresan et al. 2025). To obtain the same results, it is crucial to specify the configuration files for each agent in a way that matches the experiments&rsquo; task. For this and further details on the theory and algorithmic implementations supporting the experiments, please see (Torresan et al. 2025).
+
+Note: the command line instruction `main_aif_aa_pi_cutoff` (see below) is used to train a variation of the action-aware agent that does not plan beyond the length of an episode, and allows for a fairer comparison with the action-unaware agent.
+
+
+<a id="org64725a3"></a>
+
+## Experiment 1: 4-step t-maze
+
+-   for the action-unaware agent, execute:
+
+    main_aif_au --exp_name aif_au --gym_id gridworld-v1 --env_layout tmaze4 --num_runs 10 --num_episodes 100 --num_steps 4 --inf_steps 10 --action_selection kd -lB --num_policies 64 --pref_loc all_goal
+
+-   for the action-aware agent, execute:
+
+    main_aif_aa_pi_cutoff --exp_name aif_aa --gym_id gridworld-v1 --env_layout tmaze4 --num_runs 10 --num_episodes 100 --num_steps 4 --inf_steps 10 --action_selection kd -lB --num_policies 64 --pref_loc all_goal
+
+-   to visualise and compare metrics of the two agents, execute:
+
+    vis_aif -gid gridworld-v1 -el tmaze4 -nexp 2 -rdir episodic_e100_pol16_maxinf10_learnB -fpi 0 1 2 3 -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3 -xtes 20 -ph 3 -selrun 0 -selep 24 49 74 99 -npv 16 -sb 4 -ab 0 1 2 3
+
+
+<a id="org6ac5e5e"></a>
+
+## Experiment 2: 5-step grid world
+
+-   for the action-unaware agent, execute:
+
+    main_aif_au --exp_name aif_au --gym_id gridworld-v1 --env_layout gridw9 --num_runs 10 --num_episodes 180 --num_steps 5 --inf_steps 10 --action_selection kd -lB --num_policies 256 --pref_loc all_goal
+
+-   for the action-aware agent, execute:
+
+    main_aif_aa_pi_cutoff --exp_name aif_aa --gym_id gridworld-v1 --env_layout gridw9 --num_runs 10 --num_episodes 180 --num_steps 5 --inf_steps 10 --action_selection kd -lB --num_policies 256 --pref_loc all_goal
+
+-   to visualise and compare metrics of the two agents, execute:
+
+    vis_aif -gid gridworld-v1 -el gridw9 -nexp 2 -rdir episodic_e180_pol16_maxinf10_learnB -fpi 0 1 2 3 4 -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3 -xtes 20 -ph 4 -selrun 0 -selep 24 49 74 99 -npv 16 -sb 4 -ab 0 1 2 3
+
+
+<a id="orgdec1fc8"></a>
 
 # References
 
-Da Costa, Lancelot, Thomas Parr, Noor Sajid, Sebastijan Veselic, Victorita Neacsu, and Karl Friston. 2020. “Active Inference on Discrete State-Spaces: A Synthesis.” Journal of Mathematical Psychology 99 (December): 102447. <doi:10.1016/j.jmp.2020.102447>.
-
-Heins, Conor, Beren Millidge, Daphne Demekas, Brennan Klein, Karl Friston, Iain D. Couzin, and Alexander Tschantz. 2022. “Pymdp: A Python Library for Active Inference in Discrete State Spaces.” Journal of Open Source Software 7 (73). The Open Journal: 4098. <doi:10.21105/joss.04098>.
+bibliography:./cleanaif-refs.bib
 

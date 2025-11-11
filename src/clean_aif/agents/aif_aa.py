@@ -1644,6 +1644,8 @@ def main():
     NUM_EPISODES = agent_params["num_episodes"]
     # Number of steps in one episode
     NUM_STEPS = agent_params["num_steps"]
+    # Number of videos
+    NUM_VIDEOS = agent_params["num_videos"]
     # Fix walls location in the environment depending on env_layout
     env_layout = agent_params["env_layout"]
     if env_layout == "tmaze3":
@@ -1844,12 +1846,12 @@ def main():
             agent.reset()
 
             # Record num_videos uniformly distanced throughout the experiment
-            # if num_videos != 0 and num_videos <= num_episodes:
+            # if NUM_VIDEOS != 0 and NUM_VIDEOS <= NUM_EPISODES:
 
-            #     rec_step = num_episodes // num_videos
+            #     rec_step = NUM_EPISODES // NUM_VIDEOS
             #     if ((e + 1) % rec_step) == 0:
 
-            #         env.make_video(str(e), VIDEO_DIR)
+            #         env.make_video(str(e), data_path)
 
     # Save all collected data in a dictionary
     logs_writer.save_data(data_path)

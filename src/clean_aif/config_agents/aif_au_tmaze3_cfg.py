@@ -23,7 +23,7 @@ class Args:
     """ Environment ID """
     gym_id: str = "GridWorld-v1"
     """ Environment layout """
-    env_layout: str = "tmaze3"  # choice: Tmaze3, Tmaze4, Ymaze4
+    env_layout: str = "tmaze3"  # choice: tmaze3, tmaze4, ymaze4
     """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
     num_steps: int = 3
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
