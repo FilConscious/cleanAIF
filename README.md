@@ -1,14 +1,3 @@
----
-author: Filippo Torresan
-bibliography: /home/filconscious/org-fil/references.bib
----
-
-```{=org}
-#+startup: overview indent
-```
-```{=org}
-#+cite_export: csl /home/filconscious/org-fil/ieee.csl
-```
 # CleanAIF
 
 The code in this repository can be used to train agents with active
@@ -42,10 +31,10 @@ The implemented agents can be described and distinguished as follow:
 1.  Action-aware agents
 
     - these agents have access to the sequence of actions they performed
-      in the past, e.g., $(a_{1:\tau-1})$ where $\tau$ represent the
+      in the past, e.g., $`(a_{1:\tau-1})`$ where $`\tau`$ represent the
       present time step
     - perceptual inference corresponds to inferring the divergent future
-      state-trajectory afforded by each policy $\pi_{i}$
+      state-trajectory afforded by each policy $`\pi_{i}`$
     - policy inference involves updating the probability over policies
       by differentiating them only with respect to their future
       consequences (as the agent does not have uncertainty about past
@@ -58,7 +47,7 @@ The implemented agents can be described and distinguished as follow:
     - perceptual inference involves inferring how consistent the past
       state-trajectory of each policy is with the collected
       observations, in addition to inferring the future state-trajectory
-      afforded by each policy $\pi_{i}$
+      afforded by each policy $`\pi_{i}`$
     - policy inference combines the evidence for each policy with the
       expected free energy to derive an update of the policy
       probabilities, guiding then action selection
@@ -73,10 +62,10 @@ instructions below). The available environments include:
 - a Y-maze with 6 states/tiles
 - and a square grid world, either with 9 or 16 states/tiles.
 
-The configuration files can be modified to set the agent\'s goal in the
+The configuration files can be modified to set the agent's goal in the
 environment, the type of preferences, the length of a policy, and the
 number of policies an agent will consider (see configuration files in
-`src/clean_aif/config_agents`{.verbatim} folder).
+`src/clean_aif/config_agents` folder).
 
 # Installation
 
@@ -117,9 +106,9 @@ After installing the Gymnasium environment:
 if you have one (see the [GitHub SSH
 docs](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
 for info on SSH keys). After cloning the repo, you will have the folder
-`./cleanAIF`{.verbatim} in your working directory which you can rename
-as you see fit. Inside the folder you can find the source code, the
-`README.org` and other files.
+`./cleanAIF` in your working directory which you can rename as you see
+fit. Inside the folder you can find the source code, the `README.org`
+and other files.
 
 1.  Create a Python virtual environment or conda environment with a
     recent version of Python, e.g.:
@@ -134,8 +123,8 @@ as you see fit. Inside the folder you can find the source code, the
     conda activate my-env
     ```
 
-3.  Move inside the local repo folder `./cleanAIF`{.verbatim} (if not
-    done already):
+3.  Move inside the local repo folder `./cleanAIF` (if not done
+    already):
 
     ``` bash
     cd /home/working-dir/cleanAIF
@@ -189,16 +178,15 @@ installing it again.
     ```
 
 A detailed explanation of each command-line argument can be found in the
-main script for each agent, e.g.
-`src/clean_aif/agents/aif_au.py`{.verbatim}, and in the visualisation
-script, i.e., `src/clean_aif/vis_plots`{.verbatim}.
+main script for each agent, e.g. `src/clean_aif/agents/aif_au.py`, and
+in the visualisation script, i.e., `src/clean_aif/vis_plots`.
 
 # How to reproduce results in [\[1](#citeproc_bib_item_1)\]
 
 We include below the command-line instructions to run the experiments
 and obtain the plots discussed in [\[1](#citeproc_bib_item_1)\]. To
 obtain the same results, it is crucial to specify the configuration
-files for each agent in a way that matches the experiments\' task. For
+files for each agent in a way that matches the experiments' task. For
 this and further details on the theory and algorithmic implementations
 supporting the experiments, please see [\[1](#citeproc_bib_item_1)\].
 
@@ -249,7 +237,7 @@ vis_aif -gid gridworld-v1 -el gridw9 -nexp 2 -rdir episodic_e180_pol16_maxinf10_
 
 # References
 
-[]{#citeproc_bib_item_1}\[1\] F. Torresan, K. Suzuki, R. Kanai, and M.
-Baltieri, "Active inference for action-unaware agents," 2025, *arXiv*:
-2508.12027. doi:
+<span id="citeproc_bib_item_1"></span>\[1\] F. Torresan, K. Suzuki, R.
+Kanai, and M. Baltieri, “Active inference for action-unaware agents,”
+2025, *arXiv*: 2508.12027. doi:
 [10.48550/arXiv.2508.12027](https://doi.org/10.48550/arXiv.2508.12027).
