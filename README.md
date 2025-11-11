@@ -1,5 +1,13 @@
+---
+author: Filippo Torresan
+bibliography: /home/filconscious/org-fil/references.bib
+---
+
 ```{=org}
-#+STARTUP: overview indent
+#+startup: overview indent
+```
+```{=org}
+#+cite_export: csl /home/filconscious/org-fil/ieee.csl
 ```
 # CleanAIF
 
@@ -185,14 +193,14 @@ main script for each agent, e.g.
 `src/clean_aif/agents/aif_au.py`{.verbatim}, and in the visualisation
 script, i.e., `src/clean_aif/vis_plots`{.verbatim}.
 
-# How to reproduce results in (Torresan et al. 2025) {#how-to-reproduce-results-in-citetorresan2025a}
+# How to reproduce results in [\[1](#citeproc_bib_item_1)\]
 
 We include below the command-line instructions to run the experiments
-and obtain the plots discussed in (Torresan et al. 2025). To obtain the
-same results, it is crucial to specify the configuration files for each
-agent in a way that matches the experiments\' task. For this and further
-details on the theory and algorithmic implementations supporting the
-experiments, please see (Torresan et al. 2025).
+and obtain the plots discussed in [\[1](#citeproc_bib_item_1)\]. To
+obtain the same results, it is crucial to specify the configuration
+files for each agent in a way that matches the experiments\' task. For
+this and further details on the theory and algorithmic implementations
+supporting the experiments, please see [\[1](#citeproc_bib_item_1)\].
 
 Note: the command line instruction `main_aif_aa_pi_cutoff` (see below)
 is used to train a variation of the action-aware agent that does not
@@ -239,12 +247,9 @@ To visualise and compare metrics of the two agents, execute:
 vis_aif -gid gridworld-v1 -el gridw9 -nexp 2 -rdir episodic_e180_pol16_maxinf10_learnB -fpi 0 1 2 3 4 -i 4 -v 8 -ti 4 -tv 8 -vl 3 -hl 3 -xtes 20 -ph 4 -selrun 0 -selep 24 49 74 99 -npv 16 -sb 4 -ab 0 1 2 3
 ```
 
-# References {#references .unnumbered}
+# References
 
-:::: {#refs .references .csl-bib-body .hanging-indent entry-spacing="0"}
-::: {#ref-Torresan2025a .csl-entry}
-Torresan, Filippo, Keisuke Suzuki, Ryota Kanai, and Manuel Baltieri.
-2025. "Active Inference for Action-Unaware Agents." arXiv.
-<https://doi.org/10.48550/arXiv.2508.12027>.
-:::
-::::
+[]{#citeproc_bib_item_1}\[1\] F. Torresan, K. Suzuki, R. Kanai, and M.
+Baltieri, "Active inference for action-unaware agents," 2025, *arXiv*:
+2508.12027. doi:
+[10.48550/arXiv.2508.12027](https://doi.org/10.48550/arXiv.2508.12027).
