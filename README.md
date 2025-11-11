@@ -181,14 +181,14 @@ A detailed explanation of each command-line argument can be found in the
 main script for each agent, e.g. `src/clean_aif/agents/aif_au.py`, and
 in the visualisation script, i.e., `src/clean_aif/vis_plots`.
 
-# How to reproduce results in [\[1](#citeproc_bib_item_1)\]
+# How to reproduce results in \[[1](#citeproc_bib_item_1)\]
 
 We include below the command-line instructions to run the experiments
 and obtain the plots discussed in \[[1](#citeproc_bib_item_1)\]. To
 obtain the same results, it is crucial to specify the configuration
 files for each agent in a way that matches the experiments' task. For
 this and further details on the theory and algorithmic implementations
-supporting the experiments, please see [\[1](#citeproc_bib_item_1)\].
+supporting the experiments, please see \[[1](#citeproc_bib_item_1)\].
 
 Note: the command line instruction `main_aif_aa_pi_cutoff` (see below)
 is used to train a variation of the action-aware agent that does not
