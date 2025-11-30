@@ -5561,14 +5561,14 @@ def plot_action_probs(
     action_probs = data["action_probs"]
 
     # Averaging the probabilities over the runs for a single step of each episode
-    # avg_action_prob = np.mean(action_probs[:, :, :, step], axis=0).T
-    # std_action_prob = np.std(action_probs[:, :, :, step], axis=0).T
+    avg_action_prob = np.mean(action_probs[:, :, :, step], axis=0).T
+    std_action_prob = np.std(action_probs[:, :, :, step], axis=0).T
 
     ### DEBUG ###
     # Select only one run
-    avg_action_prob = action_probs[0, :, :, step].T
+    #avg_action_prob = action_probs[0, :, :, step].T
     # reshape((4, num_episodes))  # .squeeze()
-    std_action_prob = action_probs[0, :, :, step].T
+    # std_action_prob = action_probs[0, :, :, step].T
 
     # Making sure avg_pi_prob_ls has the right dimensions
     # print(avg_action_prob.shape)

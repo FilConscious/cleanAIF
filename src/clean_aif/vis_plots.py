@@ -186,16 +186,16 @@ def main():
             i * num_policies_vis : (i * num_policies_vis) + num_policies_vis
         ]
         # Plot step count across episodes
-        plot_steps_count(
-            data_path,
-            params["x_ticks_estep"],
-            result_dir,
-            params["env_layout"],
-        )
+        # plot_steps_count(
+        #     data_path,
+        #     params["x_ticks_estep"],
+        #     result_dir,
+        #     params["env_layout"],
+        # )
         plot_action_probs(
             data_path,
             params["x_ticks_estep"],
-            [0, 0.6],
+            [0, 0.6], # 0.6
             0,
             result_dir,
             params["env_layout"],
@@ -219,7 +219,7 @@ def main():
         plot_action_probs(
             data_path,
             params["x_ticks_estep"],
-            [0, 1],
+            [0, 0.8],
             3,
             result_dir,
             params["env_layout"],
