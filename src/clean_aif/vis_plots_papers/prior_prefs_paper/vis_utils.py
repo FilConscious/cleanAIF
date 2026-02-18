@@ -40,6 +40,28 @@ actions_map = {
     3: "$\\uparrow$",
 }
 
+# Used in latest experiments for new paper testing prior preferences
+POLICIES_TO_VIS_GRIDW9 = np.array(
+    [
+        [0, 0, 1, 1],
+        [1, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 0],
+        [1, 0, 1, 0],
+        [1, 0, 0, 1],
+        [0, 1, 2, 1],
+        [1, 1, 0, 3],
+        [1, 0, 0, 3],
+        [1, 0, 3, 2],
+        [0, 1, 1, 3],
+        [0, 2, 0, 0],
+        [0, 2, 1, 1],
+        [2, 1, 1, 0],
+        [3, 2, 0, 0],
+        [3, 3, 1, 1],
+    ]
+)
+
 # Used for submission to arxiv (action-unaware paper)
 # POLICIES_TO_VIS_GRIDW9 = np.array(
 #     [
@@ -62,26 +84,27 @@ actions_map = {
 #     ]
 # )
 
-POLICIES_TO_VIS_TMAZE4 = np.array(
-    [
-        [2, 3, 3],
-        [3, 3, 1],
-        [3, 2, 2],
-        [1, 2, 0],
-        [0, 3, 3],
-        [0, 0, 3],
-        [0, 2, 2],
-        [3, 3, 2],
-        [3, 3, 3],
-        [2, 3, 0],
-        [3, 0, 2],
-        [1, 1, 1],
-        [2, 2, 3],
-        [3, 3, 0],
-        [0, 2, 3],
-        [1, 3, 3],
-    ]
-)
+# POLICIES_TO_VIS_TMAZE4 = np.array(
+# POLICIES_TO_VIS_GRIDW9 = np.array(
+#     [
+#         [2, 3, 3],
+#         [3, 3, 1],
+#         [3, 2, 2],
+#         [1, 2, 0],
+#         [0, 3, 3],
+#         [0, 0, 3],
+#         [0, 2, 2],
+#         [3, 3, 2],
+#         [3, 3, 3],
+#         [2, 3, 0],
+#         [3, 0, 2],
+#         [1, 1, 1],
+#         [2, 2, 3],
+#         [3, 3, 0],
+#         [0, 2, 3],
+#         [1, 3, 3],
+#     ]
+# )
 
 
 ######################################################################################################
@@ -294,7 +317,7 @@ def plot_pi_fes(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -564,7 +587,7 @@ def plot_pi_state_logprob(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -766,7 +789,7 @@ def plot_pi_state_logprob_first(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -968,7 +991,7 @@ def plot_pi_obs_loglik(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -1170,7 +1193,7 @@ def plot_pi_transit_loglik(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -1383,7 +1406,7 @@ def plot_pi_fes_subplots(
         if len(policies_to_vis) == 0:
             # Broadcasting comparison: compare each target with all rows
             matches = (
-                policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+                policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
             )  # shape: (16, num_rows, 4)
             # Now reduce over last dimension to check full-row match
             row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -1723,7 +1746,7 @@ def plot_pi_fes_efe(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -1839,7 +1862,7 @@ def plot_efe(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -2176,7 +2199,7 @@ def plot_efe_risk(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -2367,7 +2390,7 @@ def plot_efe_bnov(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -2947,7 +2970,7 @@ def plot_efe_ambiguity(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -3134,7 +3157,7 @@ def plot_efe_anov(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)
@@ -3715,7 +3738,7 @@ def plot_pi_prob_first(
     if len(policies_to_vis) == 0:
         # Broadcasting comparison: compare each target with all rows
         matches = (
-            policies[None, :, :] == POLICIES_TO_VIS_TMAZE4[:, None, :]
+            policies[None, :, :] == POLICIES_TO_VIS_GRIDW9[:, None, :]
         )  # shape: (16, num_rows, 4)
         # Now reduce over last dimension to check full-row match
         row_matches = np.all(matches, axis=2)  # shape: (16, num_rows)

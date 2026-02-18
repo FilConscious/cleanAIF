@@ -1546,8 +1546,7 @@ def main():
         # NOTE: we need to convert the following various states from an index to a (x, y) representation which is
         # what the Gymnasium environment requires.
         AGENT_LOC = convert_state(
-            agent_params["start_state"],
-            env_layout,
+            agent_params["start_state"], env_layout
         )  # output: np.array([0, 0])
         # Create agent (`cast()` is used to tell the type checker that `agent_params` is of type `params`)
         agent = Agent(cast(params, agent_params))

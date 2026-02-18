@@ -21,7 +21,7 @@ class Args:
     exp_name: str = "aif_au_gridw9"  # "aif_aa_gridw9"
     ### Environment ###
     """ Environment ID """
-    gym_id: str = "NsgridWorld-v1" # "GridWorld-v1"
+    gym_id: str = "GridWorld-v1"
     """ Environment layout """
     env_layout: str = "gridw9"  # choice: Tmaze3, Tmaze4, Ymaze4
     """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
@@ -56,9 +56,9 @@ class Args:
         )
     )
     """ preference prior type """
-    pref_type: str = "states"
+    pref_type: str = "states_manh"
     """ time step(s) on which the preference prior is placed """
-    pref_loc: str = "all_goal"  # "last", all_goal", "all_diff"
+    pref_loc: str = "all_diff"  # "last", all_goal", "all_diff"
     ### Agent's knowledge of the environment ###
     """NOTE: using field() to generate a default value for the attribute when an instance is created,
     by using `field(init=False)` we can pass a function with arguments (not allowed if we had used
@@ -273,6 +273,10 @@ class Args:
             pref_array[:-1, -1] = 0.1 / (num_states - 1)
             # ...except at the last time step when the goal state is given the highest probability
             pref_array[-1, -1] = 0.9
+            # Checking all the probabilities sum to one
+            assert np.all(np.sum(pref_array, axis=0)) == 1, print(
+                "The preferences do not sum to one!"
+            )
 
         # Checking all the probabilities sum to one
         assert np.all(np.sum(pref_array, axis=0)) == 1, print(

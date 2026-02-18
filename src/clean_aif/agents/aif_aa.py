@@ -1547,6 +1547,13 @@ def main():
         default="states",
         help="choices: states, obs",
     )
+    parser.add_argument(
+        "--pref_loc",
+        "-pfl",
+        type=str,
+        default="all_goal",
+        help="choices: last, all_goal, all_diff",
+    )
     # Whether to use a policy prior when udapting the policies' probabilities
     parser.add_argument("--policy_prior", "-ppr", action="store_true")
     # Whether to shuffle policies at each times step in an episode
@@ -1604,6 +1611,10 @@ def main():
     # Custom update function not overwriting default parameter's value if the one from the CL is None
     def update_params(default_params, new_params):
         for key, value in new_params.items():
+            if key == "pref_type" or key == "pref_loc":
+                assert (
+                    value == default_params[key]
+                ), f"Agent was initialized with {key}: {default_params[key]} but you passed {value} as argument."
             if value is not None:
                 default_params[key] = value
 
@@ -1689,7 +1700,7 @@ def main():
 
     # Create the environment
     env = gymnasium.make(
-        "gymnasium_env/NsGridWorld-v1",
+        "gymnasium_env/GridWorld-v1",
         max_episode_steps=NUM_STEPS - 1,
         render_mode=None,
         size=SIZE,
@@ -1747,8 +1758,8 @@ def main():
                 options={
                     "deterministic_agent_loc": AGENT_LOC,
                     "deterministic_target_loc": TARGET_LOC,
-                    # "deterministic_wall_loc": [],
-                    "non_stationary_walls": WALLS_LOC,
+                    "deterministic_wall_loc": WALLS_LOC, # []
+                    # "non_stationary_walls": WALLS_LOC,
                 },
             )
 

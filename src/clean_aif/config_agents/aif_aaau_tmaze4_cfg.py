@@ -17,17 +17,17 @@ class Args:
     """
 
     ### General ###
-    """the name of this experiment: either 'aif_au_gridw9' or 'aif_aa_gridw9'"""
-    exp_name: str = "aif_au_gridw9"  # "aif_aa_gridw9"
+    """the name of this experiment"""
+    exp_name: str = "aif_au_tmaze4"  # "aif_aa_tmaze4"
     ### Environment ###
     """ Environment ID """
-    gym_id: str = "NsgridWorld-v1" # "GridWorld-v1"
+    gym_id: str = "GridWorld-v1"
     """ Environment layout """
-    env_layout: str = "gridw9"  # choice: Tmaze3, Tmaze4, Ymaze4
+    env_layout: str = "tmaze4"  
     """ Max number of steps in an episode denoted by indices in [0, .., num_steps -1] """
-    num_steps: int = 5
+    num_steps: int = 4
     """ Number of environmental states (represented by indices 0,1,2,..,8) """
-    num_states: int = 9
+    num_states: int = 5
     ### Agent ###
     """ the number of observation channels or modalities """
     obs_channels: int = 1
@@ -38,15 +38,15 @@ class Args:
     """ dimensions of each factor """
     factors_dims: Tuple[int] = (1,)
     """ index of starting state (agent knows start location) """
-    start_state: int = 0
+    start_state: int = 4
     """ index of goal state/location """
-    goal_state: tuple = (8,)
+    goal_state: tuple = (0,)
     """ number of policies the agent considers for planning """
-    num_policies: int = 256
+    num_policies: int = 64
     """ planning horizon, also the length of a policy """
     """ NOTE 1: also MAX number of future steps for which expected free energy is computed"""
     """ NOTE 2: the length of a policy should be num_steps - 1 because there is no action at the last time step"""
-    plan_horizon: int = 4
+    plan_horizon: int = 3
     """ number of actions (represented by indices 0,1,2,3)"""
     num_actions: int = 4
     """ hard-coded agent's policies """
@@ -76,16 +76,18 @@ class Args:
     )
     """ B params: specifies Dirichlet parameters to compute transition probabilities """
     B_params: np.ndarray = field(
-        default_factory=lambda: Args.init_B_params(Args.num_states, Args.num_actions)
+        default_factory=lambda: Args.init_B_params(
+            Args.num_states, Args.num_actions)
     )
     """ A params: specifies Dirichlet parameters to compute observation probabilities """
     A_params: np.ndarray = field(
         default_factory=lambda: Args.init_A_params(Args.num_states)
     )
 
+    
     @staticmethod
     def init_policies(
-        num_policies: int, policy_len: int, num_actions: int, exp_name: str
+            num_policies: int, policy_len: int, num_actions: int, exp_name: str
     ) -> np.ndarray:
         """Function to create and select the policies the agent will use to plan and pick an action at
         one step in the interaction with the environment.
@@ -104,8 +106,7 @@ class Args:
         - policy_array: array of shape (num_policies, policy_len), all the policies stored as rows
         """
 
-        if exp_name == "aif_au_gridw9":
-
+        if exp_name == "aif_au_tmaze4":
             if num_policies == 1:
 
                 sel_policies = np.array([[3, 3, 2]])
@@ -137,8 +138,8 @@ class Args:
                 sel_policies = policies_array[indices[:num_policies], :]
                 # print("Policies")
                 # print(sel_policies)
-
-        elif exp_name == "aif_aa_gridw9":
+                
+        elif exp_name == "aif_aa_tmaze4":
             # Array to store policies crated at the planning stage
             sel_policies = np.empty((0, policy_len))
 
@@ -165,7 +166,7 @@ class Args:
         logits = -sharpness * np.array(manh_distances)
         probs = np.exp(logits) / np.sum(np.exp(logits))
         return probs
-
+    
     @staticmethod
     def init_C_array(
         num_states: int,
@@ -222,26 +223,23 @@ class Args:
                 prob_mass_goal = 0.9 / len(goal_state)
                 for g in goal_state:
                     pref_array[g, :] = prob_mass_goal
-                # prob_mass_goal = [0.3, 0.6]
-                # for i, g in enumerate(goal_state):
-                #     pref_array[g, :] = prob_mass_goal[i]
                 print(pref_array)
 
             elif pref_loc == "all_diff":
                 print("Setting agent's preferences...")
                 # (3) Define agent's preferences for each time step (i.e. a different goal for each step time)
                 pref_array = np.ones((num_states, steps)) * (0.1 / (num_states - 1))
-
                 # IMPORTANT: the probabilities below need to be set MANUALLY depending on the environment
                 # in which the agent acts and based on the trajectory we want it to follow.
-                # Fix a trajectory of intermediate goals leading to the goal in 5 steps
-                inter_goals = [0, 1, 4, 7, 8]
-                for t in range(Args.num_steps):
-                    g = inter_goals[t]
-                    pref_array[g, t] = 0.9
 
+                # Example: trajectory in a T-maze leading to the goal (on the left arm) in 3 steps
+                pref_array[0, 2] = 0.9
+                pref_array[1, 1] = 0.9
+                pref_array[4, 0] = 0.9
+                print(pref_array)
+            
         elif pref_type == "states_manh":
-
+            
             if pref_loc == "all_goal":
                 print("Setting agent's preferences...")
                 # NOTE: this assumes that the agent wants to reach a single goal so we take the first element of
@@ -253,16 +251,17 @@ class Args:
 
             elif pref_loc == "all_diff":
                 print("Setting agent's preferences...")
-                # Fix a trajectory of intermediate goals leading to the goal in 5 steps
-                inter_goals = [0, 1, 4, 7, 8]
+                # Fix a trajectory of intermediate goals leading to the goal in 4 steps
+                inter_goals = [4, 3, 1, 0]
                 for t in range(Args.num_steps):
                     g = inter_goals[t]
                     prefs = Args.goal_distribution_manh(num_states, g)
                     pref_array[:, t] = prefs.squeeze()
 
                 print(pref_array)
-
+             
         elif pref_type == "obs":
+            # TODO: need to be aligned with options allowed in the case of state preferences
             # NOTE 1: we are assuming a 1-to-1 correspondence between states and observations, i.e. obs `1`
             # indicates to the agent that it is in state `1`. Thus, the agent actually deals with an MDP as
             # opposed to a POMDP, and selecting either type of preferences does not make a difference.
@@ -279,7 +278,7 @@ class Args:
             "The preferences do not sum to one!"
         )
 
-        if exp_name == "aif_aa_gridw9":
+        if exp_name == "aif_aa_tmaze4":
             # Goal shaping is not implemented for action-aware agents so we select a single preference vector
             pref_array = pref_array[:, -1:]
 
@@ -302,53 +301,63 @@ class Args:
 
         """
 
-        # Init B_params matrix
         B_params = np.zeros((num_actions, num_states, num_states))
-        # Creating a matrix of the same shape as the environment matrix filled with the tiles' labels
-        n = int(np.sqrt(num_states))
-        env_matrix_labels = np.reshape(np.arange(num_states), (n, n))
 
-        # Loop over the 3 rows of the maze (indexed from 0 to 2) to assign 1s to the correct transitions.
-        # IMPORTANT: The code below works for a maze of size (3, 3)
-        for r in range(3):
+        # Assigning 1s to correct transitions for every action for Tmaze4
+        # Note: the matrices below fix the transition probabilities between the 5 states that form the env
+        # layout of Tmaze4.
 
-            labels_ud = env_matrix_labels[r]
-            labels_rl = env_matrix_labels[:, r]
-
-            if r == 0:
-                # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
-                # Gymnasium grid coordinate system the negative and positive y axes are swapped
-                # Down action: 3
-                B_params[3, labels_ud, labels_ud] = 1
-                # Up action: 1
-                B_params[1, labels_ud + 3, labels_ud] = 1
-                # Right action: 0
-                B_params[0, labels_rl + 1, labels_rl] = 1
-                # Left action: 2
-                B_params[2, labels_rl, labels_rl] = 1
-
-            elif r == 1:
-                # Down action: 3
-                B_params[3, labels_ud - 3, labels_ud] = 1
-                # Up action: 1
-                B_params[1, labels_ud + 3, labels_ud] = 1
-                # Right action: 0
-                B_params[0, labels_rl + 1, labels_rl] = 1
-                # Left action: 2
-                B_params[2, labels_rl - 1, labels_rl] = 1
-            elif r == 2:
-                # Down action: 3
-                B_params[3, labels_ud - 3, labels_ud] = 1
-                # Up action: 1
-                B_params[1, labels_ud, labels_ud] = 1
-                # Right action: 0
-                B_params[0, labels_rl, labels_rl] = 1
-                # Left action: 2
-                B_params[2, labels_rl - 1, labels_rl] = 1
+        # NOTE: -1 in the y direction, from an external observer this would correspond to "up", in the
+        # Gymnasium grid coordinate system the negative and positive y axes are swapped
+        # Down action: 3
+        B_params[3, :, :] = np.array(
+            [
+                [1, 0, 0, 0, 0],
+                [0, 1, 0, 1, 0],
+                [0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 1],
+                [0, 0, 0, 0, 0],
+            ],
+            dtype=np.float64,
+        )
+        # Left action: 2
+        B_params[2, :, :] = np.array(
+            [
+                [1, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Up action: 1
+        B_params[1, :, :] = np.array(
+            [
+                [1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [0, 1, 0, 0, 0],
+                [0, 0, 0, 1, 1],
+            ],
+            dtype=np.float64,
+        )
+        # Right action: 0
+        B_params[0, :, :] = np.array(
+            [
+                [0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0],
+                [0, 1, 1, 0, 0],
+                [0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
 
         # Increasing the magnitude of the Dirichlet parameters so that when the B matrices are sampled
         # the correct transitions for every action will have a value close to 1.
         B_params = B_params * 199 + 1
+        print(B_params[0])
 
         return B_params
 
